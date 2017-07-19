@@ -9,10 +9,10 @@ Timers need a way to catch back up if offline a while.
 
 ## Commands
 
-* next <area> - displays how long until the next timer of that type and what the display message would be  
+* next \<area\> - displays how long until the next timer of that type and what the display message would be  
   -next spill: The levels will rise to Arch in 2h31m  
-* remind <area> [always|once|cancel] - Sends a PM to remind of ANY timer for an area  
+* remind \<area\> [always|once|cancel] - Sends a PM to remind of ANY timer for an area  
   -remind season once - Will only remind the next time the timer goes  
-* schedule <area> [\<number\>] - Shows the timers for the next \<number\> of days for an area  
+* schedule \<area\> [\<number\>] - Shows the timers for the next \<number\> of days for an area  
   -schedule spill 2 - The levels will rise to Arch in 2h31m / The levels will fall through Arch in 1d2h31m
   
