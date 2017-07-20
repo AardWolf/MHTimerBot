@@ -1,8 +1,8 @@
 [
  {
   "area": "gate",
-  "next_time": "2017-07-20T17:51:28.000Z",
-  "repeat_time": 86400000,
+  "seed_time": "2017-07-20T07:45:00.000Z",
+  "repeat_time": 72000000,
   "announce_string": "Test timer is happening"
  }
 ]
