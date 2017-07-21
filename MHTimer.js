@@ -16,47 +16,64 @@ var timers_list = [];
 var file_encoding = 'utf8';
 var settings = {};
 
-function Main() {
-    // Load global settings
-    fs.readFile(main_settings_filename, file_encoding, (err, data) => loadSettings);
+process.on('uncaughtException', function (exception) {
+  console.log(exception); // to see your exception details in the console
+  // if you are on production, maybe you can send the exception details to your
+  // email as well ?
+});
 
-    // Create timers list from timers settings file
-    fs.readFile(timer_settings_filename, file_encoding, (err, data) => createTimersList);
+function Main() {
+    // console.log('fire');
+    // Load global settings
+    var a = new Promise(loadSettings);
 
     // Bot log in
-    client.login(settings.token);
+    a.then(() => { client.login(settings.token); });
+
+    // Create timers list from timers settings file
+    var b = new Promise(createTimersList);
 
     // Bot start up tasks
-    client.on('ready', () => {
-        // Get channel
-        guild = client.guilds.get("'" + message_channel_id + "'");
-        var channel = guild.defaultChannel;
+    a.then(() => {
+        client.on('ready', () => {
+            // Get channel
+            //guild = client.guilds.get("'" + message_channel_id + "'");
+            //var channel = guild.defaultChannel;
 
-        // Create timed announcements
-        createTimedAnnouncements(channel)
+            // Create timed announcements
+            //createTimedAnnouncements(channel)
+        });
     });
 
     // Message event router
-    client.on('message', message => {
-        if (message.content === '.mhtimer fg') {
-            fgAnnouncer(message);
-        }
+    a.then(() => {
+        client.on('message', message => {
+            if (message.content === '.mhtimer fg') {
+                fgAnnouncer(message);
+            }
+        });
     });
 }
 Main();
 
 // Load settings
-function loadSettings(err, data) {
-    if (err) {
-		return console.log(err);
-	}
-    settings = JSON.parse(data);
-    return;
+function loadSettings(resolve, reject) {
+    fs.readFile(main_settings_filename, file_encoding, (err, data) => {
+        if (err) {
+            console.log(err);
+            reject();
+            return;
+        }
+        settings = JSON.parse(data)[0];
+        resolve();
+    });
 }
 
 // Read individual timer settings from a file and Create
-function createTimersList(err, data) {
+function createTimersList(resolve, reject) {
+    fs.readFile(timer_settings_filename, file_encoding, (err, data) => {
 	if (err) {
+        reject();
 		return console.log(err);
 	}
 
@@ -74,7 +91,8 @@ function createTimersList(err, data) {
 //				console.log(err);
 //			}
 //		});
-
+    resolve();
+    });
 }
 
 // The ready event is vital, it means that your bot will only start reacting to information
