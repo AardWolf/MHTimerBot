@@ -21,6 +21,8 @@ fs.readFile('timers.json', 'utf8', function readFileCallback(err, data) {
 		for (var i = 0; i < obj.length; i++ ) {
 //		console.log('obj length' + obj.length);
 			timers.push(new Timers(obj[i].area, obj[i].seed_time, obj[i].repeat_time, obj[i].announce_string));
+			console.log('Added ' + i + ' ' + obj[i].area);
+//			setTimeout(announce(),timers[i].getInterval(),timers[i]);
 		}
 
 //		var str = JSON.stringify(timers, ['area', 'seed_time', 'repeat_time', 'announce_string'], 1);
@@ -51,27 +53,66 @@ fs.readFile('secret_token', 'utf8', function (err,data) {
 	// console.log("'" + token + "'");
 	client.login(token);
 //	token = data;
-  });
+});
 // console.log(token);
 
 
 // The ready event is vital, it means that your bot will only start reacting to information
 // from Discord _after_ ready is emitted
+var message_channel = 245584660757872640; // This logic would be different if multiple servers are used
+var channel;
 client.on('ready', () => {
-  console.log('I am ready!');
+	console.log('I am ready!');
+	console.log('I am on ' + client.guilds.size + ' guilds.');
+	for (var [key, value] of client.guilds ) {
+		console.log('key: ' + key + ' = ' + value);
+	}
+	guild = client.guilds.get('245584660757872640');
+	channel = guild.defaultChannel;
+	channel.send('I am back!');
+	
+	for (var i = 0; i < timers.length; i++) {
+		console.log('i: ' + i + ' of ' + timers.length);
+//		channel.send("setting announce '" + timers[i].getAnnounce() + "' to " + timers[i].getNext().valueOf() + " - " + Date.now() + " ms from now");
+		channel.send("because I am dumb and think the next one is at " + timers[i].getNext());
+//		setImmediate( (a) => {
+//			channel.send(a);
+//		}, timers[i].getAnnounce());
+//		announce(timers[i], channel);
+		setTimeout(
+//				announce(timers[i], channel),
+			(ann, chan, time) => {
+				chan.send(ann);
+//				setInterval();
+			},
+			  timers[i].getNext().valueOf() - Date.now(),
+			  timers[i].getAnnounce(),
+			  channel,
+			  timers[i].getInterval());
+	}
+
+
+
 });
 
 // Create an event listener for messages
 client.on('message', message => {
-  // If the message is "ping"
-  if (message.content === '-gate') {
-    // Send "pong" to the same channel
-//    message.channel.send('pong');
-    message.channel.send('next ' + timers[0].area + ' time is ' + timers[0].getNext().toUTCString());
-    message.channel.send('That would be ' + timers[0].getNext() );
-//    message.channel.send('I know about ' + timers.length + ' timers');
-//    message.channel.send('The first one is ' + timers[0].area);
-  }
+	//If the message is "ping"
+	if (message.content === '-gate') {
+		// Send "pong" to the same channel
+//		message.channel.send('pong');
+		message.channel.send('next ' + timers[0].area + ' time is ' + timers[0].getNext().toUTCString());
+		message.channel.send('That would be ' + timers[0].getNext() );
+//		message.channel.send('FWIW this channel is ' + message.channel.id);
+//		message.channel.send('I know about ' + timers.length + ' timers');
+//		message.channel.send('The first one is ' + timers[0].area);
+		channel.s
+	}
 });
 
-
+//Announce a timer
+function announce(a, c, t) {
+//	var channel = client.guilds.get('245584660757872640').defaultChannel;
+	c.send(a);
+	setTimeout(announce(), t, a, c, t);
+}

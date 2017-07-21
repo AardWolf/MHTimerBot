@@ -2,7 +2,14 @@
  {
   "area": "gate",
   "seed_time": "2017-07-20T07:45:00.000Z",
-  "repeat_time": 72000000,
-  "announce_string": "Test timer is happening"
+  "repeat_time": 300000,
+  "announce_string": "Forbidden Grove closes in 15 minutes, travel early"
+ },
+ {
+  "area": "gate",
+  "seed_time": "2017-07-20T12:02:00.000Z",
+  "repeat_time": 300000,
+  "announce_string": "Forbidden Grove is open again"
  }
+ 
 ]

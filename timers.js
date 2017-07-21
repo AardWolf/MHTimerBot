@@ -12,12 +12,17 @@ var Timer = function(area, seed_time, repeat_time, announce_string) {
 
 Timer.prototype.getNext = function() {
 	var cur_time = Date.now();
-	return new Date(cur_time + ((this.seed_time.valueOf() - cur_time) % this.repeat_time));  //division is numer of whole elapsed iterations, modulus is ms until next
-//	return new Date(cur_time);
+	//returns the previous one
+	return new Date(cur_time + ((this.seed_time.valueOf() - cur_time) % this.repeat_time) + this.repeat_time);  //division is numer of whole elapsed iterations, modulus is ms until next
+//	return new Date(cur_time + (Math.abs(this.seed_time.valueOf() - cur_time) % this.repeat_time));  //division is numer of whole elapsed iterations, modulus is ms until next
 }
 
 Timer.prototype.getAnnounce = function() {
 	return this.announce_string;
+}
+
+Timer.prototype.getInterval = function() {
+	return this.seed_time;
 }
 
 module.exports = Timer;
