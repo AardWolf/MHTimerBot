@@ -1,118 +1,135 @@
 /*
-  A ping pong bot, whenever you send "ping", it replies "pong".
+  MHTimer Bot
 */
-
-// Import the discord.js module
+// Import required modules
 const Discord = require('discord.js');
-var Timers = require('./timers.js');
+var Timer = require('./timerClass.js');
 var fs = require ('fs');
+const client = new Discord.Client();
 
+// Globals
+var message_channel_id = 245584660757872640;
+var main_settings_filename = 'settings.json';
+var timer_settings_filename = 'timer_settings.json';
+//var token_filename = 'secret_token';
+var timers_list = [];
+var file_encoding = 'utf8';
+var settings = {};
 
-//A test to add a timer
-var timers = [];
-// var timers = [new Timers('gate', 1500573088000, 86400000, "Test timer is happening")];
-//Read it from a file
-var obj;
-fs.readFile('timers.json', 'utf8', function readFileCallback(err, data) {
+process.on('uncaughtException', function (exception) {
+  console.log(exception); // to see your exception details in the console
+  // if you are on production, maybe you can send the exception details to your
+  // email as well ?
+});
+
+function Main() {
+    // console.log('fire');
+    // Load global settings
+    var a = new Promise(loadSettings);
+
+    // Bot log in
+    a.then(() => { client.login(settings.token); });
+
+    // Create timers list from timers settings file
+    var b = new Promise(createTimersList);
+
+    // Bot start up tasks
+    a.then(() => {
+        client.on('ready', () => {
+            // Get channel
+            //guild = client.guilds.get("'" + message_channel_id + "'");
+            //var channel = guild.defaultChannel;
+
+            // Create timed announcements
+            //createTimedAnnouncements(channel)
+        });
+    });
+
+    // Message event router
+    a.then(() => {
+        client.on('message', message => {
+            if (message.content === '.mhtimer fg') {
+                fgAnnouncer(message);
+            }
+        });
+    });
+}
+Main();
+
+// Load settings
+function loadSettings(resolve, reject) {
+    fs.readFile(main_settings_filename, file_encoding, (err, data) => {
+        if (err) {
+            console.log(err);
+            reject();
+            return;
+        }
+        settings = JSON.parse(data)[0];
+        resolve();
+    });
+}
+
+// Read individual timer settings from a file and Create
+function createTimersList(resolve, reject) {
+    fs.readFile(timer_settings_filename, file_encoding, (err, data) => {
 	if (err) {
-		console.log(err);
-	} else {
-		obj = JSON.parse(data);
-		for (var i = 0; i < obj.length; i++ ) {
-//		console.log('obj length' + obj.length);
-			timers.push(new Timers(obj[i].area, obj[i].seed_time, obj[i].repeat_time, obj[i].announce_string));
-			console.log('Added ' + i + ' ' + obj[i].area);
-//			setTimeout(announce(),timers[i].getInterval(),timers[i]);
-		}
+        reject();
+		return console.log(err);
+	}
 
-//		var str = JSON.stringify(timers, ['area', 'seed_time', 'repeat_time', 'announce_string'], 1);
-//		fs.writeFile('timers.json', str, 'utf8', function writeCallback(err, data){
+    var obj = JSON.parse(data);
+    for (var i = 0; i < obj.length; i++ ) {
+        // var timers_list = [new Timer('gate', 1500573088000, 86400000, "Test timer is happening")];
+        timers_list.push(new Timer(obj[i].area, obj[i].seed_time, obj[i].repeat_time, obj[i].announce_string));
+        console.log('Added ' + i + ' ' + obj[i].area);
+        // setTimeout(announce(),timers_list[i].getInterval(),timers_list[i]);
+    }
+
+//		var str = JSON.stringify(timers_list, ['area', 'seed_time', 'repeat_time', 'announce_string'], 1);
+//		fs.writeFile('timers_list.json', str, 'utf8', function writeCallback(err, data){
 //			if (err) {
 //				console.log(err);
 //			}
 //		});
-	}
-});
-
-
-
-
-// Create an instance of a Discord client
-const client = new Discord.Client();
-//Use a file to store the token
-
-// The token of your bot - https://discordapp.com/developers/applications/me
-var token;
-fs = require('fs');
-fs.readFile('secret_token', 'utf8', function (err,data) {
-	if (err) {
-		return console.log(err);
-	}
-	// Log our bot in
-	token = data.replace(/\n/,"");
-	// console.log("'" + token + "'");
-	client.login(token);
-//	token = data;
-});
-// console.log(token);
-
+    resolve();
+    });
+}
 
 // The ready event is vital, it means that your bot will only start reacting to information
 // from Discord _after_ ready is emitted
-var message_channel = 245584660757872640; // This logic would be different if multiple servers are used
-var channel;
-client.on('ready', () => {
-	console.log('I am ready!');
-	console.log('I am on ' + client.guilds.size + ' guilds.');
-	for (var [key, value] of client.guilds ) {
-		console.log('key: ' + key + ' = ' + value);
-	}
-	guild = client.guilds.get('245584660757872640');
-	channel = guild.defaultChannel;
-	channel.send('I am back!');
-	
-	for (var i = 0; i < timers.length; i++) {
+
+function createTimedAnnouncements(channel) {
+	for (var i = 0; i < timers_list.length; i++) {
 		console.log('i: ' + i + ' of ' + timers.length);
-//		channel.send("setting announce '" + timers[i].getAnnounce() + "' to " + timers[i].getNext().valueOf() + " - " + Date.now() + " ms from now");
-		channel.send("because I am dumb and think the next one is at " + timers[i].getNext());
+//		channel.send("setting announce '" + timers_list[i].getAnnounce() + "' to " + timers_list[i].getNext().valueOf() + " - " + Date.now() + " ms from now");
+		channel.send("because I am dumb and think the next one is at " + timers_list[i].getNext());
 //		setImmediate( (a) => {
 //			channel.send(a);
-//		}, timers[i].getAnnounce());
-//		announce(timers[i], channel);
+//		}, timers_list[i].getAnnounce());
+//		announce(timers_list[i], channel);
 		setTimeout(
-//				announce(timers[i], channel),
+//				announce(timers_list[i], channel),
 			(ann, chan, time) => {
 				chan.send(ann);
 //				setInterval();
 			},
-			  timers[i].getNext().valueOf() - Date.now(),
-			  timers[i].getAnnounce(),
+			  timers_list[i].getNext().valueOf() - Date.now(),
+			  timers_list[i].getAnnounce(),
 			  channel,
-			  timers[i].getInterval());
+			  timers_list[i].getInterval()
+        );
 	}
-
-
-
-});
+}
 
 // Create an event listener for messages
-client.on('message', message => {
-	//If the message is "ping"
-	if (message.content === '-gate') {
-		// Send "pong" to the same channel
-//		message.channel.send('pong');
-		message.channel.send('next ' + timers[0].area + ' time is ' + timers[0].getNext().toUTCString());
-		message.channel.send('That would be ' + timers[0].getNext() );
-//		message.channel.send('FWIW this channel is ' + message.channel.id);
-//		message.channel.send('I know about ' + timers.length + ' timers');
-//		message.channel.send('The first one is ' + timers[0].area);
-		channel.s
-	}
-});
+function fgAnnouncer(message) {
+    message.channel.send('next ' + timers_list[0].area + ' time is ' + timers_list[0].getNext().toUTCString());
+    message.channel.send('That would be ' + timers_list[0].getNext() );
+}
 
-//Announce a timer
-function announce(a, c, t) {
-//	var channel = client.guilds.get('245584660757872640').defaultChannel;
-	c.send(a);
-	setTimeout(announce(), t, a, c, t);
+// Announce a timer
+function announce(a, channel, t) {
+//	var channel = client.guilds.get("'" + message_channel_id + "'").defaultChannel;
+	channel.send(a);
+	setTimeout(announce(), t, a, channel, t);
 }

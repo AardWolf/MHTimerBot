@@ -1,13 +1,11 @@
-// timers.js
-//   Define what a mousehunt timer is.
+// Timer Class
 
+// Constructor
 var Timer = function(area, seed_time, repeat_time, announce_string) {
-	//Simple constructor. Takes input arguments and gives them names, sets a few next times
 	this.area = area;
 	this.seed_time = new Date(seed_time); //milliseconds since epoch, UTC
 	this.repeat_time = repeat_time; // milliseconds between repeats
 	this.announce_string = announce_string;
-	
 }
 
 Timer.prototype.getNext = function() {
