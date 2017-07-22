@@ -20,7 +20,7 @@ Timer.prototype.getAnnounce = function() {
 }
 
 Timer.prototype.getInterval = function() {
-	return this.seed_time;
+	return this.repeat_time;
 }
 
 module.exports = Timer;

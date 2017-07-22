@@ -8,13 +8,16 @@ var fs = require ('fs');
 const client = new Discord.Client();
 
 // Globals
-var message_channel_id = 245584660757872640;
+var guild_id = '245584660757872640';
 var main_settings_filename = 'settings.json';
 var timer_settings_filename = 'timer_settings.json';
-//var token_filename = 'secret_token';
+
 var timers_list = [];
 var file_encoding = 'utf8';
 var settings = {};
+
+//Only support announcing in 1 channel
+var announce_channel;
 
 process.on('uncaughtException', function (exception) {
   console.log(exception); // to see your exception details in the console
@@ -23,7 +26,6 @@ process.on('uncaughtException', function (exception) {
 });
 
 function Main() {
-    // console.log('fire');
     // Load global settings
     var a = new Promise(loadSettings);
 
@@ -31,25 +33,28 @@ function Main() {
     a.then(() => { client.login(settings.token); });
 
     // Create timers list from timers settings file
-    var b = new Promise(createTimersList);
+    a.then( createTimersList );
+//    var b = new Promise(createTimersList);
 
     // Bot start up tasks
     a.then(() => {
         client.on('ready', () => {
-            // Get channel
-            //guild = client.guilds.get("'" + message_channel_id + "'");
-            //var channel = guild.defaultChannel;
-
-            // Create timed announcements
-            //createTimedAnnouncements(channel)
+            console.log ('I am alive!');
+            announce_channel = client.guilds.get(guild_id).defaultChannel;
+            //announce_channel.send("Who missed me?");
+            createTimedAnnouncements(announce_channel);
         });
     });
+    
+    //Re-sync and set up the timers
+//    a.then(createTimedAnnouncements(announce_channel));
+//    Promise.all([a, b]).then((announce_channel) => createTimedAnnouncements());
 
     // Message event router
     a.then(() => {
         client.on('message', message => {
-            if (message.content === '.mhtimer fg') {
-                fgAnnouncer(message);
+            if (message.content.startsWith('-')) {
+                messageParse(message);
             }
         });
     });
@@ -64,61 +69,49 @@ function loadSettings(resolve, reject) {
             reject();
             return;
         }
-        settings = JSON.parse(data)[0];
+        settings = JSON.parse(data);
         resolve();
     });
 }
 
 // Read individual timer settings from a file and Create
+//function createTimersList(resolve, reject) {
 function createTimersList(resolve, reject) {
     fs.readFile(timer_settings_filename, file_encoding, (err, data) => {
-	if (err) {
-        reject();
-		return console.log(err);
-	}
+        if (err) {
+            reject();
+            return console.log(err);
+        }
 
-    var obj = JSON.parse(data);
-    for (var i = 0; i < obj.length; i++ ) {
-        // var timers_list = [new Timer('gate', 1500573088000, 86400000, "Test timer is happening")];
-        timers_list.push(new Timer(obj[i].area, obj[i].seed_time, obj[i].repeat_time, obj[i].announce_string));
-        console.log('Added ' + i + ' ' + obj[i].area);
-        // setTimeout(announce(),timers_list[i].getInterval(),timers_list[i]);
-    }
-
-//		var str = JSON.stringify(timers_list, ['area', 'seed_time', 'repeat_time', 'announce_string'], 1);
-//		fs.writeFile('timers_list.json', str, 'utf8', function writeCallback(err, data){
-//			if (err) {
-//				console.log(err);
-//			}
-//		});
-    resolve();
+        var obj = JSON.parse(data);
+        for (var i = 0; i < obj.length; i++ ) {
+            timers_list.push(new Timer(obj[i].area, obj[i].seed_time, obj[i].repeat_time, obj[i].announce_string));
+            console.log('Added ' + i + ' ' + obj[i].area);
+        }
     });
 }
 
-// The ready event is vital, it means that your bot will only start reacting to information
-// from Discord _after_ ready is emitted
-
 function createTimedAnnouncements(channel) {
-	for (var i = 0; i < timers_list.length; i++) {
-		console.log('i: ' + i + ' of ' + timers.length);
-//		channel.send("setting announce '" + timers_list[i].getAnnounce() + "' to " + timers_list[i].getNext().valueOf() + " - " + Date.now() + " ms from now");
-		channel.send("because I am dumb and think the next one is at " + timers_list[i].getNext());
-//		setImmediate( (a) => {
-//			channel.send(a);
-//		}, timers_list[i].getAnnounce());
-//		announce(timers_list[i], channel);
-		setTimeout(
-//				announce(timers_list[i], channel),
-			(ann, chan, time) => {
-				chan.send(ann);
-//				setInterval();
-			},
-			  timers_list[i].getNext().valueOf() - Date.now(),
-			  timers_list[i].getAnnounce(),
-			  channel,
-			  timers_list[i].getInterval()
+    console.log('Creating timeouts');
+    for (var i = 0; i < timers_list.length; i++) {
+//        console.log('i: ' + i + ' of ' + timers_list.length);
+//        channel.send("I think the next one is at " + timers_list[i].getNext());
+
+        setTimeout(
+            (announce, channel, repeat_time) => {
+                channel.send(announce);
+                setInterval((announce, channel) => {
+                    channel.send(announce);
+                }, repeat_time, announce, channel);
+                console.log ("created a repeating timer for every " + repeat_time + " for " + announce);
+            },
+              timers_list[i].getNext().valueOf() - Date.now(),
+              timers_list[i].getAnnounce(),
+              channel,
+              timers_list[i].getInterval()
         );
-	}
+    }
+    console.log ("Let's say that " +timers_list.length + " timeouts got created");
 }
 
 // Create an event listener for messages
@@ -129,7 +122,14 @@ function fgAnnouncer(message) {
 
 // Announce a timer
 function announce(a, channel, t) {
-//	var channel = client.guilds.get("'" + message_channel_id + "'").defaultChannel;
-	channel.send(a);
-	setTimeout(announce(), t, a, channel, t);
+    channel.send(a);
+    setTimeout(announce(), t, a, channel, t);
+}
+
+//The meat of user interaction. Receives the message that starts with the magic character and decides if it knows what to do next
+function messageParse(message) {
+    switch (message.content.split(/\s+/)[0]) {
+        default:
+            message.channel.send("Thank you for sending me '" + message.content.split(/\s+/)[0] + "'. I hope to understand it soon.");
+    }
 }
