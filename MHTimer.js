@@ -129,7 +129,10 @@ function messageParse(message) {
     tokens.shift();
     switch (tokens[0].toLowerCase()) {
         case 'next':
-            message.channel.send(nextTimer(tokens[1]));
+            //TODO - This should be a PM, probably?
+            var retStr = nextTimer(tokens[1]);
+            message.channel.send("", {embed: retStr} );
+            console.log(retStr);
             break;
         default:
             message.channel.send("Thank you for sending me '" + tokens[0] + "'. I hope to understand it soon.");
@@ -163,7 +166,17 @@ function nextTimer(timerName) {
         }
     }
     if (youngestNext != 0) {
-        retStr = retStr + " at " + new Date(youngestNext).toUTCString();
+        retStr = new Discord.RichEmbed()
+            .setTitle("next " + timerName)
+//            .setDescription()
+            .setTimestamp(new Date(youngestNext))
+//            .addField("This is a field")
+            .setFooter(retStr);
+//        retStr = {embed: { description: retStr,
+//                fields: [{value: retStr}],
+//                timestamp: new Date(youngestNext) },
+//                footer: {text: "Just a test"} };
+//        retStr = retStr + " at " + new Date(youngestNext).toUTCString();
     }
     return retStr;
 }
