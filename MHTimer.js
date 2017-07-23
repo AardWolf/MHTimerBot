@@ -46,14 +46,10 @@ function Main() {
         });
     });
     
-    //Re-sync and set up the timers
-//    a.then(createTimedAnnouncements(announce_channel));
-//    Promise.all([a, b]).then((announce_channel) => createTimedAnnouncements());
-
     // Message event router
     a.then(() => {
         client.on('message', message => {
-            if (message.content.startsWith('-')) {
+            if (message.content.startsWith('-mh ')) {
                 messageParse(message);
             }
         });
@@ -128,8 +124,51 @@ function announce(a, channel, t) {
 
 //The meat of user interaction. Receives the message that starts with the magic character and decides if it knows what to do next
 function messageParse(message) {
-    switch (message.content.split(/\s+/)[0]) {
+    var tokens = [];
+    tokens = splitString(message.content);
+    tokens.shift();
+    switch (tokens[0].toLowerCase()) {
+        case 'next':
+            message.channel.send(nextTimer(tokens[1]));
+            break;
         default:
-            message.channel.send("Thank you for sending me '" + message.content.split(/\s+/)[0] + "'. I hope to understand it soon.");
+            message.channel.send("Thank you for sending me '" + tokens[0] + "'. I hope to understand it soon.");
     }
 }
+
+//Simple utility function to tokenize a string, preserving double quotes
+function splitString(inString) {
+    var returnArray = [];
+    var splitRegexp = /[^\s"]+|"([^"]*)"/gi;
+    
+    do {
+        var match = splitRegexp.exec(inString);
+        if (match != null ) {
+            returnArray.push(match[1] ? match[1] : match[0]);
+        }
+    } while (match != null);
+    return returnArray;
+}
+
+//Returns the next occurrence of the class of timers
+function nextTimer(timerName) {
+    var retStr = "I do not know the timer '" + timerName + "'";
+    var youngestNext = 0;
+    for (var i = 0; i < timers_list.length; i++) {
+        if (timers_list[i].getArea() == timerName) {
+            if (timers_list[i].getNext().valueOf() < youngestNext || youngestNext == 0) {
+                youngestNext = timers_list[i].getNext().valueOf();
+                retStr = timers_list[i].getAnnounce();
+            }
+        }
+    }
+    if (youngestNext != 0) {
+        retStr = retStr + " at " + new Date(youngestNext).toUTCString();
+    }
+    return retStr;
+}
+
+//Resources:
+//Timezones in Discord: https://www.reddit.com/r/discordapp/comments/68zkfs/timezone_tag_bot/
+
+

@@ -15,6 +15,10 @@ Timer.prototype.getNext = function() {
 //	return new Date(cur_time + (Math.abs(this.seed_time.valueOf() - cur_time) % this.repeat_time));  //division is numer of whole elapsed iterations, modulus is ms until next
 }
 
+Timer.prototype.getArea = function() {
+    return this.area;
+}
+
 Timer.prototype.getAnnounce = function() {
 	return this.announce_string;
 }
