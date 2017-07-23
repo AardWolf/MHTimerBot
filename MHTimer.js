@@ -41,8 +41,25 @@ function Main() {
         client.on('ready', () => {
             console.log ('I am alive!');
             announce_channel = client.guilds.get(guild_id).defaultChannel;
+            
+            //for each guild find its #timers channel (if it has one)
+            for (var [key, value] of client.guilds) {
+                for (var [chankey, chanvalue] of client.guilds.get(guild_id).channels) {
+                    if (client.guilds.get(guild_id).channels.get(chankey).name === "timers") {
+                        console.log("Found #timers as " + chankey + " on guild " + key);
+                        createTimedAnnouncements(client.guilds.get(guild_id).channels.get(chankey));
+                        client.guilds.get(guild_id).channels.get(chankey).send("Is this thing on?");
+                    }
+                    console.log("chankey = " + chankey);
+                    console.log("chanvalue = " + chanvalue);
+                }
+//                console.log(client.guilds.get(guild_id).channels);
+                console.log("key = " + key);
+                console.log("value = " + value);
+            }
+            
             //announce_channel.send("Who missed me?");
-            createTimedAnnouncements(announce_channel);
+//            createTimedAnnouncements(announce_channel);
         });
     });
     
@@ -130,9 +147,13 @@ function messageParse(message) {
     switch (tokens[0].toLowerCase()) {
         case 'next':
             //TODO - This should be a PM, probably?
-            var retStr = nextTimer(tokens[1]);
-            message.channel.send("", {embed: retStr} );
-            console.log(retStr);
+            var retStr = nextTimer(tokens[1].toLowerCase());
+            if (typeof retStr === "string") {
+                message.channel.send(retStr);
+            } else {
+                message.channel.send("", {embed: retStr} );
+            }
+            // console.log(typeof retStr);
             break;
         default:
             message.channel.send("Thank you for sending me '" + tokens[0] + "'. I hope to understand it soon.");
@@ -179,6 +200,11 @@ function nextTimer(timerName) {
 //        retStr = retStr + " at " + new Date(youngestNext).toUTCString();
     }
     return retStr;
+}
+
+//Find the identifier for a given guild for its #timers channel
+function findTimersChannel(guild) {
+    
 }
 
 //Resources:
