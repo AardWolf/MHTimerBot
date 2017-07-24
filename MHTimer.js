@@ -43,12 +43,12 @@ function Main() {
 //            announce_channel = client.guilds.get(guild_id).defaultChannel;
             
             //for each guild find its #timers channel (if it has one)
-            for (var [key, value] of client.guilds) {
-                for (var [chankey, chanvalue] of client.guilds.get(key).channels) {
-                    if (client.guilds.get(key).channels.get(chankey).name === "timers") {
-                        console.log("Found #timers as " + chankey + " on guild " + client.guilds.get(key).name);
-                        createTimedAnnouncements(client.guilds.get(key).channels.get(chankey));
-//                        client.guilds.get(key).channels.get(chankey).send("Is this thing on?");
+            for (var [guildkey, guildvalue] of client.guilds) {
+                for (var [chankey, chanvalue] of guildvalue.channels) {
+                    if (chanvalue.name === "timers") {
+                        console.log("Found #timers as " + chankey + " on guild " + guildvalue.name);
+                        createTimedAnnouncements(chanvalue);
+//                        chanvalue.send("Is this thing on?");
                     }
 //                    console.log("chankey = " + chankey);
 //                    console.log("chanvalue = " + chanvalue);
@@ -103,33 +103,29 @@ function createTimersList(resolve, reject) {
 
 function createTimedAnnouncements(channel) {
     console.log('Creating timeouts');
+    var startDate = new Date();
     for (var i = 0; i < timers_list.length; i++) {
 //        console.log('i: ' + i + ' of ' + timers_list.length);
 //        channel.send("I think the next one is at " + timers_list[i].getNext());
 
         setTimeout(
-            (announce, channel, repeat_time) => {
+            function (announce, channel, repeat_time) {
                 channel.send(announce);
                 setInterval((announce, channel) => {
                     channel.send(announce);
                 }, repeat_time, announce, channel);
-//                console.log ("created a repeating timer for every " + repeat_time + " for " + announce);
+                console.log ("created a repeating timer for every " + repeat_time + " for " + announce);
             },
-              timers_list[i].getNext().valueOf() - Date.now(),
+              (timers_list[i].getNext().valueOf() - startDate.valueOf()),
               timers_list[i].getAnnounce(),
               channel,
               timers_list[i].getInterval()
         );
-        console.log(timers_list[i].getAnnounce() + " next happens at " + timers_list[i].getNext().toString());
+        console.log(timers_list[i].getAnnounce() + " next happens in " + (timers_list[i].getNext().valueOf() - startDate.valueOf()) + " ms");
     }
     console.log ("Let's say that " +timers_list.length + " timeouts got created");
 }
 
-// Announce a timer
-function announce(a, channel, t) {
-    channel.send(a);
-    setTimeout(announce(), t, a, channel, t);
-}
 
 //The meat of user interaction. Receives the message that starts with the magic character and decides if it knows what to do next
 function messageParse(message) {
@@ -148,7 +144,7 @@ function messageParse(message) {
             // console.log(typeof retStr);
             break;
         default:
-            message.channel.send("Thank you for sending me '" + tokens[0] + "'. I hope to understand it soon.");
+            message.channel.send("Right now I only know the word 'next' for timers: sg, fg, reset, spill, cove");
     }
 }
 
@@ -168,7 +164,7 @@ function splitString(inString) {
 
 //Returns the next occurrence of the class of timers
 function nextTimer(timerName) {
-    var retStr = "I do not know the timer '" + timerName + "'";
+    var retStr = "I do not know the timer '" + timerName + "' but I do know: sg, fg, reset, spill, cove";
     var youngestNext = 0;
     for (var i = 0; i < timers_list.length; i++) {
         if (timers_list[i].getArea() == timerName) {
@@ -179,17 +175,14 @@ function nextTimer(timerName) {
         }
     }
     if (youngestNext != 0) {
+        //TODO - This embed is too wide to see the timestamp. Shorter footer, move retStr to Field
         retStr = new Discord.RichEmbed()
-            .setTitle("next " + timerName)
-//            .setDescription()
+//            .setTitle("next " + timerName) // removing this cleaned up the embed a lot
+            .setDescription(retStr) // Putting here makes it look nicer and fit in portrait mode
             .setTimestamp(new Date(youngestNext))
-//            .addField("This is a field")
-            .setFooter(retStr);
-//        retStr = {embed: { description: retStr,
-//                fields: [{value: retStr}],
-//                timestamp: new Date(youngestNext) },
-//                footer: {text: "Just a test"} };
-//        retStr = retStr + " at " + new Date(youngestNext).toUTCString();
+//            .addField(retStr)
+            .setFooter("at"); // There has to be something in here or there is no footer
+
     }
     return retStr;
 }
