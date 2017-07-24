@@ -114,7 +114,7 @@ function createTimedAnnouncements(channel) {
                 setInterval((announce, channel) => {
                     channel.send(announce);
                 }, repeat_time, announce, channel);
-                console.log ("created a repeating timer for every " + repeat_time + " for " + announce);
+//                console.log ("created a repeating timer for every " + repeat_time + " for " + announce);
             },
               (timers_list[i].getNext().valueOf() - startDate.valueOf()),
               timers_list[i].getAnnounce(),
@@ -165,16 +165,52 @@ function splitString(inString) {
 //Returns the next occurrence of the class of timers
 function nextTimer(timerName) {
     var retStr = "I do not know the timer '" + timerName + "' but I do know: sg, fg, reset, spill, cove";
+    switch (timerName) {
+        case 'sg':
+        case 'seasonal':
+        case 'season':
+        case 'garden':
+            timerName = 'sg';
+            break;
+        case 'fg':
+        case 'grove':
+        case 'gate':
+        case 'realm':
+            timerName = 'fg';
+            break;
+        case 'reset':
+        case 'game':
+        case 'rh':
+        case 'midnight':
+            timerName = 'reset';
+            break;
+        case 'spill':
+        case 'toxic':
+        case 'ts':
+            timerName = 'spill';
+            break;
+        case 'cove':
+        case 'balack':
+        case 'tide':
+            timerName = 'cove';
+            break;
+        case 'ronza':
+            retStr = 'She just left here 10 minutes ago. I guess you missed her';
+            break;
+    }
     var youngestNext = 0;
     for (var i = 0; i < timers_list.length; i++) {
         if (timers_list[i].getArea() == timerName) {
-            if (timers_list[i].getNext().valueOf() < youngestNext || youngestNext == 0) {
+            if (youngestNext === 0) { 
+                youngestNext = timers_list[i].getNext().valueOf();
+            }
+            if (timers_list[i].getNext().valueOf() < youngestNext) {
                 youngestNext = timers_list[i].getNext().valueOf();
                 retStr = timers_list[i].getAnnounce();
             }
         }
     }
-    if (youngestNext != 0) {
+    if (youngestNext !== 0) {
         //TODO - This embed is too wide to see the timestamp. Shorter footer, move retStr to Field
         retStr = new Discord.RichEmbed()
 //            .setTitle("next " + timerName) // removing this cleaned up the embed a lot
