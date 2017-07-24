@@ -8,7 +8,7 @@ var fs = require ('fs');
 const client = new Discord.Client();
 
 // Globals
-var guild_id = '245584660757872640';
+// var guild_id = '245584660757872640';
 var main_settings_filename = 'settings.json';
 var timer_settings_filename = 'timer_settings.json';
 
@@ -40,26 +40,23 @@ function Main() {
     a.then(() => {
         client.on('ready', () => {
             console.log ('I am alive!');
-            announce_channel = client.guilds.get(guild_id).defaultChannel;
+//            announce_channel = client.guilds.get(guild_id).defaultChannel;
             
             //for each guild find its #timers channel (if it has one)
             for (var [key, value] of client.guilds) {
-                for (var [chankey, chanvalue] of client.guilds.get(guild_id).channels) {
-                    if (client.guilds.get(guild_id).channels.get(chankey).name === "timers") {
-                        console.log("Found #timers as " + chankey + " on guild " + key);
-                        createTimedAnnouncements(client.guilds.get(guild_id).channels.get(chankey));
-                        client.guilds.get(guild_id).channels.get(chankey).send("Is this thing on?");
+                for (var [chankey, chanvalue] of client.guilds.get(key).channels) {
+                    if (client.guilds.get(key).channels.get(chankey).name === "timers") {
+                        console.log("Found #timers as " + chankey + " on guild " + client.guilds.get(key).name);
+                        createTimedAnnouncements(client.guilds.get(key).channels.get(chankey));
+//                        client.guilds.get(key).channels.get(chankey).send("Is this thing on?");
                     }
-                    console.log("chankey = " + chankey);
-                    console.log("chanvalue = " + chanvalue);
+//                    console.log("chankey = " + chankey);
+//                    console.log("chanvalue = " + chanvalue);
                 }
 //                console.log(client.guilds.get(guild_id).channels);
-                console.log("key = " + key);
-                console.log("value = " + value);
+//                console.log("key = " + key);
+//                console.log("value = " + value);
             }
-            
-            //announce_channel.send("Who missed me?");
-//            createTimedAnnouncements(announce_channel);
         });
     });
     
@@ -99,7 +96,7 @@ function createTimersList(resolve, reject) {
         var obj = JSON.parse(data);
         for (var i = 0; i < obj.length; i++ ) {
             timers_list.push(new Timer(obj[i].area, obj[i].seed_time, obj[i].repeat_time, obj[i].announce_string));
-            console.log('Added ' + i + ' ' + obj[i].area);
+//            console.log('Added ' + i + ' ' + obj[i].area);
         }
     });
 }
@@ -116,21 +113,16 @@ function createTimedAnnouncements(channel) {
                 setInterval((announce, channel) => {
                     channel.send(announce);
                 }, repeat_time, announce, channel);
-                console.log ("created a repeating timer for every " + repeat_time + " for " + announce);
+//                console.log ("created a repeating timer for every " + repeat_time + " for " + announce);
             },
               timers_list[i].getNext().valueOf() - Date.now(),
               timers_list[i].getAnnounce(),
               channel,
               timers_list[i].getInterval()
         );
+        console.log(timers_list[i].getAnnounce() + " next happens at " + timers_list[i].getNext().toString());
     }
     console.log ("Let's say that " +timers_list.length + " timeouts got created");
-}
-
-// Create an event listener for messages
-function fgAnnouncer(message) {
-    message.channel.send('next ' + timers_list[0].area + ' time is ' + timers_list[0].getNext().toUTCString());
-    message.channel.send('That would be ' + timers_list[0].getNext() );
 }
 
 // Announce a timer
@@ -202,10 +194,7 @@ function nextTimer(timerName) {
     return retStr;
 }
 
-//Find the identifier for a given guild for its #timers channel
-function findTimersChannel(guild) {
-    
-}
+
 
 //Resources:
 //Timezones in Discord: https://www.reddit.com/r/discordapp/comments/68zkfs/timezone_tag_bot/

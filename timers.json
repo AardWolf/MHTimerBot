@@ -1,15 +1,152 @@
 [
  {
   "area": "fg",
-  "seed_time": "2017-07-20T07:45:00.000Z",
-  "repeat_time": 300000,
-  "announce_string": "Forbidden Grove closes in 15 minutes, travel early"
+  "seed_time": "2017-07-25T07:45:00.000Z",
+  "repeat_time": 72000000,
+  "announce_string": "**Forbidden Grove** The gate closes in 15 minutes, travel early"
  },
  {
   "area": "fg",
-  "seed_time": "2017-07-20T12:02:00.000Z",
-  "repeat_time": 300000,
-  "announce_string": "Forbidden Grove is open again"
+  "seed_time": "2017-07-25T12:00:00.000Z",
+  "repeat_time": 72000000,
+  "announce_string": "**Forbidden Grove** The gate is open again"
+ },
+ {
+  "area": "game",
+  "seed_time": "2017-07-20T00:00:00.000Z",
+  "repeat_time": 86400000,
+  "announce_string": "Gift Reset / Relic Hunter Moves / Shields Expire - it's midnight UTC"
+ },
+ {
+  "area": "cove",
+  "seed_time": "2017-07-24T17:20:00.000Z",
+  "repeat_time": 67200000,
+  "announce_string": "**Balack's Cove** Low Tide (Ebbing and Flooding) for 16 hours"
+ },
+ {
+  "area": "cove",
+  "seed_time": "2017-07-25T09:20:00.000Z",
+  "repeat_time": 67200000,
+  "announce_string": "**Balack's Cove** Mid Tide (Flooding) for 1 hour"
+ },
+ {
+  "area": "cove",
+  "seed_time": "2017-07-24T15:40:00.000Z",
+  "repeat_time": 67200000,
+  "announce_string": "**Balack's Cove** High Tide (Ebbing and Flooding) for 40 minutes"
+ },
+ {
+  "area": "cove",
+  "seed_time": "2017-07-24T16:20:00.000Z",
+  "repeat_time": 67200000,
+  "announce_string": "**Balack's Cove** Mid Tide (Ebbing) for 1 hour"
+ },
+ {
+  "area": "sg",
+  "seed_time": "2017-07-26T08:00:00.000Z",
+  "repeat_time": 1152000000,
+  "announce_string": "**Seasonal Garden** It's Springtime for 80 hours - Physical"
+ },
+ {
+  "area": "sg",
+  "seed_time": "2017-07-29T16:00:00.000Z",
+  "repeat_time": 1152000000,
+  "announce_string": "**Seasonal Garden** It's Summer for 80 hours - Tactical"
+ },
+ {
+  "area": "sg",
+  "seed_time": "2017-08-02T00:00:00.000Z",
+  "repeat_time": 1152000000,
+  "announce_string": "**Seasonal Garden** It's Autumn for 80 hours - Shadow - Sandcastle Shard and some other Halloween Traps"
+ },
+ {
+  "area": "sg",
+  "seed_time": "2017-08-05T08:00:00.000Z",
+  "repeat_time": 1152000000,
+  "announce_string": "**Seasonal Garden** It's Winter for 80 hours - Hydro"
+ },
+ {
+  "area": "spill",
+  "seed_time": "2017-08-05T09:00:00.000Z",
+  "repeat_time": 1087200000,
+  "announce_string": "**Toxic Spill** Archduke Levels for 24 hours"
+ },
+ {
+  "area": "spill",
+  "seed_time": "2017-08-06T09:00:00.000Z",
+  "repeat_time": 1087200000,
+  "announce_string": "**Toxic Spill** Levels fall through Grand Duke/Duchess for 24 hours"
+ },
+ {
+  "area": "spill",
+  "seed_time": "2017-08-07T09:00:00.000Z",
+  "repeat_time": 1087200000,
+  "announce_string": "**Toxic Spill** Levels fall through Duke/Duchess for 24 hours"
+ },
+ {
+  "area": "spill",
+  "seed_time": "2017-08-08T09:00:00.000Z",
+  "repeat_time": 1087200000,
+  "announce_string": "**Toxic Spill** Levels fall through Count/Countess for 24 hours"
+ },
+ {
+  "area": "spill",
+  "seed_time": "2017-08-09T09:00:00.000Z",
+  "repeat_time": 1087200000,
+  "announce_string": "**Toxic Spill** Levels fall through Baron/Baroness for 18 hours"
+ },
+ {
+  "area": "spill",
+  "seed_time": "2017-08-10T03:00:00.000Z",
+  "repeat_time": 1087200000,
+  "announce_string": "**Toxic Spill** Levels fall through Lord/Lady for 18 hours"
+ },
+ {
+  "area": "spill",
+  "seed_time": "2017-08-10T21:00:00.000Z",
+  "repeat_time": 1087200000,
+  "announce_string": "**Toxic Spill** Levels fall through Knight for 16 hours"
+ },
+ {
+  "area": "spill",
+  "seed_time": "2017-08-11T13:00:00.000Z",
+  "repeat_time": 1087200000,
+  "announce_string": "**Toxic Spill** Levels at Hero for 30 hours"
+ },
+ {
+  "area": "spill",
+  "seed_time": "2017-08-12T19:00:00.000Z",
+  "repeat_time": 1087200000,
+  "announce_string": "**Toxic Spill** Levels rising through Knight for 16 hours"
+ },
+ {
+  "area": "spill",
+  "seed_time": "2017-08-13T11:00:00.000Z",
+  "repeat_time": 1087200000,
+  "announce_string": "**Toxic Spill** Levels rising through Lord/Lady for 18 hours"
+ },
+ {
+  "area": "spill",
+  "seed_time": "2017-08-14T05:00:00.000Z",
+  "repeat_time": 1087200000,
+  "announce_string": "**Toxic Spill** Levels rising through Baron/Baroness for 18 hours"
+ },
+ {
+  "area": "spill",
+  "seed_time": "2017-08-14T23:00:00.000Z",
+  "repeat_time": 1087200000,
+  "announce_string": "**Toxic Spill** Levels rising through Count/Countess for 24 hours"
+ },
+ {
+  "area": "spill",
+  "seed_time": "2017-08-15T23:00:00.000Z",
+  "repeat_time": 1087200000,
+  "announce_string": "**Toxic Spill** Levels rising through Duke/Duchess for 24 hours"
+ },
+ {
+  "area": "spill",
+  "seed_time": "2017-08-16T23:00:00.000Z",
+  "repeat_time": 1087200000,
+  "announce_string": "**Toxic Spill** Levels rising through Grand Duke/Duchess for 24 hours"
  }
-
 ]
