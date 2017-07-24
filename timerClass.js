@@ -1,11 +1,12 @@
 // Timer Class
 
 // Constructor
-var Timer = function(area, seed_time, repeat_time, announce_string) {
+var Timer = function(area, seed_time, repeat_time, announce_string, demand_string) {
 	this.area = area;
 	this.seed_time = new Date(seed_time); //milliseconds since epoch, UTC
 	this.repeat_time = repeat_time; // milliseconds between repeats
 	this.announce_string = announce_string;
+    this.demand_string = demand_string;
 }
 
 Timer.prototype.getNext = function() {
@@ -34,6 +35,10 @@ Timer.prototype.getArea = function() {
 
 Timer.prototype.getAnnounce = function() {
 	return this.announce_string;
+}
+
+Timer.prototype.getDemand = function() {
+    return this.demand_string ? this.demand_string : this.announce_string;
 }
 
 Timer.prototype.getInterval = function() {

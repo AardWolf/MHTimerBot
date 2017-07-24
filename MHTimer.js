@@ -95,7 +95,7 @@ function createTimersList(resolve, reject) {
 
         var obj = JSON.parse(data);
         for (var i = 0; i < obj.length; i++ ) {
-            timers_list.push(new Timer(obj[i].area, obj[i].seed_time, obj[i].repeat_time, obj[i].announce_string));
+            timers_list.push(new Timer(obj[i].area, obj[i].seed_time, obj[i].repeat_time, obj[i].announce_string, obj[i].demand_string));
 //            console.log('Added ' + i + ' ' + obj[i].area);
         }
     });
@@ -204,9 +204,14 @@ function nextTimer(timerName) {
             if (youngestNext === 0) { 
                 youngestNext = timers_list[i].getNext().valueOf();
             }
-            if (timers_list[i].getNext().valueOf() < youngestNext) {
-                youngestNext = timers_list[i].getNext().valueOf();
-                retStr = timers_list[i].getAnnounce();
+            if (timers_list[i].getNext().valueOf() <= youngestNext) {
+                if (i === 0) {
+                    //Wouldn't you know the gate closing case (first timer) is confusing
+                    youngestNext = timers_list[i].getNext().valueOf() + 15 * 60 * 1000;
+                } else {
+                    youngestNext = timers_list[i].getNext().valueOf();
+                }
+                retStr = timers_list[i].getDemand();
             }
         }
     }
