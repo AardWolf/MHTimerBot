@@ -15,4 +15,10 @@ Timers need a way to catch back up if offline a while.
   -remind season once - Will only remind the next time the timer goes  
 * schedule \<area\> [\<number\>] - Shows the timers for the next \<number\> of days for an area  
   -schedule spill 2 - The levels will rise to Arch in 2h31m / The levels will fall through Arch in 1d2h31m
-  
+
+## TO-DO
+
+* Implement setInterval for the timers.  
+* Configure which channel is announced on (should be #timers at some point)  
+* Read/Save reminder requests.  
+* Add commands to listener
