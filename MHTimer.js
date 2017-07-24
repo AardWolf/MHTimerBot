@@ -121,7 +121,7 @@ function createTimedAnnouncements(channel) {
               channel,
               timers_list[i].getInterval()
         );
-        console.log(timers_list[i].getAnnounce() + " next happens in " + (timers_list[i].getNext().valueOf() - startDate.valueOf()) + " ms");
+//        console.log(timers_list[i].getAnnounce() + " next happens at " + timers_list[i].getNext().toUTCString() + " ms");
     }
     console.log ("Let's say that " +timers_list.length + " timeouts got created");
 }
@@ -199,17 +199,20 @@ function nextTimer(timerName) {
             break;
     }
     var youngestNext = 0;
+    var nextText;
     for (var i = 0; i < timers_list.length; i++) {
         if (timers_list[i].getArea() == timerName) {
+            nextTest = timers_list[i].getNext().valueOf();
+//            console.log(i + " " + timers_list[i].getNext().toUTCString());
             if (youngestNext === 0) { 
-                youngestNext = timers_list[i].getNext().valueOf();
+                youngestNext = nextTest;
             }
-            if (timers_list[i].getNext().valueOf() <= youngestNext) {
+            if (nextTest <= youngestNext) {
                 if (i === 0) {
                     //Wouldn't you know the gate closing case (first timer) is confusing
-                    youngestNext = timers_list[i].getNext().valueOf() + 15 * 60 * 1000;
+                    youngestNext = nextTest + 15 * 60 * 1000;
                 } else {
-                    youngestNext = timers_list[i].getNext().valueOf();
+                    youngestNext = nextTest;
                 }
                 retStr = timers_list[i].getDemand();
             }
@@ -223,7 +226,6 @@ function nextTimer(timerName) {
             .setTimestamp(new Date(youngestNext))
 //            .addField(retStr)
             .setFooter("at"); // There has to be something in here or there is no footer
-
     }
     return retStr;
 }
