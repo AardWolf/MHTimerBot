@@ -90,7 +90,7 @@ function createTimersList(resolve, reject) {
 
         var obj = JSON.parse(data);
         for (var i = 0; i < obj.length; i++ ) {
-            timers_list.push(new Timer(obj[i].area, obj[i].seed_time, obj[i].repeat_time, obj[i].announce_string, obj[i].demand_string));
+            timers_list.push(new Timer(obj[i]));
 //            console.log('Added ' + i + ' ' + obj[i].area);
         }
     });
@@ -107,27 +107,16 @@ function createTimedAnnouncements(channel) {
                 setInterval((announce, channel) => {
                     channel.send(announce);
                 }, repeat_time, announce, channel);
-                console.log ("created a repeating timer for every " + repeat_time + " for " + announce);
+//                console.log ("created a repeating timer for every " + repeat_time + " for " + announce);
             },
               (timers_list[i].getNext().valueOf() - startDate.valueOf()),
               timers_list[i].getAnnounce(),
               channel,
               timers_list[i].getInterval()
         );
-        console.log(timers_list[i].getAnnounce() + " next happens in " + (timers_list[i].getNext().valueOf() - startDate.valueOf() ) + " ms");
+//        console.log(timers_list[i].getAnnounce() + " next happens in " + (timers_list[i].getNext().valueOf() - startDate.valueOf() ) + " ms");
     }
     console.log ("Let's say that " +timers_list.length + " timeouts got created");
-}
-
-function firstAnnounce(announce, channel, repeat_time) {
-    channel.send(announce);
-    setInterval((announce, channel) => {
-        channel.send(announce);
-    }, repeat_time, announce, channel);
-}
-
-function repeatAnnounce(announce, channel) {
-    channel.send(announce);
 }
 
 //The meat of user interaction. Receives the message that starts with the magic character and decides if it knows what to do next
@@ -139,7 +128,7 @@ function messageParse(message) {
         case 'next':
             //TODO - This should be a PM, probably?
             if (tokens.length === 1) { 
-                message.channel.send("Could you speak up? I couldn't hear what timer you asked about."); 
+                message.channel.send("Did you want to know about sg, fg, reset, spill, or cove?"); 
             } else {
                 var retStr = nextTimer(tokens[1].toLowerCase());
                 if (typeof retStr === "string") {
@@ -169,10 +158,8 @@ function splitString(inString) {
     return returnArray;
 }
 
-//Returns the next occurrence of the class of timers
-function nextTimer(timerName) {
-    var retStr = "I do not know the timer '" + timerName + "' but I do know: sg, fg, reset, spill, cove";
-    switch (timerName) {
+function timerAliases(timerName) {
+    switch (timerName.toLowerCase()) {
         case 'sg':
         case 'seasonal':
         case 'season':
@@ -201,43 +188,70 @@ function nextTimer(timerName) {
         case 'tide':
             timerName = 'cove';
             break;
+    }
+    return timerName;
+}
+
+//Returns the next occurrence of the class of timers
+function nextTimer(timerName) {
+    var retStr = "I do not know the timer '" + timerName + "' but I do know: sg, fg, reset, spill, cove";
+    var youngTimer;
+    timerName = timerAliases(timerName);
+    switch (timerName) {
         case 'ronza':
-            retStr = 'She just left here 10 minutes ago. I guess you missed her';
+            retStr = 'She just left 10 minutes ago. I guess you missed her';
             break;
     }
-    var youngestNext = 0;
-    var nextText;
-    for (var i = 0; i < timers_list.length; i++) {
-        if (timers_list[i].getArea() == timerName) {
-            nextTest = timers_list[i].getNext().valueOf();
-//            console.log(i + " " + timers_list[i].getNext().toUTCString());
-            if (youngestNext === 0) { 
-                youngestNext = nextTest;
-            }
-            if (nextTest <= youngestNext) {
-                if (i === 0) {
-                    //Wouldn't you know the gate closing case (first timer) is confusing
-                    youngestNext = nextTest + 15 * 60 * 1000;
-                } else {
-                    youngestNext = nextTest;
-                }
-                retStr = timers_list[i].getDemand();
+
+    for (var timer of timers_list) {
+        if (timer.getArea() === timerName) {
+            if ((typeof youngTimer == 'undefined') || (timer.getNext() <= youngTimer.getNext())) {
+                youngTimer = timer;
             }
         }
     }
-    if (youngestNext !== 0) {
-        //TODO - This embed is too wide to see the timestamp. Shorter footer, move retStr to Field
+
+    if (typeof youngTimer == 'undefined') {
+        return retStr;
+    } else {
         retStr = new Discord.RichEmbed()
 //            .setTitle("next " + timerName) // removing this cleaned up the embed a lot
-            .setDescription(retStr) // Putting here makes it look nicer and fit in portrait mode
-            .setTimestamp(new Date(youngestNext))
+            .setDescription(youngTimer.getDemand() + "\n" + timeLeft(youngTimer.getNext())) // Putting here makes it look nicer and fit in portrait mode
+            .setTimestamp(new Date(youngTimer.getNext().valueOf() + youngTimer.getDemandOffset()))
 //            .addField(retStr)
             .setFooter("at"); // There has to be something in here or there is no footer
     }
     return retStr;
 }
 
-
+function timeLeft (in_date) {
+    var now_date = new Date();
+    var retStr = "real soon";
+    var ms_left = in_date.valueOf() - now_date.valueOf() ;
+    if (ms_left > 1000) {
+        retStr = "in ";
+        if (ms_left > 1000 * 60 * 60 * 24) {
+            //days left
+            retStr += Math.floor(ms_left / (1000 * 60 * 60 * 24)) + " days ";
+            ms_left = ms_left % (1000 * 60 * 60 * 24);
+        }
+        if (ms_left > 1000 * 60 * 60) {
+            //hours left
+            retStr += Math.floor(ms_left / (1000 * 60 * 60)) + " hours ";
+            ms_left = ms_left % (1000 * 60 * 60);
+        }
+        if (ms_left > 1000 * 60) {
+            //minutes left
+            retStr += Math.floor(ms_left / (1000 * 60)) + " minutes ";
+            ms_left = ms_left % (1000 * 60);
+        }
+        if (ms_left > 1000) {
+            //seconds left
+            retStr += Math.floor(ms_left / 1000) + " seconds";
+        }
+    }
+    return retStr;
+}
 
 //Resources:
 //Timezones in Discord: https://www.reddit.com/r/discordapp/comments/68zkfs/timezone_tag_bot/
