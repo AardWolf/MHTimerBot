@@ -17,7 +17,7 @@ Timer.prototype.getNext = function() {
 //    }
 //    return test_time;
 	//returns the previous one
-    return new Date(cur_time.valueOf() + (((this.seed_time - cur_time.valueOf() ) % this.repeat_time) ));
+    return new Date(cur_time.valueOf() + (this.repeat_time + ((this.seed_time - cur_time.valueOf() ) % this.repeat_time) ));
     
     //Math.floor((cur_time - seed_time) / repeat_time) = num_iterations
     //seed_time + repeat_time * (num_iterations + 1) = next_time

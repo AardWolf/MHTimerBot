@@ -50,12 +50,7 @@ function Main() {
                         createTimedAnnouncements(chanvalue);
 //                        chanvalue.send("Is this thing on?");
                     }
-//                    console.log("chankey = " + chankey);
-//                    console.log("chanvalue = " + chanvalue);
                 }
-//                console.log(client.guilds.get(guild_id).channels);
-//                console.log("key = " + key);
-//                console.log("value = " + value);
             }
         });
     });
@@ -104,28 +99,36 @@ function createTimersList(resolve, reject) {
 function createTimedAnnouncements(channel) {
     console.log('Creating timeouts');
     var startDate = new Date();
+    
     for (var i = 0; i < timers_list.length; i++) {
-//        console.log('i: ' + i + ' of ' + timers_list.length);
-//        channel.send("I think the next one is at " + timers_list[i].getNext());
-
-        setTimeout(
-            function (announce, channel, repeat_time) {
+        setTimeout( 
+            (announce, channel, repeat_time) => {
                 channel.send(announce);
                 setInterval((announce, channel) => {
                     channel.send(announce);
                 }, repeat_time, announce, channel);
-//                console.log ("created a repeating timer for every " + repeat_time + " for " + announce);
+                console.log ("created a repeating timer for every " + repeat_time + " for " + announce);
             },
               (timers_list[i].getNext().valueOf() - startDate.valueOf()),
               timers_list[i].getAnnounce(),
               channel,
               timers_list[i].getInterval()
         );
-//        console.log(timers_list[i].getAnnounce() + " next happens at " + timers_list[i].getNext().toUTCString() + " ms");
+        console.log(timers_list[i].getAnnounce() + " next happens in " + (timers_list[i].getNext().valueOf() - startDate.valueOf() ) + " ms");
     }
     console.log ("Let's say that " +timers_list.length + " timeouts got created");
 }
 
+function firstAnnounce(announce, channel, repeat_time) {
+    channel.send(announce);
+    setInterval((announce, channel) => {
+        channel.send(announce);
+    }, repeat_time, announce, channel);
+}
+
+function repeatAnnounce(announce, channel) {
+    channel.send(announce);
+}
 
 //The meat of user interaction. Receives the message that starts with the magic character and decides if it knows what to do next
 function messageParse(message) {
@@ -135,11 +138,15 @@ function messageParse(message) {
     switch (tokens[0].toLowerCase()) {
         case 'next':
             //TODO - This should be a PM, probably?
-            var retStr = nextTimer(tokens[1].toLowerCase());
-            if (typeof retStr === "string") {
-                message.channel.send(retStr);
+            if (tokens.length === 1) { 
+                message.channel.send("Could you speak up? I couldn't hear what timer you asked about."); 
             } else {
-                message.channel.send("", {embed: retStr} );
+                var retStr = nextTimer(tokens[1].toLowerCase());
+                if (typeof retStr === "string") {
+                    message.channel.send(retStr);
+                } else {
+                    message.channel.send("", {embed: retStr} );
+                }
             }
             // console.log(typeof retStr);
             break;
