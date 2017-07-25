@@ -4,7 +4,8 @@
   "seed_time": "2017-07-24T11:45:00.000Z",
   "repeat_time": 72000000,
   "announce_string": "**Forbidden Grove** The gate closes in 15 minutes, travel early",
-  "demand_string": "**Forbidden Grove** Travel early, the gate closes"
+  "demand_string": "**Forbidden Grove** Travel early, the gate closes",
+  "demand_offset": 900000
  },
  {
   "area": "fg",
@@ -172,5 +173,20 @@
   "repeat_time": 1087200000,
   "announce_string": "**Toxic Spill** Levels rising through Grand Duke/Duchess for 24 hours",
   "demand_string": "**Toxic Spill** Grand Duke/Duchess level starts (rising)"
+ },
+ {
+  "area": "test",
+  "seed_time": "2017-06-02T11:00:00.000Z",
+  "repeat_time": 120000,
+  "announce_string": "**Test** Test timer 0",
+  "demand_string": "**Test** Test demand 0"
+ },
+ {
+  "area": "test",
+  "seed_time": "2017-06-02T11:01:00.000Z",
+  "repeat_time": 120000,
+  "announce_string": "**Test** Test timer 1",
+  "demand_string": "**Test** Test demand 1",
+  "demand_offset": 240000
  }
 ]
