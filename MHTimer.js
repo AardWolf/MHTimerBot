@@ -99,21 +99,24 @@ function createTimersList(resolve, reject) {
 function createTimedAnnouncements(channel) {
     console.log('Creating timeouts');
     var startDate = new Date();
+    var temp_timeout;
     
     for (var i = 0; i < timers_list.length; i++) {
-        setTimeout( 
-            (announce, channel, repeat_time) => {
-                channel.send(announce);
-                setInterval((announce, channel) => {
-                    channel.send(announce);
-                }, repeat_time, announce, channel);
+        temp_timeout = setTimeout( 
+            (timer, channel) => {
+                channel.send(timer.getAnnounce());
+                timer.stopTimeout();
+                var temp_timer = setInterval((timer, channel) => {
+                    channel.send(timer.getAnnounce());
+                }, timer.getRepeat(), timer, channel);
+                timer.setInterval(temp_timer);
 //                console.log ("created a repeating timer for every " + repeat_time + " for " + announce);
             },
               (timers_list[i].getNext().valueOf() - startDate.valueOf()),
-              timers_list[i].getAnnounce(),
-              channel,
-              timers_list[i].getInterval()
+              timers_list[i],
+              channel
         );
+        timers_list[i].setTimeout(temp_timeout);
 //        console.log(timers_list[i].getAnnounce() + " next happens in " + (timers_list[i].getNext().valueOf() - startDate.valueOf() ) + " ms");
     }
     console.log ("Let's say that " +timers_list.length + " timeouts got created");

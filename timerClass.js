@@ -34,6 +34,8 @@ var Timer = function(in_object) {
         in_object.demand_offset = 0;
     }
     this.demand_offset = in_object.demand_offset;
+    this.timeout;
+    this.interval;
 }
 
 Timer.prototype.getNext = function() {
@@ -66,8 +68,46 @@ Timer.prototype.getDemandOffset = function () {
     return this.demand_offset;
 }
 
-Timer.prototype.getInterval = function() {
+Timer.prototype.getRepeat = function() {
     return this.repeat_time;
+}
+
+Timer.prototype.getTimeout = function() {
+    return this.timeout;
+}
+
+Timer.prototype.setTimeout = function(timeout) {
+    if (typeof timeout.ref() === "object") {
+        if (typeof this.timeout === "object" && typeof this.timeout.ref() === "object") {
+            this.stopTimeout();
+        }
+        this.timeout = timeout;
+    }
+}
+
+Timer.prototype.stopTimeout = function () {
+    if (typeof this.timeout.ref() === "object") {
+        clearTimeout(this.timeout);
+    }
+}
+
+Timer.prototype.getInterval = function() {
+    return this.interval;
+}
+
+Timer.prototype.setInterval = function(interval) {
+    if (typeof interval.ref() === "object") {
+        if (typeof this.interval === "object" && typeof this.interval.ref() === "object") {
+            this.stopInterval();
+        }
+        this.interval = interval;
+    }
+}
+
+Timer.prototype.stopInterval = function () {
+    if (typeof this.interval.ref() === "object") {
+        clearInterval(this.interval);
+    }
 }
 
 module.exports = Timer;
