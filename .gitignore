@@ -3,3 +3,5 @@ settings.json
 project.geany
 timer_settings.json.bak
 MHTimer.log
+.test_timers.json
+.timers.json
