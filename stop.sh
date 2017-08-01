@@ -6,10 +6,9 @@ if [ -f MHTimer.pid ]; then
   if [ $RC == 0 ]; then
     echo "Killing the old process: $OLDPID"
     kill $OLDPID
-  else
-    rm -f MHTimer.pid
-    #Process is gone
   fi
+  rm -f MHTimer.pid
+  #Process is gone
 else
   pkill -f "node MHTimer.js"
 fi
