@@ -11,8 +11,10 @@ const client = new Discord.Client();
 // var guild_id = '245584660757872640';
 var main_settings_filename = 'settings.json';
 var timer_settings_filename = 'timer_settings.json';
+var reminder_filename = 'reminders.json';
 
 var timers_list = [];
+var reminders = [];
 var file_encoding = 'utf8';
 var settings = {};
 
@@ -34,7 +36,9 @@ function Main() {
 
     // Create timers list from timers settings file
     a.then( createTimersList );
-//    var b = new Promise(createTimersList);
+    
+    // Load any saved reminders
+    a.then( loadReminders );
 
     // Bot start up tasks
     a.then(() => {
@@ -104,10 +108,10 @@ function createTimedAnnouncements(channel) {
     for (var i = 0; i < timers_list.length; i++) {
         temp_timeout = setTimeout( 
             (timer, channel) => {
-                channel.send(timer.getAnnounce());
+                doAnnounce(timer, channel);
                 timer.stopTimeout();
                 var temp_timer = setInterval((timer, channel) => {
-                    channel.send(timer.getAnnounce());
+                    doAnnounce(timer, channel);
                 }, timer.getRepeat(), timer, channel);
                 timer.setInterval(temp_timer);
 //                console.log ("created a repeating timer for every " + repeat_time + " for " + announce);
@@ -141,6 +145,61 @@ function messageParse(message) {
                 }
             }
             // console.log(typeof retStr);
+            break;
+        case 'remind':
+            if (tokens.length === 1) {
+                message.channel.send("Did you want me to remind you for sg, fg, reset, spill, or cove?");
+            } else {
+                var area = timerAliases(tokens[1].toLowerCase());
+                //confirm it is a valid area
+                var found = 0;
+                for (var i = 0; i < timers_list.length; i++) {
+                    if (timers_list[i].getArea() === area) {
+                        i = timers_list.length;
+                        found = 1;
+                    }
+                }
+                if (found === 0) {
+                    message.channel.send("I do not know the area '" + area + "', only sg, fg, reset, spill, or cove");
+                } else {
+                    var num = -1;
+                    var stop = 0;
+                    if (tokens.length === 3) {
+                        if (tokens[2].toLowerCase() === 'once') {
+                            num = 1;
+                        }
+                        else if (tokens[2].toLowerCase() === 'stop') {
+                            stop = 1;
+                            //Find the reminder and remove it
+                            var found = 0;
+                            for (key in reminders) {
+                                if ((reminders[key].user === message.author.id) && (reminders[key].area === area)) {
+                                    reminders[key].count = 0;
+                                    found = 1;
+                                }
+                            }
+                            if (found === 1) {
+                                message.channel.send("Reminder for '" + area + "' was turned off");
+                            } else {
+                                message.channel.send("I couldn't find a timer for you for '" + area);
+                            }
+                        }
+                        else {
+                            message.send("I only know 'once' and 'stop' as reminder frequency");
+                            return;
+                        }
+                    }
+                    if (stop === 0) {
+                        var remind = {  "count" : num,
+                                        "area" : area,
+                                        "user" : message.author.id
+                        }
+                        reminders.push(remind);
+                        message.channel.send("Reminder for " + area + " set");
+                    }
+                    saveReminders();
+                }
+            }
             break;
         default:
             message.channel.send("Right now I only know the word 'next' for timers: sg, fg, reset, spill, cove");
@@ -254,6 +313,61 @@ function timeLeft (in_date) {
         }
     }
     return retStr;
+}
+
+function loadReminders(resolve, reject) {
+    //Read the JSON into the reminders array
+    fs.readFile(reminder_filename, file_encoding, (err, data) => {
+        if (err) {
+            reject();
+            return console.log(err);
+        }
+
+        timers = JSON.parse(data);
+    });
+}
+
+function saveReminders () {
+    //Write out the JSON of the reminders array
+    var i = reminders.length;
+    while (i--) {
+        if (reminders[i].count === 0) {
+            reminders.splice(i, 1);
+        }
+    }
+    fs.writeFile(reminder_filename, JSON.stringify(reminders, null, 1), file_encoding, (err) => {
+        if (err) { 
+            reject();
+            return console.log(err);
+        }
+    });
+    console.log("Reminders saved: " + reminders.length);
+}
+
+function doAnnounce (timer, channel) {
+    //Announce into a channel, then process any reminders
+    channel.send(timer.getAnnounce());
+    
+    doRemind(timer);
+}
+
+function doRemind (timer) {
+    //Go through the reminder requests and process each
+    for (key in reminders) {
+        remind = reminders[key];
+//        console.log(JSON.stringify(remind, null, 1));
+        if ((timer.getArea() === remind.area) && (remind.count !== 0)) {
+            var user = client.users.get(remind.user);
+//            console.log("Got a user of " + typeof user + " when I tried with " + remind.user + " for " + remind.area);
+            if (user.presence !== 'dnd') {
+                user.send(timer.getAnnounce());
+            }
+            if (remind.count > 0) {
+                remind.count -= 1;
+            }
+        }
+    }
+    saveReminders();
 }
 
 //Resources:
