@@ -181,7 +181,7 @@ function messageParse(message) {
                             if (found === 1) {
                                 message.channel.send("Reminder for '" + area + "' was turned off");
                             } else {
-                                message.channel.send("I couldn't find a timer for you for '" + area);
+                                message.channel.send("I couldn't find a timer for you for '" + area + "'");
                             }
                         }
                         else {
@@ -343,7 +343,7 @@ function saveReminders () {
             return console.log(err);
         }
     });
-    console.log("Reminders saved: " + reminders.length);
+//    console.log("Reminders saved: " + reminders.length);
 }
 
 function doAnnounce (timer, channel) {
