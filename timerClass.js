@@ -30,10 +30,10 @@ var Timer = function(in_object) {
         in_object.demand_string = in_object.announce_string;
     }
     this.demand_string = in_object.demand_string;
-    if (typeof in_object.demand_offset == 'undefined') {
-        in_object.demand_offset = 0;
+    if (typeof in_object.announce_offset == 'undefined') {
+        in_object.announce_offset = 0;
     }
-    this.demand_offset = in_object.demand_offset;
+    this.announce_offset = in_object.announce_offset;
     this.timeout;
     this.interval;
 }
@@ -64,8 +64,8 @@ Timer.prototype.getDemand = function() {
     return this.demand_string ;
 }
 
-Timer.prototype.getDemandOffset = function () {
-    return this.demand_offset;
+Timer.prototype.getAnnounceOffset = function () {
+    return this.announce_offset;
 }
 
 Timer.prototype.getRepeat = function() {

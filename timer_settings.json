@@ -1,11 +1,11 @@
 [
  {
   "area": "fg",
-  "seed_time": "2017-07-24T11:45:00.000Z",
+  "seed_time": "2017-07-24T12:00:00.000Z",
   "repeat_time": 72000000,
   "announce_string": "**Forbidden Grove** The gate closes in 15 minutes, travel early",
   "demand_string": "**Forbidden Grove** Travel early, the gate closes",
-  "demand_offset": 900000
+  "announce_offset": 900000
  },
  {
   "area": "fg",
