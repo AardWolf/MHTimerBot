@@ -315,15 +315,17 @@ function timeLeft (in_date) {
     return retStr;
 }
 
-function loadReminders(resolve, reject) {
+function loadReminders() {
     //Read the JSON into the reminders array
+    console.log("loading reminders");
     fs.readFile(reminder_filename, file_encoding, (err, data) => {
         if (err) {
-            reject();
-            return console.log(err);
+            console.log(err);
+            return undefined;
         }
 
-        timers = JSON.parse(data);
+        reminders = JSON.parse(data);
+        console.log (reminders.length + " reminders loaded");
     });
 }
 
