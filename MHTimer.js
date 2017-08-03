@@ -131,6 +131,7 @@ function messageParse(message) {
     var tokens = [];
     tokens = splitString(message.content);
     tokens.shift();
+    var usage_string;
     switch (tokens[0].toLowerCase()) {
         case 'next':
             //TODO - This should be a PM, probably?
@@ -147,58 +148,11 @@ function messageParse(message) {
             // console.log(typeof retStr);
             break;
         case 'remind':
+            usage_string = "Usage: `-mh remind <sg|fg|reset|spill|cove> [once|stop]` where once/stop are optional";
             if (tokens.length === 1) {
-                message.channel.send("Did you want me to remind you for sg, fg, reset, spill, or cove?");
+                message.channel.send("Did you want me to remind you for sg, fg, reset, spill, or cove?\n" + usage_string);
             } else {
-                var area = timerAliases(tokens[1].toLowerCase());
-                //confirm it is a valid area
-                var found = 0;
-                for (var i = 0; i < timers_list.length; i++) {
-                    if (timers_list[i].getArea() === area) {
-                        i = timers_list.length;
-                        found = 1;
-                    }
-                }
-                if (found === 0) {
-                    message.channel.send("I do not know the area '" + area + "', only sg, fg, reset, spill, or cove");
-                } else {
-                    var num = -1;
-                    var stop = 0;
-                    if (tokens.length === 3) {
-                        if (tokens[2].toLowerCase() === 'once') {
-                            num = 1;
-                        }
-                        else if (tokens[2].toLowerCase() === 'stop') {
-                            stop = 1;
-                            //Find the reminder and remove it
-                            var found = 0;
-                            for (key in reminders) {
-                                if ((reminders[key].user === message.author.id) && (reminders[key].area === area)) {
-                                    reminders[key].count = 0;
-                                    found = 1;
-                                }
-                            }
-                            if (found === 1) {
-                                message.channel.send("Reminder for '" + area + "' was turned off");
-                            } else {
-                                message.channel.send("I couldn't find a timer for you for '" + area + "'");
-                            }
-                        }
-                        else {
-                            message.send("I only know 'once' and 'stop' as reminder frequency");
-                            return;
-                        }
-                    }
-                    if (stop === 0) {
-                        var remind = {  "count" : num,
-                                        "area" : area,
-                                        "user" : message.author.id
-                        }
-                        reminders.push(remind);
-                        message.channel.send("Reminder for " + area + " set");
-                    }
-                    saveReminders();
-                }
+                message.channel.send(addRemind(tokens, message));
             }
             break;
         default:
@@ -250,6 +204,43 @@ function timerAliases(timerName) {
         case 'tide':
             timerName = 'cove';
             break;
+        case 'lowtide':
+            timerName = 'low';
+            break;
+        case 'midtide':
+            timerName = 'mid';
+            break;
+        case 'hightide':
+            timerName = 'high';
+            break;
+        case 'fall':
+            timerName = 'autumn';
+            break;
+        case 'archduke':
+        case 'ad':
+        case 'archduchess':
+            timerName = 'arch';
+            break;
+        case 'grandduke':
+        case 'gd':
+        case 'grandduchess':
+            timerName = 'grand';
+            break;
+        case 'duchess':
+            timerName = 'duke';
+            break;
+        case 'countess':
+            timerName = 'count';
+            break;
+        case 'baronness':
+            timerName = 'baron';
+            break;
+        case 'lady':
+            timerName = 'lord';
+            break;
+        case 'heroine':
+            timerName = 'hero';
+            break;
     }
     return timerName;
 }
@@ -276,7 +267,6 @@ function nextTimer(timerName) {
     if (typeof youngTimer == 'undefined') {
         return retStr;
     } else {
-        var announceDate = new Date(youngTimer.getNext().valueOf() + youngTimer.getDemandOffset());
         retStr = new Discord.RichEmbed()
 //            .setTitle("next " + timerName) // removing this cleaned up the embed a lot
             .setDescription(youngTimer.getDemand() + "\n" + timeLeft(youngTimer.getNext())) // Putting here makes it look nicer and fit in portrait mode
@@ -371,6 +361,76 @@ function doRemind (timer) {
         }
     }
     saveReminders();
+}
+
+function addRemind(tokens, message) {
+    //Add (or remove) a reminder
+    var area = timerAliases(tokens[1].toLowerCase());
+    var response_str;
+    //confirm it is a valid area
+    var found = 0;
+    for (var i = 0; i < timers_list.length; i++) {
+        if (timers_list[i].getArea() === area) {
+            found = 1;
+            break;
+        }
+    }
+    if (found === 0) {
+        return "I do not know the area '" + area + "', only sg, fg, reset, spill, or cove";
+    } 
+    var num = -1;
+    var stop = 0;
+    if (tokens.length === 3) {
+        if (tokens[2].toLowerCase() === 'once') {
+            num = 1;
+        }
+        else if (!isNaN(parseInt(tokens[2]))) {
+            num = parseInt(tokens[2]);
+            if (num < 0) { num = -1; }
+        }
+        else if (tokens[2].toLowerCase() === 'stop') {
+            stop = 1;
+            //Find the reminder and remove it
+            var found = 0;
+            for (key in reminders) {
+                if ((reminders[key].user === message.author.id) && (reminders[key].area === area)) {
+                    reminders[key].count = 0;
+                    found = 1;
+                }
+            }
+            if (found === 1) {
+                response_str = "Reminder for '" + area + "' was turned off";
+            } else {
+                response_str = "I couldn't find a timer for you for '" + area + "'";
+            }
+        }
+        else {
+            return "I only know 'once' and 'stop' as reminder frequency";
+        }
+    }
+    if (stop === 0) {
+        var remind = {  "count" : num,
+                        "area" : area,
+                        "user" : message.author.id
+        }
+        //Make sure the reminder doesn't already exist
+        found = 0;
+        for (var i = 0; i < reminders.length; i++) {
+            if ((reminders[i].user === message.author.id) &&
+                (reminders[i].area === area)) 
+            {
+                response_str = "I already have a reminder for " + area + " for you.";
+                found = 1;
+                break;
+            }
+        }
+        if (found === 0) {
+            reminders.push(remind);
+            response_str = "Reminder for " + area + " set";
+        }
+    }
+    saveReminders();
+    return response_str;
 }
 
 //Resources:
