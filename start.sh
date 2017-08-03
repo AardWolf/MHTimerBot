@@ -17,4 +17,13 @@ if [ -f MHTimer.log ]; then
   mv MHTimer.log MHTimer.log.0
 fi
 nohup node MHTimer.js > MHTimer.log 2>&1 &
-echo $! >MHTimer.pid
+PID=$!
+echo $PID >MHTimer.pid
+sleep 1
+ps $PID
+RC=$?
+if [ $RC -eq 0 ]; then
+  echo "Bot started as $PID"
+else
+  echo "Bot did not start. I thought it was ${PID}. Check MHTimer.log and remove MHTimer.pid"
+fi
