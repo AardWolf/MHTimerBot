@@ -30,10 +30,12 @@ var Timer = function(in_object) {
         in_object.demand_string = in_object.announce_string;
     }
     this.demand_string = in_object.demand_string;
-    if (typeof in_object.demand_offset == 'undefined') {
-        in_object.demand_offset = 0;
+    if (typeof in_object.announce_offset == 'undefined') {
+        in_object.announce_offset = 0;
     }
-    this.demand_offset = in_object.demand_offset;
+    this.announce_offset = in_object.announce_offset;
+    this.timeout;
+    this.interval;
 }
 
 Timer.prototype.getNext = function() {
@@ -62,12 +64,50 @@ Timer.prototype.getDemand = function() {
     return this.demand_string ;
 }
 
-Timer.prototype.getDemandOffset = function () {
-    return this.demand_offset;
+Timer.prototype.getAnnounceOffset = function () {
+    return this.announce_offset;
+}
+
+Timer.prototype.getRepeat = function() {
+    return this.repeat_time;
+}
+
+Timer.prototype.getTimeout = function() {
+    return this.timeout;
+}
+
+Timer.prototype.setTimeout = function(timeout) {
+    if (typeof timeout.ref() === "object") {
+        if (typeof this.timeout === "object" && typeof this.timeout.ref() === "object") {
+            this.stopTimeout();
+        }
+        this.timeout = timeout;
+    }
+}
+
+Timer.prototype.stopTimeout = function () {
+    if (typeof this.timeout.ref() === "object") {
+        clearTimeout(this.timeout);
+    }
 }
 
 Timer.prototype.getInterval = function() {
-    return this.repeat_time;
+    return this.interval;
+}
+
+Timer.prototype.setInterval = function(interval) {
+    if (typeof interval.ref() === "object") {
+        if (typeof this.interval === "object" && typeof this.interval.ref() === "object") {
+            this.stopInterval();
+        }
+        this.interval = interval;
+    }
+}
+
+Timer.prototype.stopInterval = function () {
+    if (typeof this.interval.ref() === "object") {
+        clearInterval(this.interval);
+    }
 }
 
 module.exports = Timer;
