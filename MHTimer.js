@@ -152,7 +152,7 @@ function messageParse(message) {
             if (tokens.length === 1) {
                 message.channel.send("Did you want me to remind you for sg, fg, reset, spill, or cove?\n" + usage_string);
             } else {
-                message.channel.send(addRemind(tokens));
+                message.channel.send(addRemind(tokens, message));
             }
             break;
         default:
@@ -267,7 +267,6 @@ function nextTimer(timerName) {
     if (typeof youngTimer == 'undefined') {
         return retStr;
     } else {
-        var announceDate = new Date(youngTimer.getNext().valueOf() + youngTimer.getDemandOffset());
         retStr = new Discord.RichEmbed()
 //            .setTitle("next " + timerName) // removing this cleaned up the embed a lot
             .setDescription(youngTimer.getDemand() + "\n" + timeLeft(youngTimer.getNext())) // Putting here makes it look nicer and fit in portrait mode
@@ -364,7 +363,7 @@ function doRemind (timer) {
     saveReminders();
 }
 
-function addRemind(tokens) {
+function addRemind(tokens, message) {
     //Add (or remove) a reminder
     var area = timerAliases(tokens[1].toLowerCase());
     var response_str;
@@ -372,8 +371,8 @@ function addRemind(tokens) {
     var found = 0;
     for (var i = 0; i < timers_list.length; i++) {
         if (timers_list[i].getArea() === area) {
-            i = timers_list.length;
             found = 1;
+            break;
         }
     }
     if (found === 0) {
@@ -421,8 +420,8 @@ function addRemind(tokens) {
                 (reminders[i].area === area)) 
             {
                 response_str = "I already have a reminder for " + area + " for you.";
-                i = reminders.length;
                 found = 1;
+                break;
             }
         }
         if (found === 0) {
