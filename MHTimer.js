@@ -172,6 +172,7 @@ function messageParse(message) {
                         }
                         else if (!isNaN(parseInt(tokens[2]))) {
                             num = parseInt(tokens[2]);
+                            if (num < 0) { num = -1; }
                         }
                         else if (tokens[2].toLowerCase() === 'stop') {
                             stop = 1;
