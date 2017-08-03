@@ -204,6 +204,43 @@ function timerAliases(timerName) {
         case 'tide':
             timerName = 'cove';
             break;
+        case 'lowtide':
+            timerName = 'low';
+            break;
+        case 'midtide':
+            timerName = 'mid';
+            break;
+        case 'hightide':
+            timerName = 'high';
+            break;
+        case 'fall':
+            timerName = 'autumn';
+            break;
+        case 'archduke':
+        case 'ad':
+        case 'archduchess':
+            timerName = 'arch';
+            break;
+        case 'grandduke':
+        case 'gd':
+        case 'grandduchess':
+            timerName = 'grand';
+            break;
+        case 'duchess':
+            timerName = 'duke';
+            break;
+        case 'countess':
+            timerName = 'count';
+            break;
+        case 'baronness':
+            timerName = 'baron';
+            break;
+        case 'lady':
+            timerName = 'lord';
+            break;
+        case 'heroine':
+            timerName = 'hero';
+            break;
     }
     return timerName;
 }
