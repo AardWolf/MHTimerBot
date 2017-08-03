@@ -267,6 +267,7 @@ function nextTimer(timerName) {
     if (typeof youngTimer == 'undefined') {
         return retStr;
     } else {
+        var announceDate = new Date(youngTimer.getNext().valueOf() + youngTimer.getDemandOffset());
         retStr = new Discord.RichEmbed()
 //            .setTitle("next " + timerName) // removing this cleaned up the embed a lot
             .setDescription(youngTimer.getDemand() + "\n" + timeLeft(youngTimer.getNext())) // Putting here makes it look nicer and fit in portrait mode
