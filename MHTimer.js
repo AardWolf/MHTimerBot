@@ -131,6 +131,7 @@ function messageParse(message) {
     var tokens = [];
     tokens = splitString(message.content);
     tokens.shift();
+    var usage_string;
     switch (tokens[0].toLowerCase()) {
         case 'next':
             //TODO - This should be a PM, probably?
@@ -147,8 +148,9 @@ function messageParse(message) {
             // console.log(typeof retStr);
             break;
         case 'remind':
+            usage_string = "Usage: `-mh remind <sg|fg|reset|spill|cove> [once|stop]` where once/stop are optional";
             if (tokens.length === 1) {
-                message.channel.send("Did you want me to remind you for sg, fg, reset, spill, or cove?");
+                message.channel.send("Did you want me to remind you for sg, fg, reset, spill, or cove?\n" + usage_string);
             } else {
                 var area = timerAliases(tokens[1].toLowerCase());
                 //confirm it is a valid area
@@ -160,13 +162,16 @@ function messageParse(message) {
                     }
                 }
                 if (found === 0) {
-                    message.channel.send("I do not know the area '" + area + "', only sg, fg, reset, spill, or cove");
+                    message.channel.send("I do not know the area '" + area + "', only sg, fg, reset, spill, or cove\n" + usage_string);
                 } else {
                     var num = -1;
                     var stop = 0;
                     if (tokens.length === 3) {
                         if (tokens[2].toLowerCase() === 'once') {
                             num = 1;
+                        }
+                        else if (!isNaN(parseInt(tokens[2]))) {
+                            num = parseInt(tokens[2]);
                         }
                         else if (tokens[2].toLowerCase() === 'stop') {
                             stop = 1;
@@ -185,7 +190,7 @@ function messageParse(message) {
                             }
                         }
                         else {
-                            message.send("I only know 'once' and 'stop' as reminder frequency");
+                            message.send("I only know 'once' and 'stop' as reminder frequency\n" + usage_string);
                             return;
                         }
                     }
