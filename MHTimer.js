@@ -152,59 +152,7 @@ function messageParse(message) {
             if (tokens.length === 1) {
                 message.channel.send("Did you want me to remind you for sg, fg, reset, spill, or cove?\n" + usage_string);
             } else {
-                var area = timerAliases(tokens[1].toLowerCase());
-                //confirm it is a valid area
-                var found = 0;
-                for (var i = 0; i < timers_list.length; i++) {
-                    if (timers_list[i].getArea() === area) {
-                        i = timers_list.length;
-                        found = 1;
-                    }
-                }
-                if (found === 0) {
-                    message.channel.send("I do not know the area '" + area + "', only sg, fg, reset, spill, or cove\n" + usage_string);
-                } else {
-                    var num = -1;
-                    var stop = 0;
-                    if (tokens.length === 3) {
-                        if (tokens[2].toLowerCase() === 'once') {
-                            num = 1;
-                        }
-                        else if (!isNaN(parseInt(tokens[2]))) {
-                            num = parseInt(tokens[2]);
-                            if (num < 0) { num = -1; }
-                        }
-                        else if (tokens[2].toLowerCase() === 'stop') {
-                            stop = 1;
-                            //Find the reminder and remove it
-                            var found = 0;
-                            for (key in reminders) {
-                                if ((reminders[key].user === message.author.id) && (reminders[key].area === area)) {
-                                    reminders[key].count = 0;
-                                    found = 1;
-                                }
-                            }
-                            if (found === 1) {
-                                message.channel.send("Reminder for '" + area + "' was turned off");
-                            } else {
-                                message.channel.send("I couldn't find a timer for you for '" + area + "'");
-                            }
-                        }
-                        else {
-                            message.send("I only know 'once' and 'stop' as reminder frequency\n" + usage_string);
-                            return;
-                        }
-                    }
-                    if (stop === 0) {
-                        var remind = {  "count" : num,
-                                        "area" : area,
-                                        "user" : message.author.id
-                        }
-                        reminders.push(remind);
-                        message.channel.send("Reminder for " + area + " set");
-                    }
-                    saveReminders();
-                }
+                message.channel.send(addRemind(tokens));
             }
             break;
         default:
@@ -376,6 +324,76 @@ function doRemind (timer) {
         }
     }
     saveReminders();
+}
+
+function addRemind(tokens) {
+    //Add (or remove) a reminder
+    var area = timerAliases(tokens[1].toLowerCase());
+    var response_str;
+    //confirm it is a valid area
+    var found = 0;
+    for (var i = 0; i < timers_list.length; i++) {
+        if (timers_list[i].getArea() === area) {
+            i = timers_list.length;
+            found = 1;
+        }
+    }
+    if (found === 0) {
+        return "I do not know the area '" + area + "', only sg, fg, reset, spill, or cove";
+    } 
+    var num = -1;
+    var stop = 0;
+    if (tokens.length === 3) {
+        if (tokens[2].toLowerCase() === 'once') {
+            num = 1;
+        }
+        else if (!isNaN(parseInt(tokens[2]))) {
+            num = parseInt(tokens[2]);
+            if (num < 0) { num = -1; }
+        }
+        else if (tokens[2].toLowerCase() === 'stop') {
+            stop = 1;
+            //Find the reminder and remove it
+            var found = 0;
+            for (key in reminders) {
+                if ((reminders[key].user === message.author.id) && (reminders[key].area === area)) {
+                    reminders[key].count = 0;
+                    found = 1;
+                }
+            }
+            if (found === 1) {
+                response_str = "Reminder for '" + area + "' was turned off";
+            } else {
+                response_str = "I couldn't find a timer for you for '" + area + "'";
+            }
+        }
+        else {
+            return "I only know 'once' and 'stop' as reminder frequency";
+        }
+    }
+    if (stop === 0) {
+        var remind = {  "count" : num,
+                        "area" : area,
+                        "user" : message.author.id
+        }
+        //Make sure the reminder doesn't already exist
+        found = 0;
+        for (var i = 0; i < reminders.length; i++) {
+            if ((reminders[i].user === message.author.id) &&
+                (reminders[i].area === area)) 
+            {
+                response_str = "I already have a reminder for " + area + " for you.";
+                i = reminders.length;
+                found = 1;
+            }
+        }
+        if (found === 0) {
+            reminders.push(remind);
+            response_str = "Reminder for " + area + " set";
+        }
+    }
+    saveReminders();
+    return response_str;
 }
 
 //Resources:
