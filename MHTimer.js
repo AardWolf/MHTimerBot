@@ -349,9 +349,19 @@ function doRemind (timer) {
     for (key in reminders) {
         remind = reminders[key];
 //        console.log(JSON.stringify(remind, null, 1));
-        if ((timer.getArea() === remind.area) && (remind.count !== 0)) {
+        if ((timer.getArea() === remind.area) && 
+            (remind.count !== 0) &&
+            (   (typeof remind.sub_area === 'undefined') ||
+                (typeof timer.getSubArea() !== 'undefined') &&
+                (timer.getSubArea() === remind.sub_area))
+           )
+        {
             var user = client.users.get(remind.user);
 //            console.log("Got a user of " + typeof user + " when I tried with " + remind.user + " for " + remind.area);
+            if (typeof user !== 'object') {
+                remind.count = 0;
+                continue;
+            }
             if (user.presence !== 'dnd') {
                 user.send(timer.getAnnounce());
             }
@@ -419,7 +429,9 @@ function addRemind(tokens, message) {
     
     if (num === 0) {
         //This is the stop case
-        for (var i = 0; i < reminders.length; i++) {
+        var i = reminders.length;
+        while (i--) {
+//        for (var i = 0; i < reminders.length; i++) {
             if ((reminders[i].user === message.author.id) &&
                 (reminders[i].area === area))
             {
@@ -427,19 +439,23 @@ function addRemind(tokens, message) {
                     (typeof reminders[i].sub_area !== 'undefined') && 
                     (reminders[i].sub_area === sub_area))
                 {
-                    reminders[i].num = 0;
+                    reminders[i].count = 0;
+                    response_str = "Reminder for " + reminders[i].area + " (" + reminders[i].sub_area + ") turned off ";
+                    reminders.splice(i,1);
                     turned_off++;
-                    response_str = "Reminder for " + reminders[i].area + "(" + reminders[i].sub_area + ") turned off";
                 }
                 else if (!has_sub_area) {
-                    reminders[i].num = 0;
+                    reminders[i].count = 0;
+                    response_str = "Reminder for " + reminders[i].area + " (all sub areas) turned off ";
+                    reminders.splice(i,1);
                     turned_off++;
-                    response_str = "Reminder for " + reminders[i].area + "(all sub areas) turned off";
                 }
             }
         }
         if (turned_off === 0) {
             response_str = "I couldn't find a reminder for you in " + area;
+        } else {
+            saveReminders();
         }
         return response_str;
     }// end stop case
