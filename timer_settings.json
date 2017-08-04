@@ -90,7 +90,7 @@
  {
   "area": "spill",
   "sub_area": "arch",
-  "seed_time": "2017-06-02T11:00:00.000Z",
+  "seed_time": "2017-06-03T11:00:00.000Z",
   "repeat_time": 1087200000,
   "announce_string": "**Toxic Spill** Archduke levels for 24 hours",
   "demand_string": "**Toxic Spill** Archduke level starts"
@@ -98,7 +98,7 @@
  {
   "area": "spill",
   "sub_area": "grand",
-  "seed_time": "2017-05-20T21:00:00.000Z",
+  "seed_time": "2017-06-04T11:00:00.000Z",
   "repeat_time": 1087200000,
   "announce_string": "**Toxic Spill** Levels fall through Grand Duke/Duchess for 24 hours",
   "demand_string": "**Toxic Spill** Grand Duke/Duchess level starts (falling)"
@@ -106,7 +106,7 @@
  {
   "area": "spill",
   "sub_area": "duke",
-  "seed_time": "2017-05-23T21:00:00.000Z",
+  "seed_time": "2017-06-05T11:00:00.000Z",
   "repeat_time": 1087200000,
   "announce_string": "**Toxic Spill** Levels fall through Duke/Duchess for 24 hours",
   "demand_string": "**Toxic Spill** Duke/Duchess level starts (falling)"
@@ -114,7 +114,7 @@
  {
   "area": "spill",
   "sub_area": "count",
-  "seed_time": "2017-05-24T21:00:00.000Z",
+  "seed_time": "2017-06-06T11:00:00.000Z",
   "repeat_time": 1087200000,
   "announce_string": "**Toxic Spill** Levels fall through Count/Countess for 24 hours",
   "demand_string": "**Toxic Spill** Count/Countess level starts (falling)"
@@ -122,7 +122,7 @@
  {
   "area": "spill",
   "sub_area": "baron",
-  "seed_time": "2017-05-25T21:00:00.000Z",
+  "seed_time": "2017-06-07T11:00:00.000Z",
   "repeat_time": 1087200000,
   "announce_string": "**Toxic Spill** Levels fall through Baron/Baroness for 18 hours",
   "demand_string": "**Toxic Spill** Baron/Baroness level starts (falling)"
@@ -130,7 +130,7 @@
  {
   "area": "spill",
   "sub_area": "lord",
-  "seed_time": "2017-05-25T15:00:00.000Z",
+  "seed_time": "2017-06-08T05:00:00.000Z",
   "repeat_time": 1087200000,
   "announce_string": "**Toxic Spill** Levels fall through Lord/Lady for 18 hours",
   "demand_string": "**Toxic Spill** Lord/Lady level starts (falling)"
@@ -138,7 +138,7 @@
  {
   "area": "spill",
   "sub_area": "knight",
-  "seed_time": "2017-05-27T09:00:00.000Z",
+  "seed_time": "2017-06-08T23:00:00.000Z",
   "repeat_time": 1087200000,
   "announce_string": "**Toxic Spill** Levels fall through Knight for 16 hours",
   "demand_string": "**Toxic Spill** Knight level starts (falling)"
@@ -146,7 +146,7 @@
  {
   "area": "spill",
   "sub_area": "hero",
-  "seed_time": "2017-05-28T01:00:00.000Z",
+  "seed_time": "2017-06-09T15:00:00.000Z",
   "repeat_time": 1087200000,
   "announce_string": "**Toxic Spill** Levels at Hero for 30 hours",
   "demand_string": "**Toxic Spill** Hero level starts (falling then rising)"
@@ -154,7 +154,7 @@
  {
   "area": "spill",
   "sub_area": "knight",
-  "seed_time": "2017-05-29T07:00:00.000Z",
+  "seed_time": "2017-06-10T21:00:00.000Z",
   "repeat_time": 1087200000,
   "announce_string": "**Toxic Spill** Levels rising through Knight for 16 hours",
   "demand_string": "**Toxic Spill** Knight level starts (rising)"
@@ -162,7 +162,7 @@
  {
   "area": "spill",
   "sub_area": "lord",
-  "seed_time": "2017-05-29T23:00:00.000Z",
+  "seed_time": "2017-06-11T13:00:00.000Z",
   "repeat_time": 1087200000,
   "announce_string": "**Toxic Spill** Levels rising through Lord/Lady for 18 hours",
   "demand_string": "**Toxic Spill** Lord/Lady level starts (rising)"
@@ -170,7 +170,7 @@
  {
   "area": "spill",
   "sub_area": "baron",
-  "seed_time": "2017-05-30T17:00:00.000Z",
+  "seed_time": "2017-06-12T07:00:00.000Z",
   "repeat_time": 1087200000,
   "announce_string": "**Toxic Spill** Levels rising through Baron/Baroness for 18 hours",
   "demand_string": "**Toxic Spill** Baron/Baroness level starts (rising)"
@@ -178,7 +178,7 @@
  {
   "area": "spill",
   "sub_area": "count",
-  "seed_time": "2017-05-31T11:00:00.000Z",
+  "seed_time": "2017-06-13T01:00:00.000Z",
   "repeat_time": 1087200000,
   "announce_string": "**Toxic Spill** Levels rising through Count/Countess for 24 hours",
   "demand_string": "**Toxic Spill** Count/Countess level starts (rising)"
@@ -186,7 +186,7 @@
  {
   "area": "spill",
   "sub_area": "duke",
-  "seed_time": "2017-06-01T11:00:00.000Z",
+  "seed_time": "2017-06-14T01:00:00.000Z",
   "repeat_time": 1087200000,
   "announce_string": "**Toxic Spill** Levels rising through Duke/Duchess for 24 hours",
   "demand_string": "**Toxic Spill** Duke/Duchess level starts (rising)"
@@ -194,7 +194,7 @@
  {
   "area": "spill",
   "sub_area": "grand",
-  "seed_time": "2017-06-02T11:00:00.000Z",
+  "seed_time": "2017-06-15T01:00:00.000Z",
   "repeat_time": 1087200000,
   "announce_string": "**Toxic Spill** Levels rising through Grand Duke/Duchess for 24 hours",
   "demand_string": "**Toxic Spill** Grand Duke/Duchess level starts (rising)"
