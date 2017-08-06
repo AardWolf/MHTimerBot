@@ -376,7 +376,7 @@ function doRemind (timer) {
 function addRemind(tokens, message) {
     //Add (or remove) a reminder
     var area = timerAliases(tokens[1].toLowerCase());
-    var response_str;
+    var response_str = "Tell aardwolf what you did. This used to break the bot";
     var sub_area;
     var num = -1;
     var timer_found = -1;
