@@ -376,7 +376,7 @@ function doRemind (timer) {
 function addRemind(tokens, message) {
     //Add (or remove) a reminder
     var area = timerAliases(tokens[1].toLowerCase());
-    var response_str;
+    var response_str = "Tell aardwolf what you did. This used to break the bot";
     var sub_area;
     var num = -1;
     var timer_found = -1;
@@ -456,6 +456,11 @@ function addRemind(tokens, message) {
             response_str = "I couldn't find a reminder for you in " + area;
         } else {
             saveReminders();
+        }
+        if (typeof response_str === 'undefined') {
+            console.log("response_str got undefined");
+            console.log(tokens);
+            response_str = "That was a close one, I almost crashed!";
         }
         return response_str;
     }// end stop case
