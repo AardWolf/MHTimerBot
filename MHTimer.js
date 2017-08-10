@@ -427,6 +427,10 @@ function addRemind(tokens, message) {
         return "I do not know the area '" + area + "', only sg, fg, reset, spill, or cove";
     } 
     
+    if (has_sub_area == 0) {
+        sub_area = undefined;
+    }
+    
     if (num === 0) {
         //This is the stop case
         var i = reminders.length;
@@ -470,28 +474,30 @@ function addRemind(tokens, message) {
                     "area" : area,
                     "user" : message.author.id
     }
-    if (has_sub_area) {
+    if (has_sub_area === 1) {
         remind.sub_area = sub_area;
     }
     //Make sure the reminder doesn't already exist
     found = 0;
     for (var i = 0; i < reminders.length; i++) {
         if ((reminders[i].user === message.author.id) &&
-            (reminders[i].area === area) &&
-            (   (typeof remind.sub_area === 'undefined') &&
-                (typeof reminders[i].sub_area === 'undefined')) ||
-            (   (typeof remind.sub_area !== 'undefined') &&
-                (typeof reminders[i].sub_area !== 'undefined') &&
-                (reminders[i].sub_area === remind.sub_area))
-            )
+            (reminders[i].area === area))
         {
-            response_str = "I already have a reminder for " + area;
-            if (typeof remind.sub_area !== 'undefined') {
-                reponse_str += " (" + remind.sub_area + ")";
+            if ((typeof remind.sub_area === 'undefined') &&
+                (typeof reminders[i].sub_area === 'undefined'))
+            {
+                response_str = "I already have a reminder for " + area + " for you";
+                found = 1;
+                break;
             }
-            response_str += " for you";
-            found = 1;
-            break;
+            else if ((typeof remind.sub_area !== 'undefined') &&
+                     (typeof reminders[i].sub_area !== 'undefined') &&
+                     (reminders[i].sub_area === remind.sub_area))
+            {
+                response_str = "I already have a remind for " + area + " (" + remind.sub_area + ") for you";
+                found = 1;
+                break;
+            }
         }
     }
     if (found === 0) {
