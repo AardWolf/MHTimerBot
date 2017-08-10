@@ -502,6 +502,11 @@ function addRemind(tokens, message) {
         }
         response_str += " set";
     }
+    if (typeof response_str === 'undefined') {
+        console.log("response_str got undefined");
+        console.log(tokens);
+        response_str = "That was a close one, I almost crashed!";
+    }
     saveReminders();
     return response_str;
 }
