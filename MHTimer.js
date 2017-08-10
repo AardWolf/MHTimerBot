@@ -371,7 +371,7 @@ function doRemind (timer) {
                 } else {
                     usage_str += remind.count;
                 }
-                usage_str += " reminders left for this timer. Use `-mh remind `" + remind.area;
+                usage_str += " reminders left for this timer. Use `-mh remind " + remind.area;
                 if (typeof remind.sub_area !== 'undefined') {
                     usage_str += " " + remind.sub_area;
                 }
