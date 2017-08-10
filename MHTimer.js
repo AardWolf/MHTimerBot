@@ -346,6 +346,7 @@ function doAnnounce (timer, channel) {
 
 function doRemind (timer) {
     //Go through the reminder requests and process each
+    var usage_str = "";
     for (key in reminders) {
         remind = reminders[key];
 //        console.log(JSON.stringify(remind, null, 1));
@@ -364,6 +365,18 @@ function doRemind (timer) {
             }
             if (user.presence !== 'dnd') {
                 user.send(timer.getAnnounce());
+                usage_str = "You have ";
+                if (remind.count < 0) {
+                    usage_str += "unlimited";
+                } else {
+                    usage_str += remind.count;
+                }
+                usage_str += " reminders left for this timer. Use `-mh remind `" + remind.area;
+                if (typeof remind.sub_area !== 'undefined') {
+                    usage_str += " " + remind.sub_area;
+                }
+                usage_str += " stop` to end them sooner";
+                user.send(usage_str);
             }
             if (remind.count > 0) {
                 remind.count -= 1;
