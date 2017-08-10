@@ -246,13 +246,18 @@ function timerAliases(timerName) {
 }
 
 //Returns the next occurrence of the class of timers
+//TODO - this should take an array as an argument and process the words passed in
 function nextTimer(timerName) {
     var retStr = "I do not know the timer '" + timerName + "' but I do know: sg, fg, reset, spill, cove";
     var youngTimer;
     timerName = timerAliases(timerName);
     switch (timerName) {
         case 'ronza':
+        case 'aznor':
             retStr = 'She just left 10 minutes ago. I guess you missed her';
+            break;
+        case 'larry':
+            retStr = 'He was here handing out TTTs. Where were you?';
             break;
     }
 
