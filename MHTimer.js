@@ -131,14 +131,26 @@ function messageParse(message) {
     var tokens = [];
     tokens = splitString(message.content);
     tokens.shift();
+    var command = tokens.shift();
+    var timerName; // This has area and sub_area possibly defined
+    if (typeof command === 'undefined') {
+        message.channel.send("I didn't understand. I know 'next' and 'remind'");
+        return;
+    } else {
+        if (tokens.length >= 1) {
+            timerName = timerAliases(tokens);
+        } else {
+            timerName = {};
+        }
+    }
     var usage_string;
-    switch (tokens[0].toLowerCase()) {
+    switch (command) {
         case 'next':
             //TODO - This should be a PM, probably?
-            if (tokens.length === 1) { 
+            if ((tokens.length === 0) || (typeof timerName.area === 'undefined')) { 
                 message.channel.send("Did you want to know about sg, fg, reset, spill, or cove?"); 
             } else {
-                var retStr = nextTimer(tokens[1].toLowerCase());
+                var retStr = nextTimer(timerName);
                 if (typeof retStr === "string") {
                     message.channel.send(retStr);
                 } else {
@@ -174,97 +186,137 @@ function splitString(inString) {
     return returnArray;
 }
 
-function timerAliases(timerName) {
-    switch (timerName.toLowerCase()) {
-        case 'sg':
-        case 'seasonal':
-        case 'season':
-        case 'garden':
-            timerName = 'sg';
-            break;
-        case 'fg':
-        case 'grove':
-        case 'gate':
-        case 'realm':
-            timerName = 'fg';
-            break;
-        case 'reset':
-        case 'game':
-        case 'rh':
-        case 'midnight':
-            timerName = 'reset';
-            break;
-        case 'spill':
-        case 'toxic':
-        case 'ts':
-            timerName = 'spill';
-            break;
-        case 'cove':
-        case 'balack':
-        case 'tide':
-            timerName = 'cove';
-            break;
-        case 'lowtide':
-            timerName = 'low';
-            break;
-        case 'midtide':
-            timerName = 'mid';
-            break;
-        case 'hightide':
-            timerName = 'high';
-            break;
-        case 'fall':
-            timerName = 'autumn';
-            break;
-        case 'archduke':
-        case 'ad':
-        case 'archduchess':
-            timerName = 'arch';
-            break;
-        case 'grandduke':
-        case 'gd':
-        case 'grandduchess':
-            timerName = 'grand';
-            break;
-        case 'duchess':
-            timerName = 'duke';
-            break;
-        case 'countess':
-            timerName = 'count';
-            break;
-        case 'baronness':
-            timerName = 'baron';
-            break;
-        case 'lady':
-            timerName = 'lord';
-            break;
-        case 'heroine':
-            timerName = 'hero';
-            break;
+function timerAliases(tokens) {
+    var timerQuery = {};
+    var timerName;
+    for (var i = 0; i < tokens.length; i++) {
+        timerName = tokens[i].toLowerCase();
+        switch (timerName.toLowerCase()) {
+            case 'sg':
+            case 'seasonal':
+            case 'season':
+            case 'garden':
+                timerQuery.area = 'sg';
+                break;
+            case 'fall':
+            case 'autumn':
+                timerQuery.area = 'sg';
+                timerQuery.sub_area = 'autumn';
+                break;
+            case 'spring':
+                timerQuery.area = 'sg';
+                timerQuery.sub_area = 'spring';
+                break;
+            case 'summer':
+                timerQuery.area = 'sg';
+                timerQuery.sub_area = 'summer';
+                break;
+            case 'winter':
+                timerQuery.area = 'sg';
+                timerQuery.sub_area = 'winter';
+                break;
+            case 'fg':
+            case 'grove':
+            case 'gate':
+            case 'realm':
+                timerQuery.area = 'fg';
+                break;
+            case 'open':
+                timerQuery.area = 'fg';
+                timerQuery.sub_area = 'open';
+                break;
+            case 'close':
+            case 'closed':
+            case 'shut':
+                timerQuery.area = 'fg';
+                timerQuery.sub_area = 'close';
+                break;
+            case 'reset':
+            case 'game':
+            case 'rh':
+            case 'midnight':
+                timerQuery.area = 'reset';
+                break;
+            case 'cove':
+            case 'balack':
+            case 'tide':
+                timerQuery.area = 'cove';
+                break;
+            case 'lowtide':
+            case 'low':
+                timerQuery.area = 'cove';
+                timerQuery.sub_area = 'low';
+                break;
+            case 'midtide':
+            case 'mid':
+                timerQuery.area = 'cove';
+                timerQuery.sub_area = 'mid';
+                break;
+            case 'hightide':
+            case 'high':
+                timerQuery.area = 'cove';
+                timerQuery.sub_area = 'high';
+                break;
+            case 'spill':
+            case 'toxic':
+            case 'ts':
+                timerQuery.area = 'spill';
+                break;
+            case 'archduke':
+            case 'ad':
+            case 'archduchess':
+            case 'aardwolf':
+                timerQuery.area = 'spill';
+                timerQuery.sub_area = 'arch';
+                break;
+            case 'grandduke':
+            case 'gd':
+            case 'grandduchess':
+                timerQuery.area = 'spill';
+                timerQuery.sub_area = 'grand';
+                break;
+            case 'duchess':
+            case 'duke':
+                timerQuery.area = 'spill';
+                timerQuery.sub_area = 'duke';
+                break;
+            case 'countess':
+            case 'count':
+                timerQuery.area = 'spill';
+                timerQuery.sub_area = 'count';
+                break;
+            case 'baronness':
+            case 'baron':
+                timerQuery.area = 'spill';
+                timerQuery.sub_area = 'baron';
+                break;
+            case 'lady':
+            case 'lord':
+                timerQuery.area = 'spill';
+                timerQuery.sub_area = 'lord';
+                break;
+            case 'heroine':
+            case 'hero':
+                timerQuery.area = 'spill';
+                timerQuery.sub_area = 'hero';
+                break;
+        }
     }
-    return timerName;
+    return timerQuery;
 }
 
 //Returns the next occurrence of the class of timers
 //TODO - this should take an array as an argument and process the words passed in
 function nextTimer(timerName) {
-    var retStr = "I do not know the timer '" + timerName + "' but I do know: sg, fg, reset, spill, cove";
+    var retStr = "I do not know that timer but I do know: sg, fg, reset, spill, cove and their sub-areas";
     var youngTimer;
-    timerName = timerAliases(timerName);
-    switch (timerName) {
-        case 'ronza':
-        case 'aznor':
-            retStr = 'She just left 10 minutes ago. I guess you missed her';
-            break;
-        case 'larry':
-            retStr = 'He was here handing out TTTs. Where were you?';
-            break;
-    }
 
     for (var timer of timers_list) {
-        if (timer.getArea() === timerName) {
-            if ((typeof youngTimer == 'undefined') || (timer.getNext() <= youngTimer.getNext())) {
-                youngTimer = timer;
+        if (timer.getArea() === timerName.area) {
+            if ((typeof timerName.sub_area === 'undefined') || (timerName.sub_area === timer.getSubArea())) {
+                if ((typeof youngTimer === 'undefined') || (timer.getNext() <= youngTimer.getNext())) {
+                    youngTimer = timer;
+                }
             }
         }
     }
