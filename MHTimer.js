@@ -369,7 +369,7 @@ function doRemind (timer) {
                 continue;
             }
             if (user.presence !== 'dnd') {
-                user.send(timer.getAnnounce());
+                //user.send(timer.getAnnounce());
                 usage_str = "You have ";
                 if (remind.count < 0) {
                     usage_str += "unlimited";
@@ -381,7 +381,7 @@ function doRemind (timer) {
                     usage_str += " " + remind.sub_area;
                 }
                 usage_str += " stop` to end them sooner";
-                user.send(usage_str);
+                user.send(timer.getAnnounce() + "\n" + usage_str );
             }
             if (remind.count > 0) {
                 remind.count -= 1;
