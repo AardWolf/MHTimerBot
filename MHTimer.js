@@ -267,12 +267,14 @@ function timerAliases(tokens) {
             case 'ad':
             case 'archduchess':
             case 'aardwolf':
+            case 'arch':
                 timerQuery.area = 'spill';
                 timerQuery.sub_area = 'arch';
                 break;
             case 'grandduke':
             case 'gd':
             case 'grandduchess':
+            case 'grand':
                 timerQuery.area = 'spill';
                 timerQuery.sub_area = 'grand';
                 break;
