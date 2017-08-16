@@ -161,10 +161,10 @@ function messageParse(message) {
             break;
         case 'remind':
             usage_string = "Usage: `-mh remind <sg|fg|reset|spill|cove> [once|stop|<num>]` where once/stop/num are optional";
-            if (tokens.length === 1) {
+            if ((tokens.length === 0) || (typeof timerName.area === 'undefined')) {
                 message.channel.send("Did you want me to remind you for sg, fg, reset, spill, or cove?\n" + usage_string);
             } else {
-                message.channel.send(addRemind(tokens, message));
+                message.channel.send(addRemind(timerName, message));
             }
             break;
         default:
@@ -299,6 +299,26 @@ function timerAliases(tokens) {
             case 'hero':
                 timerQuery.area = 'spill';
                 timerQuery.sub_area = 'hero';
+                break;
+            case 'once':
+            case '1':
+            case 1:
+                timerQuery.count = 1;
+                break;
+            case 'always':
+            case '-1':
+            case -1:
+                timerQuery.count = -1;
+                break;
+            case 'stop':
+            case '0':
+            case 0:
+                timerQuery.count = 0;
+                break;
+            default:
+                if (!isNaN(parseInt(timerName))) {
+                    timerQuery.count = parseInt(timerName);
+                }
                 break;
         }
     }
@@ -443,58 +463,48 @@ function doRemind (timer) {
     saveReminders();
 }
 
-function addRemind(tokens, message) {
+function addRemind(timerRequest, message) {
     //Add (or remove) a reminder
-    var area = timerAliases(tokens[1].toLowerCase());
+    var area = timerRequest.area;
     var response_str = "Tell aardwolf what you did. This used to break the bot";
-    var sub_area;
-    var num = -1;
+    var sub_area = timerRequest.sub_area;
+    var num = timerRequest.count;
     var timer_found = -1;
     var has_sub_area = 0;
     var turned_off = 0;
     
-    if (typeof area === 'undefined') {
-        return "I do not know the area you asked for: '" + tokens[i] + "'";
+    if (typeof num === 'undefined') {
+        num = 1; //new default is once
     }
     
-    //We know area is the first word.
-    for (var i = 2; i < tokens.length; i++) {
-        if (tokens[i].toLowerCase() === 'once') {
-            num = 1;
-        }
-        else if (tokens[i].toLowerCase() === 'stop') {
-            num = 0;
-        }
-        else if (!isNaN(parseInt(tokens[i]))) {
-            num = parseInt(tokens[i]);
-        }
-        else if (typeof sub_area === 'undefined') {
-            sub_area = timerAliases(tokens[i].toLowerCase());
-            //see if we got a valid sub_area
-            for (var j = 0; j < timers_list.length; j++) {
-                if ((timers_list[j].getArea() === area) &&
-                    (timers_list[j].getSubArea() === sub_area))
-                {
-                    timer_found = j;
-                    has_sub_area = 1;
-                    break;
-                }
+    if (typeof area === 'undefined') {
+        return "I do not know the area you asked for";
+    }
+    
+    for (var i = 0; i < timers_list.length; i++) {
+        if (timers_list[i].getArea() === area) {
+            if ((typeof sub_area === 'undefined') || (sub_area === timers_list[i].getSubArea())) {
+                timer_found = i;
+                has_sub_area = 1;
+                break;
             }
         }
     }
-    
+   
     //confirm it is a valid area
     if (timer_found < 0) {
         for (var i = 0; i < timers_list.length; i++) {
             if (timers_list[i].getArea() === area) {
                 timer_found = i;
                 has_sub_area = 0;
+                console.log ("Apparently this is still needed for '" + area + "'");
+                console.log(timerRequest);
                 break;
             }
         }
     }
     if (timer_found < 0) {
-        return "I do not know the area '" + area + "', only sg, fg, reset, spill, or cove";
+        return "I do not know the area requested, only sg, fg, reset, spill, or cove";
     } 
     
     if (has_sub_area == 0) {
@@ -518,9 +528,9 @@ function addRemind(tokens, message) {
                     reminders.splice(i,1);
                     turned_off++;
                 }
-                else if (!has_sub_area) {
+                else if ((!has_sub_area) && (typeof reminders[i].sub_area === 'undefined')) {
                     reminders[i].count = 0;
-                    response_str = "Reminder for " + reminders[i].area + " (all sub areas) turned off ";
+                    response_str = "Reminder for " + reminders[i].area + " turned off ";
                     reminders.splice(i,1);
                     turned_off++;
                 }
@@ -528,6 +538,9 @@ function addRemind(tokens, message) {
         }
         if (turned_off === 0) {
             response_str = "I couldn't find a reminder for you in " + area;
+            if (typeof sub_area !== 'undefined') {
+                response_str += " (" + sub_area + ")";
+            }
         } else {
             saveReminders();
         }
@@ -576,7 +589,16 @@ function addRemind(tokens, message) {
         if (typeof remind.sub_area !== 'undefined') {
             response_str += " (" + remind.sub_area + ")";
         }
-        response_str += " set";
+        response_str += " set to PM you ";
+        if (remind.count === 1) {
+            response_str += "once";
+        }
+        else if (remind.count === -1) {
+            response_str += "until you stop it";
+        }
+        else {
+            response_str += remind.count + " times";
+        }
     }
     if (typeof response_str === 'undefined') {
         console.log("response_str got undefined");
