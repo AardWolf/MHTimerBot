@@ -160,9 +160,10 @@ function messageParse(message) {
             // console.log(typeof retStr);
             break;
         case 'remind':
-            usage_string = "Usage: `-mh remind <sg|fg|reset|spill|cove> [once|stop|<num>]` where once/stop/num are optional";
+            usage_string = "Usage: `-mh remind <sg|fg|reset|spill|cove> [once|stop|<num>]` where once/stop/num are optional"; // save this for a help
             if ((tokens.length === 0) || (typeof timerName.area === 'undefined')) {
-                message.channel.send("Did you want me to remind you for sg, fg, reset, spill, or cove?\n" + usage_string);
+                listRemind(message);
+                // message.channel.send("Did you want me to remind you for sg, fg, reset, spill, or cove?\n" + usage_string);
             } else {
                 message.channel.send(addRemind(timerName, message));
             }
@@ -607,6 +608,44 @@ function addRemind(timerRequest, message) {
     }
     saveReminders();
     return response_str;
+}
+
+function listRemind(message) {
+    // List the reminders for the user, PM them the result
+    var user = message.author.id;
+    var pm_channel = message.author;
+    var timer_str = "";
+    var usage_str;
+    var found = 0;
+    
+    for (var i = 0; i < reminders.length; i++) {
+        console.log ("Checking " + reminders[i].user );
+        if (reminders[i].user === user) {
+            timer_str += "Timer:    " + reminders[i].area;
+            usage_str = "`-mh remind " + reminders[i].area;
+            if (typeof reminders[i].sub_area !== 'undefined') {
+                timer_str += " (" + reminders[i].sub_area + ")";
+                usage_str += " " + reminders[i].sub_area;
+            }
+            if (reminders[i].count === 1) {
+                timer_str += " one more time";
+            } 
+            else if (reminders[i].count === -1) {
+                timer_str += " until you stop it";
+            }
+            else {
+                timer_str += " " + reminders[i].count + " times";
+            }
+            timer_str += ". " + usage_str + " stop` to turn off\n";
+            found++;
+        }
+    }
+
+    if (found > 0) {
+        pm_channel.send(timer_str);
+    } else {
+        pm_channel.send("I found no reminders for you, sorry");
+    }
 }
 
 //Resources:
