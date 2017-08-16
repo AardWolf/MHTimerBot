@@ -486,7 +486,12 @@ function addRemind(timerRequest, message) {
     
     for (var i = 0; i < timers_list.length; i++) {
         if (timers_list[i].getArea() === area) {
-            if ((typeof sub_area === 'undefined') || (sub_area === timers_list[i].getSubArea())) {
+            if (typeof sub_area === 'undefined') {
+                timer_found = i;
+                has_sub_area = 0;
+                break;
+            }
+            else if (sub_area === timers_list[i].getSubArea()) {
                 timer_found = i;
                 has_sub_area = 1;
                 break;
@@ -544,6 +549,8 @@ function addRemind(timerRequest, message) {
             if (typeof sub_area !== 'undefined') {
                 response_str += " (" + sub_area + ")";
             }
+            console.log(timerRequest);
+            console.log(has_sub_area);
         } else {
             saveReminders();
         }
@@ -555,7 +562,7 @@ function addRemind(timerRequest, message) {
         return response_str;
     }// end stop case
                     
-    
+    response_str = "";
     var remind = {  "count" : num,
                     "area" : area,
                     "user" : message.author.id
@@ -621,7 +628,7 @@ function listRemind(message) {
     var found = 0;
     
     for (var i = 0; i < reminders.length; i++) {
-        console.log ("Checking " + reminders[i].user );
+        //console.log ("Checking " + reminders[i].user );
         if (reminders[i].user === user) {
             timer_str += "Timer:    " + reminders[i].area;
             usage_str = "`-mh remind " + reminders[i].area;
