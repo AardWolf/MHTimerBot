@@ -131,14 +131,26 @@ function messageParse(message) {
     var tokens = [];
     tokens = splitString(message.content);
     tokens.shift();
+    var command = tokens.shift();
+    var timerName; // This has area and sub_area possibly defined
+    if (typeof command === 'undefined') {
+        message.channel.send("I didn't understand. I know 'next' and 'remind'");
+        return;
+    } else {
+        if (tokens.length >= 1) {
+            timerName = timerAliases(tokens);
+        } else {
+            timerName = {};
+        }
+    }
     var usage_string;
-    switch (tokens[0].toLowerCase()) {
+    switch (command) {
         case 'next':
             //TODO - This should be a PM, probably?
-            if (tokens.length === 1) { 
+            if ((tokens.length === 0) || (typeof timerName.area === 'undefined')) { 
                 message.channel.send("Did you want to know about sg, fg, reset, spill, or cove?"); 
             } else {
-                var retStr = nextTimer(tokens[1].toLowerCase());
+                var retStr = nextTimer(timerName);
                 if (typeof retStr === "string") {
                     message.channel.send(retStr);
                 } else {
@@ -148,11 +160,12 @@ function messageParse(message) {
             // console.log(typeof retStr);
             break;
         case 'remind':
-            usage_string = "Usage: `-mh remind <sg|fg|reset|spill|cove> [once|stop|<num>]` where once/stop/num are optional";
-            if (tokens.length === 1) {
-                message.channel.send("Did you want me to remind you for sg, fg, reset, spill, or cove?\n" + usage_string);
+            usage_string = "Usage: `-mh remind <sg|fg|reset|spill|cove> [once|stop|<num>]` where once/stop/num are optional"; // save this for a help
+            if ((tokens.length === 0) || (typeof timerName.area === 'undefined')) {
+                listRemind(message);
+                // message.channel.send("Did you want me to remind you for sg, fg, reset, spill, or cove?\n" + usage_string);
             } else {
-                message.channel.send(addRemind(tokens, message));
+                message.channel.send(addRemind(timerName, message));
             }
             break;
         default:
@@ -174,97 +187,157 @@ function splitString(inString) {
     return returnArray;
 }
 
-function timerAliases(timerName) {
-    switch (timerName.toLowerCase()) {
-        case 'sg':
-        case 'seasonal':
-        case 'season':
-        case 'garden':
-            timerName = 'sg';
-            break;
-        case 'fg':
-        case 'grove':
-        case 'gate':
-        case 'realm':
-            timerName = 'fg';
-            break;
-        case 'reset':
-        case 'game':
-        case 'rh':
-        case 'midnight':
-            timerName = 'reset';
-            break;
-        case 'spill':
-        case 'toxic':
-        case 'ts':
-            timerName = 'spill';
-            break;
-        case 'cove':
-        case 'balack':
-        case 'tide':
-            timerName = 'cove';
-            break;
-        case 'lowtide':
-            timerName = 'low';
-            break;
-        case 'midtide':
-            timerName = 'mid';
-            break;
-        case 'hightide':
-            timerName = 'high';
-            break;
-        case 'fall':
-            timerName = 'autumn';
-            break;
-        case 'archduke':
-        case 'ad':
-        case 'archduchess':
-            timerName = 'arch';
-            break;
-        case 'grandduke':
-        case 'gd':
-        case 'grandduchess':
-            timerName = 'grand';
-            break;
-        case 'duchess':
-            timerName = 'duke';
-            break;
-        case 'countess':
-            timerName = 'count';
-            break;
-        case 'baronness':
-            timerName = 'baron';
-            break;
-        case 'lady':
-            timerName = 'lord';
-            break;
-        case 'heroine':
-            timerName = 'hero';
-            break;
+function timerAliases(tokens) {
+    var timerQuery = {};
+    var timerName;
+    for (var i = 0; i < tokens.length; i++) {
+        timerName = tokens[i].toLowerCase();
+        switch (timerName.toLowerCase()) {
+            case 'sg':
+            case 'seasonal':
+            case 'season':
+            case 'garden':
+                timerQuery.area = 'sg';
+                break;
+            case 'fall':
+            case 'autumn':
+                timerQuery.area = 'sg';
+                timerQuery.sub_area = 'autumn';
+                break;
+            case 'spring':
+                timerQuery.area = 'sg';
+                timerQuery.sub_area = 'spring';
+                break;
+            case 'summer':
+                timerQuery.area = 'sg';
+                timerQuery.sub_area = 'summer';
+                break;
+            case 'winter':
+                timerQuery.area = 'sg';
+                timerQuery.sub_area = 'winter';
+                break;
+            case 'fg':
+            case 'grove':
+            case 'gate':
+            case 'realm':
+                timerQuery.area = 'fg';
+                break;
+            case 'open':
+                timerQuery.area = 'fg';
+                timerQuery.sub_area = 'open';
+                break;
+            case 'close':
+            case 'closed':
+            case 'shut':
+                timerQuery.area = 'fg';
+                timerQuery.sub_area = 'close';
+                break;
+            case 'reset':
+            case 'game':
+            case 'rh':
+            case 'midnight':
+                timerQuery.area = 'reset';
+                break;
+            case 'cove':
+            case 'balack':
+            case 'tide':
+                timerQuery.area = 'cove';
+                break;
+            case 'lowtide':
+            case 'low':
+                timerQuery.area = 'cove';
+                timerQuery.sub_area = 'low';
+                break;
+            case 'midtide':
+            case 'mid':
+                timerQuery.area = 'cove';
+                timerQuery.sub_area = 'mid';
+                break;
+            case 'hightide':
+            case 'high':
+                timerQuery.area = 'cove';
+                timerQuery.sub_area = 'high';
+                break;
+            case 'spill':
+            case 'toxic':
+            case 'ts':
+                timerQuery.area = 'spill';
+                break;
+            case 'archduke':
+            case 'ad':
+            case 'archduchess':
+            case 'aardwolf':
+                timerQuery.area = 'spill';
+                timerQuery.sub_area = 'arch';
+                break;
+            case 'grandduke':
+            case 'gd':
+            case 'grandduchess':
+                timerQuery.area = 'spill';
+                timerQuery.sub_area = 'grand';
+                break;
+            case 'duchess':
+            case 'duke':
+                timerQuery.area = 'spill';
+                timerQuery.sub_area = 'duke';
+                break;
+            case 'countess':
+            case 'count':
+                timerQuery.area = 'spill';
+                timerQuery.sub_area = 'count';
+                break;
+            case 'baronness':
+            case 'baron':
+                timerQuery.area = 'spill';
+                timerQuery.sub_area = 'baron';
+                break;
+            case 'lady':
+            case 'lord':
+                timerQuery.area = 'spill';
+                timerQuery.sub_area = 'lord';
+                break;
+            case 'heroine':
+            case 'hero':
+                timerQuery.area = 'spill';
+                timerQuery.sub_area = 'hero';
+                break;
+            case 'once':
+            case '1':
+            case 1:
+                timerQuery.count = 1;
+                break;
+            case 'always':
+            case '-1':
+            case -1:
+                timerQuery.count = -1;
+                break;
+            case 'stop':
+            case '0':
+            case 0:
+                timerQuery.count = 0;
+                break;
+            default:
+                if (!isNaN(parseInt(timerName))) {
+                    timerQuery.count = parseInt(timerName);
+                }
+                break;
+        }
     }
-    return timerName;
+    return timerQuery;
 }
 
 //Returns the next occurrence of the class of timers
 //TODO - this should take an array as an argument and process the words passed in
 function nextTimer(timerName) {
-    var retStr = "I do not know the timer '" + timerName + "' but I do know: sg, fg, reset, spill, cove";
+    var retStr = "I do not know that timer but I do know: sg, fg, reset, spill, cove and their sub-areas";
     var youngTimer;
-    timerName = timerAliases(timerName);
-    switch (timerName) {
-        case 'ronza':
-        case 'aznor':
-            retStr = 'She just left 10 minutes ago. I guess you missed her';
-            break;
-        case 'larry':
-            retStr = 'He was here handing out TTTs. Where were you?';
-            break;
-    }
 
     for (var timer of timers_list) {
-        if (timer.getArea() === timerName) {
-            if ((typeof youngTimer == 'undefined') || (timer.getNext() <= youngTimer.getNext())) {
-                youngTimer = timer;
+        if (timer.getArea() === timerName.area) {
+            if ((typeof timerName.sub_area === 'undefined') || (timerName.sub_area === timer.getSubArea())) {
+                if ((typeof youngTimer === 'undefined') || (timer.getNext() <= youngTimer.getNext())) {
+                    youngTimer = timer;
+                }
             }
         }
     }
@@ -369,7 +442,7 @@ function doRemind (timer) {
                 continue;
             }
             if (user.presence !== 'dnd') {
-                user.send(timer.getAnnounce());
+                //user.send(timer.getAnnounce());
                 usage_str = "You have ";
                 if (remind.count < 0) {
                     usage_str += "unlimited";
@@ -381,7 +454,7 @@ function doRemind (timer) {
                     usage_str += " " + remind.sub_area;
                 }
                 usage_str += " stop` to end them sooner";
-                user.send(usage_str);
+                user.send(timer.getAnnounce() + "\n" + usage_str );
             }
             if (remind.count > 0) {
                 remind.count -= 1;
@@ -391,58 +464,48 @@ function doRemind (timer) {
     saveReminders();
 }
 
-function addRemind(tokens, message) {
+function addRemind(timerRequest, message) {
     //Add (or remove) a reminder
-    var area = timerAliases(tokens[1].toLowerCase());
+    var area = timerRequest.area;
     var response_str = "Tell aardwolf what you did. This used to break the bot";
-    var sub_area;
-    var num = -1;
+    var sub_area = timerRequest.sub_area;
+    var num = timerRequest.count;
     var timer_found = -1;
     var has_sub_area = 0;
     var turned_off = 0;
     
-    if (typeof area === 'undefined') {
-        return "I do not know the area you asked for: '" + tokens[i] + "'";
+    if (typeof num === 'undefined') {
+        num = 1; //new default is once
     }
     
-    //We know area is the first word.
-    for (var i = 2; i < tokens.length; i++) {
-        if (tokens[i].toLowerCase() === 'once') {
-            num = 1;
-        }
-        else if (tokens[i].toLowerCase() === 'stop') {
-            num = 0;
-        }
-        else if (!isNaN(parseInt(tokens[i]))) {
-            num = parseInt(tokens[i]);
-        }
-        else if (typeof sub_area === 'undefined') {
-            sub_area = timerAliases(tokens[i].toLowerCase());
-            //see if we got a valid sub_area
-            for (var j = 0; j < timers_list.length; j++) {
-                if ((timers_list[j].getArea() === area) &&
-                    (timers_list[j].getSubArea() === sub_area))
-                {
-                    timer_found = j;
-                    has_sub_area = 1;
-                    break;
-                }
+    if (typeof area === 'undefined') {
+        return "I do not know the area you asked for";
+    }
+    
+    for (var i = 0; i < timers_list.length; i++) {
+        if (timers_list[i].getArea() === area) {
+            if ((typeof sub_area === 'undefined') || (sub_area === timers_list[i].getSubArea())) {
+                timer_found = i;
+                has_sub_area = 1;
+                break;
             }
         }
     }
-    
+   
     //confirm it is a valid area
     if (timer_found < 0) {
         for (var i = 0; i < timers_list.length; i++) {
             if (timers_list[i].getArea() === area) {
                 timer_found = i;
                 has_sub_area = 0;
+                console.log ("Apparently this is still needed for '" + area + "'");
+                console.log(timerRequest);
                 break;
             }
         }
     }
     if (timer_found < 0) {
-        return "I do not know the area '" + area + "', only sg, fg, reset, spill, or cove";
+        return "I do not know the area requested, only sg, fg, reset, spill, or cove";
     } 
     
     if (has_sub_area == 0) {
@@ -466,9 +529,9 @@ function addRemind(tokens, message) {
                     reminders.splice(i,1);
                     turned_off++;
                 }
-                else if (!has_sub_area) {
+                else if ((!has_sub_area) && (typeof reminders[i].sub_area === 'undefined')) {
                     reminders[i].count = 0;
-                    response_str = "Reminder for " + reminders[i].area + " (all sub areas) turned off ";
+                    response_str = "Reminder for " + reminders[i].area + " turned off ";
                     reminders.splice(i,1);
                     turned_off++;
                 }
@@ -476,6 +539,9 @@ function addRemind(tokens, message) {
         }
         if (turned_off === 0) {
             response_str = "I couldn't find a reminder for you in " + area;
+            if (typeof sub_area !== 'undefined') {
+                response_str += " (" + sub_area + ")";
+            }
         } else {
             saveReminders();
         }
@@ -524,7 +590,16 @@ function addRemind(tokens, message) {
         if (typeof remind.sub_area !== 'undefined') {
             response_str += " (" + remind.sub_area + ")";
         }
-        response_str += " set";
+        response_str += " set to PM you ";
+        if (remind.count === 1) {
+            response_str += "once";
+        }
+        else if (remind.count === -1) {
+            response_str += "until you stop it";
+        }
+        else {
+            response_str += remind.count + " times";
+        }
     }
     if (typeof response_str === 'undefined') {
         console.log("response_str got undefined");
@@ -533,6 +608,44 @@ function addRemind(tokens, message) {
     }
     saveReminders();
     return response_str;
+}
+
+function listRemind(message) {
+    // List the reminders for the user, PM them the result
+    var user = message.author.id;
+    var pm_channel = message.author;
+    var timer_str = "";
+    var usage_str;
+    var found = 0;
+    
+    for (var i = 0; i < reminders.length; i++) {
+        console.log ("Checking " + reminders[i].user );
+        if (reminders[i].user === user) {
+            timer_str += "Timer:    " + reminders[i].area;
+            usage_str = "`-mh remind " + reminders[i].area;
+            if (typeof reminders[i].sub_area !== 'undefined') {
+                timer_str += " (" + reminders[i].sub_area + ")";
+                usage_str += " " + reminders[i].sub_area;
+            }
+            if (reminders[i].count === 1) {
+                timer_str += " one more time";
+            } 
+            else if (reminders[i].count === -1) {
+                timer_str += " until you stop it";
+            }
+            else {
+                timer_str += " " + reminders[i].count + " times";
+            }
+            timer_str += ". " + usage_str + " stop` to turn off\n";
+            found++;
+        }
+    }
+
+    if (found > 0) {
+        pm_channel.send(timer_str);
+    } else {
+        pm_channel.send("I found no reminders for you, sorry");
+    }
 }
 
 //Resources:
