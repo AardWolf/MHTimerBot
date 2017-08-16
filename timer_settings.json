@@ -14,7 +14,7 @@
   "seed_time": "2017-07-24T16:00:00.000Z",
   "repeat_time": 72000000,
   "announce_string": "**Forbidden Grove** The gate is open again",
-  "demand_string": "**Forbidden Grove** The gate is closed and will open again"
+  "demand_string": "**Forbidden Grove** The gate next swings open"
  },
  {
   "area": "reset",
