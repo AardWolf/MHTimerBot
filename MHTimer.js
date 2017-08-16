@@ -160,7 +160,7 @@ function messageParse(message) {
             // console.log(typeof retStr);
             break;
         case 'remind':
-            usage_string = "Usage: `-mh remind <sg|fg|reset|spill|cove> [once|stop|<num>]` where once/stop/num are optional"; // save this for a help
+            usage_string = "Usage: `-mh remind <sg|fg|reset|spill|cove> [once|stop|always|<num>]` where once/stop/num/always are optional"; // save this for a help
             if ((tokens.length === 0) || (typeof timerName.area === 'undefined')) {
                 listRemind(message);
                 // message.channel.send("Did you want me to remind you for sg, fg, reset, spill, or cove?\n" + usage_string);
@@ -309,6 +309,8 @@ function timerAliases(tokens) {
                 timerQuery.count = 1;
                 break;
             case 'always':
+            case 'forever':
+            case 'unlimited':
             case '-1':
             case -1:
                 timerQuery.count = -1;
@@ -601,7 +603,7 @@ function addRemind(timerRequest, message) {
         }
         response_str += " set to PM you ";
         if (remind.count === 1) {
-            response_str += "once";
+            response_str += "once (stop this one and use the word 'always' if you wanted a repeating reminder) ";
         }
         else if (remind.count === -1) {
             response_str += "until you stop it";
