@@ -160,7 +160,7 @@ function messageParse(message) {
             // console.log(typeof retStr);
             break;
         case 'remind':
-            usage_string = "Usage: `-mh remind <sg|fg|reset|spill|cove> [once|stop|<num>]` where once/stop/num are optional"; // save this for a help
+            usage_string = "Usage: `-mh remind <sg|fg|reset|spill|cove> [once|stop|always|<num>]` where once/stop/num/always are optional"; // save this for a help
             if ((tokens.length === 0) || (typeof timerName.area === 'undefined')) {
                 listRemind(message);
                 // message.channel.send("Did you want me to remind you for sg, fg, reset, spill, or cove?\n" + usage_string);
@@ -168,8 +168,34 @@ function messageParse(message) {
                 message.channel.send(addRemind(timerName, message));
             }
             break;
+        case 'help':
+        case 'arrg':
         default:
-            message.channel.send("Right now I only know the words 'next' and 'remind' for timers: sg, fg, reset, spill, cove");
+            if (tokens.length > 0) {
+                if (tokens[0] === 'next') {
+                    usage_str = "Usage: `-mh next [area/sub-area]` will provide a message about the next related occurrence.\n";
+                    usage_str += "Areas are Seasonal Garden (**sg**), Forbidden Grove (**fg**), Toxic Spill (**ts**), Balack's Cove (**cove**), and the daily **reset**.\n"; 
+                    usage_str += "Sub areas are the seasons, open/close, spill ranks, and tide levels\n";
+                    usage_str += "Example: `-mh next fall` will tell when it is Autumn in the Seasonal Garden."
+                }
+                else if (tokens[0] === 'remind') {
+                    usage_str = "Usage: `-mh remind [area/sub-area] [<number>/always/stop]` will control my reminder function relating to you specifically.\n";
+                    usage_str += "Using the word `stop` will turn off a reminder if it exists.\n";
+                    usage_str += "Using a number means I will remind you that many times for that timer.\n";
+                    usage_str += "Use the word `always` to have me remind you for every occurrence.\n";
+                    usage_str += "Just using `-mh remind` will list all your existing reminders and how to turn off each\n";
+                    usage_str += "Areas are Seasonal Garden (**sg**), Forbidden Grove (**fg**), Toxic Spill (**ts**), Balack's Cove (**cove**), and the daily **reset**.\n"; 
+                    usage_str += "Sub areas are the seasons, open/close, spill ranks, and tide levels\n";
+                    usage_str += "Example: `-mh remind close always` will always PM you 15 minutes before the Forbidden Grove closes.\n";
+                }
+                else {
+                    usage_str = "I can only provide help for `remind` and `next`";
+                }
+            } else {
+                usage_str = "I know the keywords `next` and `remind`. You can use `-mh help [next|remind]` to get specific information.\n";
+                usage_str += "Example: `-mh help next` provides help about the 'next' keyword, `-mh help remind` provides help about the 'remind' keyword.";
+            }
+            message.author.send(usage_str);
     }
 }
 
@@ -309,6 +335,8 @@ function timerAliases(tokens) {
                 timerQuery.count = 1;
                 break;
             case 'always':
+            case 'forever':
+            case 'unlimited':
             case '-1':
             case -1:
                 timerQuery.count = -1;
@@ -486,7 +514,12 @@ function addRemind(timerRequest, message) {
     
     for (var i = 0; i < timers_list.length; i++) {
         if (timers_list[i].getArea() === area) {
-            if ((typeof sub_area === 'undefined') || (sub_area === timers_list[i].getSubArea())) {
+            if (typeof sub_area === 'undefined') {
+                timer_found = i;
+                has_sub_area = 0;
+                break;
+            }
+            else if (sub_area === timers_list[i].getSubArea()) {
                 timer_found = i;
                 has_sub_area = 1;
                 break;
@@ -544,6 +577,8 @@ function addRemind(timerRequest, message) {
             if (typeof sub_area !== 'undefined') {
                 response_str += " (" + sub_area + ")";
             }
+            console.log(timerRequest);
+            console.log(has_sub_area);
         } else {
             saveReminders();
         }
@@ -555,7 +590,7 @@ function addRemind(timerRequest, message) {
         return response_str;
     }// end stop case
                     
-    
+    response_str = "";
     var remind = {  "count" : num,
                     "area" : area,
                     "user" : message.author.id
@@ -594,7 +629,7 @@ function addRemind(timerRequest, message) {
         }
         response_str += " set to PM you ";
         if (remind.count === 1) {
-            response_str += "once";
+            response_str += "once (stop this one and use the word 'always' if you wanted a repeating reminder) ";
         }
         else if (remind.count === -1) {
             response_str += "until you stop it";
@@ -621,7 +656,7 @@ function listRemind(message) {
     var found = 0;
     
     for (var i = 0; i < reminders.length; i++) {
-        console.log ("Checking " + reminders[i].user );
+        //console.log ("Checking " + reminders[i].user );
         if (reminders[i].user === user) {
             timer_str += "Timer:    " + reminders[i].area;
             usage_str = "`-mh remind " + reminders[i].area;
