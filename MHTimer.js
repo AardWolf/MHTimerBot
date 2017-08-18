@@ -168,8 +168,34 @@ function messageParse(message) {
                 message.channel.send(addRemind(timerName, message));
             }
             break;
+        case 'help':
+        case 'arrg':
         default:
-            message.channel.send("Right now I only know the words 'next' and 'remind' for timers: sg, fg, reset, spill, cove");
+            if (tokens.length > 0) {
+                if (tokens[0] === 'next') {
+                    usage_str = "Usage: `-mh next [area/sub-area]` will provide a message about the next related occurrence.\n";
+                    usage_str += "Areas are Seasonal Garden (**sg**), Forbidden Grove (**fg**), Toxic Spill (**ts**), Balack's Cove (**cove**), and the daily **reset**.\n"; 
+                    usage_str += "Sub areas are the seasons, open/close, spill ranks, and tide levels\n";
+                    usage_str += "Example: `-mh next fall` will tell when it is Autumn in the Seasonal Garden."
+                }
+                else if (tokens[0] === 'remind') {
+                    usage_str = "Usage: `-mh remind [area/sub-area] [<number>/always/stop]` will control my reminder function relating to you specifically.\n";
+                    usage_str += "Using the word `stop` will turn off a reminder if it exists.\n";
+                    usage_str += "Using a number means I will remind you that many times for that timer.\n";
+                    usage_str += "Use the word `always` to have me remind you for every occurrence.\n";
+                    usage_str += "Just using `-mh remind` will list all your existing reminders and how to turn off each\n";
+                    usage_str += "Areas are Seasonal Garden (**sg**), Forbidden Grove (**fg**), Toxic Spill (**ts**), Balack's Cove (**cove**), and the daily **reset**.\n"; 
+                    usage_str += "Sub areas are the seasons, open/close, spill ranks, and tide levels\n";
+                    usage_str += "Example: `-mh remind close always` will always PM you 15 minutes before the Forbidden Grove closes.\n";
+                }
+                else {
+                    usage_str = "I can only provide help for `remind` and `next`";
+                }
+            } else {
+                usage_str = "I know the keywords `next` and `remind`. You can use `-mh help [next|remind]` to get specific information.\n";
+                usage_str += "Example: `-mh help next` provides help about the 'next' keyword, `-mh help remind` provides help about the 'remind' keyword.";
+            }
+            message.author.send(usage_str);
     }
 }
 
