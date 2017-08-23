@@ -168,6 +168,18 @@ function messageParse(message) {
                 message.channel.send(addRemind(timerName, message));
             }
             break;
+        case 'sched':
+        case 'schedule':
+            usage_str = "Not implemented yet";
+            var hours = 24;
+            if ((tokens.length === 0) || (typeof timerName.count === 'undefined')) {
+                hours = 24;
+            } else {
+                hours = timerName.count;
+            }
+            usage_str = buildSchedule(hours);
+            message.author.send(usage_str);
+            break;
         case 'help':
         case 'arrg':
         default:
@@ -188,10 +200,15 @@ function messageParse(message) {
                     usage_str += "Sub areas are the seasons, open/close, spill ranks, and tide levels\n";
                     usage_str += "Example: `-mh remind close always` will always PM you 15 minutes before the Forbidden Grove closes.\n";
                 }
+                else if (tokens[0].substring(0,5) === 'sched') {
+                    usage_str = "Usage: `-mh schedule [<number>]` will tell you the timers scheduled for the next `<number>` of hours. Default is 24, max is 168";
+                }
                 else {
+                    //TODO: Update this with schedule
                     usage_str = "I can only provide help for `remind` and `next`";
                 }
             } else {
+                //TODO: Update this with schedule
                 usage_str = "I know the keywords `next` and `remind`. You can use `-mh help [next|remind]` to get specific information.\n";
                 usage_str += "Example: `-mh help next` provides help about the 'next' keyword, `-mh help remind` provides help about the 'remind' keyword.";
             }
@@ -683,6 +700,49 @@ function listRemind(message) {
     } else {
         pm_channel.send("I found no reminders for you, sorry");
     }
+}
+
+function buildSchedule(req_hours) {
+    //Build a list of timers coming up in the next bit of time
+    var return_str = "";
+    var upcoming_timers = [];
+    
+    if (isNaN(parseInt(req_hours))) {
+        return "Somehow I got an argument that was not an integer.";
+    }
+    
+    var time_span = req_hours * 60 * 60 * 1000;
+    var cur_time = new Date();
+    var end_time = new Date(cur_time.valueOf() + time_span);
+    
+    //Get the next occurrence for every timer. Compare its interval to determine how many of them to include
+    var next_time;
+    var timer_interval;
+    for (var i = 0; i < timers_list.length; i++) {
+        next_time = timers_list[i].getNext();
+        if (next_time <= end_time) {
+            upcoming_timers.push({  time: next_time.valueOf(),
+                                    announce: timers_list[i].getDemand()
+                                 });
+            timer_interval = timers_list[i].getInterval();
+            while (next_time.getTime() + timer_interval < end_time.getTime()) {
+                next_time.setTime(next_time.getTime() + timer_interval);
+                upcoming_timers.push({  time: next_time.getTime(),
+                                        announce: timers_list[i].getDemand()
+                                     });
+            }
+        }
+    }
+    //Now we have an array of upcoming timers, let's sort it
+    upcoming_timers.sort( function(a, b) {
+        return a.time - b.time;
+    });
+    return_str = "I have " + (upcoming_timers.length + 1) + " timers coming up in the next " + req_hours + " hours:\n";
+    for (var i = 0; i < upcoming_timers.length; i++) {
+        return_str += upcoming_timers[i].announce + " " + timeLeft(upcoming_timers[i].time) + "\n";
+    }
+    return return_str;
+    
 }
 
 //Resources:
