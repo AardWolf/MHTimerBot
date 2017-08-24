@@ -178,6 +178,12 @@ function messageParse(message) {
                 hours = timerName.count;
             }
             usage_str = buildSchedule(hours);
+            var part_str;
+            while (usage_str.length > 2000) {
+                part_str = usage_str.substr(0,usage_str.lastIndexOf('\n',2000));
+                message.author.send(part_str);
+                usage_str = usage_str.substr(part_str.length);
+            }
             message.author.send(usage_str);
             break;
         case 'help':
@@ -724,8 +730,9 @@ function buildSchedule(req_hours) {
             upcoming_timers.push({  time: next_time.valueOf(),
                                     announce: timers_list[i].getDemand()
                                  });
-            timer_interval = timers_list[i].getInterval();
-            while (next_time.getTime() + timer_interval < end_time.getTime()) {
+            timer_interval = timers_list[i].getRepeat();
+            //console.log("Schedule: " + (next_time.getTime()) + " AND " + (timer_interval) + " and " + end_time.getTime());
+            while ((next_time.getTime() + timer_interval) < end_time.getTime()) {
                 next_time.setTime(next_time.getTime() + timer_interval);
                 upcoming_timers.push({  time: next_time.getTime(),
                                         announce: timers_list[i].getDemand()
