@@ -169,15 +169,16 @@ function messageParse(message) {
             }
             break;
         case 'sched':
+        case 'itin':
+        case 'agenda':
+        case 'itinerary':
         case 'schedule':
             usage_str = "Not implemented yet";
             var hours = 24;
             if ((tokens.length === 0) || (typeof timerName.count === 'undefined')) {
-                hours = 24;
-            } else {
-                hours = timerName.count;
-            }
-            usage_str = buildSchedule(hours);
+                timerName.count = 24;
+            } 
+            usage_str = buildSchedule(timerName);
             var part_str;
             while (usage_str.length > 2000) {
                 part_str = usage_str.substr(0,usage_str.lastIndexOf('\n',2000));
@@ -207,7 +208,8 @@ function messageParse(message) {
                     usage_str += "Example: `-mh remind close always` will always PM you 15 minutes before the Forbidden Grove closes.\n";
                 }
                 else if (tokens[0].substring(0,5) === 'sched') {
-                    usage_str = "Usage: `-mh schedule [<number>]` will tell you the timers scheduled for the next `<number>` of hours. Default is 24, max is 168";
+                    usage_str = "Usage: `-mh schedule [<area>] [<number>]` will tell you the timers scheduled for the next `<number>` of hours. Default is 24, max is 240.\n";
+                    usage_str += "If you provide an area I will only report on that area.";
                 }
                 else {
                     //TODO: Update this with schedule
@@ -215,7 +217,7 @@ function messageParse(message) {
                 }
             } else {
                 //TODO: Update this with schedule
-                usage_str = "I know the keywords `next` and `remind`. You can use `-mh help [next|remind]` to get specific information.\n";
+                usage_str = "I know the keywords `next`, `remind`, and `schedule`. You can use `-mh help [next|remind|schedule]` to get specific information.\n";
                 usage_str += "Example: `-mh help next` provides help about the 'next' keyword, `-mh help remind` provides help about the 'remind' keyword.";
             }
             message.author.send(usage_str);
@@ -708,13 +710,21 @@ function listRemind(message) {
     }
 }
 
-function buildSchedule(req_hours) {
+function buildSchedule(timer_request) {
     //Build a list of timers coming up in the next bit of time
     var return_str = "";
     var upcoming_timers = [];
+    var req_hours = timer_request.count;
+    var area = timer_request.area;
     
     if (isNaN(parseInt(req_hours))) {
         return "Somehow I got an argument that was not an integer.";
+    }
+    else if (req_hours <= 0) {
+        req_hours = 24;
+    }
+    else if (req_hours >= 240) {
+        req_hours = 240;
     }
     
     var time_span = req_hours * 60 * 60 * 1000;
@@ -725,6 +735,9 @@ function buildSchedule(req_hours) {
     var next_time;
     var timer_interval;
     for (var i = 0; i < timers_list.length; i++) {
+        if ((typeof area !== 'undefined') && (timers_list[i].getArea() !== area)) {
+            continue;
+        }
         next_time = timers_list[i].getNext();
         if (next_time <= end_time) {
             upcoming_timers.push({  time: next_time.valueOf(),
@@ -744,7 +757,7 @@ function buildSchedule(req_hours) {
     upcoming_timers.sort( function(a, b) {
         return a.time - b.time;
     });
-    return_str = "I have " + (upcoming_timers.length + 1) + " timers coming up in the next " + req_hours + " hours:\n";
+    return_str = "I have " + (upcoming_timers.length) + " timers coming up in the next " + req_hours + " hours:\n";
     for (var i = 0; i < upcoming_timers.length; i++) {
         return_str += upcoming_timers[i].announce + " " + timeLeft(upcoming_timers[i].time) + "\n";
     }
