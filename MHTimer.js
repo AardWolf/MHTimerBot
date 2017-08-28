@@ -431,10 +431,10 @@ function timeLeft (in_date) {
             retStr += Math.floor(ms_left / (1000 * 60)) + " minutes ";
             ms_left = ms_left % (1000 * 60);
         }
-        if (ms_left > 1000) {
-            //seconds left
-            retStr += Math.floor(ms_left / 1000) + " seconds";
-        }
+        //if (ms_left > 1000) {
+            ////seconds left
+            //retStr += Math.floor(ms_left / 1000) + " seconds";
+        //}
     }
     return retStr;
 }
