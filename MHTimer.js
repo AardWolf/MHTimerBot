@@ -213,7 +213,7 @@ function messageParse(message) {
                 }
                 else {
                     //TODO: Update this with schedule
-                    usage_str = "I can only provide help for `remind` and `next`";
+                    usage_str = "I can only provide help for `remind`, `next`, and `schedule`";
                 }
             } else {
                 //TODO: Update this with schedule
