@@ -5,6 +5,7 @@
 const Discord = require('discord.js');
 var Timer = require('./timerClass.js');
 var fs = require ('fs');
+var request = require('request'); //Needed to use Jack's tools
 const client = new Discord.Client();
 
 // Globals
@@ -17,6 +18,7 @@ var timers_list = [];
 var reminders = [];
 var file_encoding = 'utf8';
 var settings = {};
+var mice = [];
 
 //Only support announcing in 1 channel
 var announce_channel;
@@ -101,6 +103,9 @@ function Main() {
             }
         });
     });
+    
+    a.then( getMouseList );
+        
 }
 Main();
 
@@ -224,6 +229,15 @@ function messageParse(message) {
             //message.author.send(usage_str);
             message.channel.send(usage_str);
             break;
+        case 'find':
+            if (tokens.length == 0) {
+                message.channel.send("You have to supply mice to find");
+            }
+            else {
+                message.channel.send(findMouse(tokens.join(" ").trim()));
+            }
+            break;
+                
         case 'help':
         case 'arrg':
         default:
@@ -836,6 +850,39 @@ function buildSchedule(timer_request) {
     }
     return return_str;
     
+}
+
+function getMouseList() {
+    var url = "https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=mouse&item_id=all";
+    request({
+        url: url,
+        json: true
+    }, function (error, response, body) {
+        if (!error && response.statusCode == 200) {
+            console.log("Got a mouse list");
+//            console.log(body);
+            mice = body;
+            for (var i = 0; i < mice.length; i++ ) {
+                mice[i].lowerValue = mice[i].value.toLowerCase();
+            }
+        }
+    })
+}
+
+function findMouse(args) {
+    //https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=mouse&item_id=602 (use appropriate mouse numbers)
+    var retStr = "'" + args + "' not found";
+    var found = 0;
+    for (var i = 0; (i < mice.length && !found); i++) {
+        if (mice[i].lowerValue === args.toLowerCase()) {
+            retStr = "'" + args + "' is '" + mice[i].value + "' AKA " + mice[i].id;
+            found = 1;
+        }
+    }
+    if (!found) {
+        console.log("Nothing found for '", args, "'");
+    }
+    return retStr;
 }
 
 //Resources:
