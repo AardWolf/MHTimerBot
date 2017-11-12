@@ -214,6 +214,7 @@ function messageParse(message) {
             } 
             usage_str = buildSchedule(timerName);
             var part_str;
+            var curr_count = 0;
             while (usage_str.length > 2000) {
                 part_str = usage_str.substr(0,usage_str.lastIndexOf('\n',2000));
                 message.author.send(part_str);
@@ -757,6 +758,8 @@ function buildSchedule(timer_request) {
     var upcoming_timers = [];
     var req_hours = timer_request.count;
     var area = timer_request.area;
+    var max_count = 25;
+    var curr_count = 0;
     
     if (isNaN(parseInt(req_hours))) {
         return "Somehow I got an argument that was not an integer.";
@@ -798,8 +801,14 @@ function buildSchedule(timer_request) {
     upcoming_timers.sort( function(a, b) {
         return a.time - b.time;
     });
-    return_str = "I have " + (upcoming_timers.length) + " timers coming up in the next " + req_hours + " hours:\n";
-    for (var i = 0; i < upcoming_timers.length; i++) {
+    return_str = "I have " + (upcoming_timers.length) + " timers coming up in the next " + req_hours + " hours";
+    if (upcoming_timers.length < max_count) {
+        max_count = upcoming_timers.length;
+    } else {
+        return_str += " (truncated to " + max_count + " entries)";
+    }
+    return_str += ":\n";
+    for (var i = 0; i < max_count; i++) {
         return_str += upcoming_timers[i].announce + " " + timeLeft(upcoming_timers[i].time) + "\n";
     }
     return return_str;
