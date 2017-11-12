@@ -220,7 +220,9 @@ function messageParse(message) {
                 message.author.send(part_str);
                 usage_str = usage_str.substr(part_str.length);
             }
-            message.author.send(usage_str);
+            //Issue 39, use the channel the request came in on
+            //message.author.send(usage_str);
+            message.channel.send(usage_str);
             break;
         case 'help':
         case 'arrg':
