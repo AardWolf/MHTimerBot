@@ -873,8 +873,10 @@ function findMouse(args) {
     //https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=mouse&item_id=602 (use appropriate mouse numbers)
     var retStr = "'" + args + "' not found";
     var found = 0;
+    var len = args.length;
+    console.log("Check for a string length of " + len)
     for (var i = 0; (i < mice.length && !found); i++) {
-        if (mice[i].lowerValue === args.toLowerCase()) {
+        if (mice[i].lowerValue.substring(0,len) === args) {
             retStr = "'" + args + "' is '" + mice[i].value + "' AKA " + mice[i].id;
             found = 1;
         }
