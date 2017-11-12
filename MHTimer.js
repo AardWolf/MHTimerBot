@@ -21,6 +21,40 @@ var settings = {};
 //Only support announcing in 1 channel
 var announce_channel;
 
+//https://stackoverflow.com/questions/12008120/console-log-timestamps-in-chrome
+console.logCopy = console.log.bind(console);
+
+console.log = function()
+{
+    // Timestamp to prepend
+    var timestamp = new Date().toJSON();
+
+    if (arguments.length)
+    {
+        // True array copy so we can call .splice()
+        var args = Array.prototype.slice.call(arguments, 0);
+
+        // If there is a format string then... it must
+        // be a string
+        if (typeof arguments[0] === "string")
+        {
+            // Prepend timestamp to the (possibly format) string
+            args[0] = "[" + timestamp + "] " + arguments[0];
+
+            // Insert the timestamp where it has to be
+            //args.splice(0, 0, "[" + timestamp + "]");
+
+            // Log the whole array
+            this.logCopy.apply(this, args);
+        }
+        else
+        { 
+            // "Normal" log
+            this.logCopy(timestamp, args);
+        }
+    }
+};
+
 process.on('uncaughtException', function (exception) {
   console.log(exception); // to see your exception details in the console
   // if you are on production, maybe you can send the exception details to your
@@ -180,12 +214,15 @@ function messageParse(message) {
             } 
             usage_str = buildSchedule(timerName);
             var part_str;
+            var curr_count = 0;
             while (usage_str.length > 2000) {
                 part_str = usage_str.substr(0,usage_str.lastIndexOf('\n',2000));
                 message.author.send(part_str);
                 usage_str = usage_str.substr(part_str.length);
             }
-            message.author.send(usage_str);
+            //Issue 39, use the channel the request came in on
+            //message.author.send(usage_str);
+            message.channel.send(usage_str);
             break;
         case 'help':
         case 'arrg':
@@ -213,7 +250,7 @@ function messageParse(message) {
                 }
                 else {
                     //TODO: Update this with schedule
-                    usage_str = "I can only provide help for `remind` and `next`";
+                    usage_str = "I can only provide help for `remind`, `next`, and `schedule`";
                 }
             } else {
                 //TODO: Update this with schedule
@@ -241,141 +278,158 @@ function splitString(inString) {
 function timerAliases(tokens) {
     var timerQuery = {};
     var timerName;
+    var found = 0;
     for (var i = 0; i < tokens.length; i++) {
         timerName = tokens[i].toLowerCase();
-        switch (timerName.toLowerCase()) {
-            case 'sg':
-            case 'seasonal':
-            case 'season':
-            case 'garden':
-                timerQuery.area = 'sg';
-                break;
-            case 'fall':
-            case 'autumn':
-                timerQuery.area = 'sg';
-                timerQuery.sub_area = 'autumn';
-                break;
-            case 'spring':
-                timerQuery.area = 'sg';
-                timerQuery.sub_area = 'spring';
-                break;
-            case 'summer':
-                timerQuery.area = 'sg';
-                timerQuery.sub_area = 'summer';
-                break;
-            case 'winter':
-                timerQuery.area = 'sg';
-                timerQuery.sub_area = 'winter';
-                break;
-            case 'fg':
-            case 'grove':
-            case 'gate':
-            case 'realm':
-                timerQuery.area = 'fg';
-                break;
-            case 'open':
-                timerQuery.area = 'fg';
-                timerQuery.sub_area = 'open';
-                break;
-            case 'close':
-            case 'closed':
-            case 'shut':
-                timerQuery.area = 'fg';
-                timerQuery.sub_area = 'close';
-                break;
-            case 'reset':
-            case 'game':
-            case 'rh':
-            case 'midnight':
-                timerQuery.area = 'reset';
-                break;
-            case 'cove':
-            case 'balack':
-            case 'tide':
-                timerQuery.area = 'cove';
-                break;
-            case 'lowtide':
-            case 'low':
-                timerQuery.area = 'cove';
-                timerQuery.sub_area = 'low';
-                break;
-            case 'midtide':
-            case 'mid':
-                timerQuery.area = 'cove';
-                timerQuery.sub_area = 'mid';
-                break;
-            case 'hightide':
-            case 'high':
-                timerQuery.area = 'cove';
-                timerQuery.sub_area = 'high';
-                break;
-            case 'spill':
-            case 'toxic':
-            case 'ts':
-                timerQuery.area = 'spill';
-                break;
-            case 'archduke':
-            case 'ad':
-            case 'archduchess':
-            case 'aardwolf':
-            case 'arch':
-                timerQuery.area = 'spill';
-                timerQuery.sub_area = 'arch';
-                break;
-            case 'grandduke':
-            case 'gd':
-            case 'grandduchess':
-            case 'grand':
-                timerQuery.area = 'spill';
-                timerQuery.sub_area = 'grand';
-                break;
-            case 'duchess':
-            case 'duke':
-                timerQuery.area = 'spill';
-                timerQuery.sub_area = 'duke';
-                break;
-            case 'countess':
-            case 'count':
-                timerQuery.area = 'spill';
-                timerQuery.sub_area = 'count';
-                break;
-            case 'baronness':
-            case 'baron':
-                timerQuery.area = 'spill';
-                timerQuery.sub_area = 'baron';
-                break;
-            case 'lady':
-            case 'lord':
-                timerQuery.area = 'spill';
-                timerQuery.sub_area = 'lord';
-                break;
-            case 'heroine':
-            case 'hero':
-                timerQuery.area = 'spill';
-                timerQuery.sub_area = 'hero';
-                break;
-            case 'once':
-            case '1':
-            case 1:
-                timerQuery.count = 1;
-                break;
-            case 'always':
-            case 'forever':
-            case 'unlimited':
-            case '-1':
-            case -1:
-                timerQuery.count = -1;
-                break;
-            case 'stop':
-            case '0':
-            case 0:
-                timerQuery.count = 0;
-                break;
-            default:
-                if (!isNaN(parseInt(timerName))) {
-                    timerQuery.count = parseInt(timerName);
-                }
-                break;
+        //Check if this is an exact timer name, useful if we can dynamically add new timers
+        for (var j = 0; j < timers_list.length; j++) {
+            if (timers_list[j].getArea() === timerName) {
+                timerQuery.area = timerName;
+                found = 1;
+                j = timers_list.length;
+            }
+            else if (timers_list[j].getSubArea() === timerName) {
+                timerQuery.area = timers_list[j].getArea();
+                timerQuery.sub_area = timerName;
+                found = 1;
+                j = timers_list.length;
+            }
+        }
+        if (found == 0) {
+            switch (timerName) {
+                case 'sg':
+                case 'seasonal':
+                case 'season':
+                case 'garden':
+                    timerQuery.area = 'sg';
+                    break;
+                case 'fall':
+                case 'autumn':
+                    timerQuery.area = 'sg';
+                    timerQuery.sub_area = 'autumn';
+                    break;
+                case 'spring':
+                    timerQuery.area = 'sg';
+                    timerQuery.sub_area = 'spring';
+                    break;
+                case 'summer':
+                    timerQuery.area = 'sg';
+                    timerQuery.sub_area = 'summer';
+                    break;
+                case 'winter':
+                    timerQuery.area = 'sg';
+                    timerQuery.sub_area = 'winter';
+                    break;
+                case 'fg':
+                case 'grove':
+                case 'gate':
+                case 'realm':
+                    timerQuery.area = 'fg';
+                    break;
+                case 'open':
+                    timerQuery.area = 'fg';
+                    timerQuery.sub_area = 'open';
+                    break;
+                case 'close':
+                case 'closed':
+                case 'shut':
+                    timerQuery.area = 'fg';
+                    timerQuery.sub_area = 'close';
+                    break;
+                case 'reset':
+                case 'game':
+                case 'rh':
+                case 'midnight':
+                    timerQuery.area = 'reset';
+                    break;
+                case 'cove':
+                case 'balack':
+                case 'tide':
+                    timerQuery.area = 'cove';
+                    break;
+                case 'lowtide':
+                case 'low':
+                    timerQuery.area = 'cove';
+                    timerQuery.sub_area = 'low';
+                    break;
+                case 'midtide':
+                case 'mid':
+                    timerQuery.area = 'cove';
+                    timerQuery.sub_area = 'mid';
+                    break;
+                case 'hightide':
+                case 'high':
+                    timerQuery.area = 'cove';
+                    timerQuery.sub_area = 'high';
+                    break;
+                case 'spill':
+                case 'toxic':
+                case 'ts':
+                    timerQuery.area = 'spill';
+                    break;
+                case 'archduke':
+                case 'ad':
+                case 'archduchess':
+                case 'aardwolf':
+                case 'arch':
+                    timerQuery.area = 'spill';
+                    timerQuery.sub_area = 'arch';
+                    break;
+                case 'grandduke':
+                case 'gd':
+                case 'grandduchess':
+                case 'grand':
+                    timerQuery.area = 'spill';
+                    timerQuery.sub_area = 'grand';
+                    break;
+                case 'duchess':
+                case 'duke':
+                    timerQuery.area = 'spill';
+                    timerQuery.sub_area = 'duke';
+                    break;
+                case 'countess':
+                case 'count':
+                    timerQuery.area = 'spill';
+                    timerQuery.sub_area = 'count';
+                    break;
+                case 'baronness':
+                case 'baron':
+                    timerQuery.area = 'spill';
+                    timerQuery.sub_area = 'baron';
+                    break;
+                case 'lady':
+                case 'lord':
+                    timerQuery.area = 'spill';
+                    timerQuery.sub_area = 'lord';
+                    break;
+                case 'heroine':
+                case 'hero':
+                    timerQuery.area = 'spill';
+                    timerQuery.sub_area = 'hero';
+                    break;
+                case 'once':
+                case '1':
+                case 1:
+                    timerQuery.count = 1;
+                    break;
+                case 'always':
+                case 'forever':
+                case 'unlimited':
+                case '-1':
+                case -1:
+                    timerQuery.count = -1;
+                    break;
+                case 'stop':
+                case '0':
+                case 0:
+                    timerQuery.count = 0;
+                    break;
+                default:
+                    if (!isNaN(parseInt(timerName))) {
+                        timerQuery.count = parseInt(timerName);
+                    }
+                    break;
+            }
         }
     }
     return timerQuery;
@@ -402,7 +456,8 @@ function nextTimer(timerName) {
     } else {
         retStr = new Discord.RichEmbed()
 //            .setTitle("next " + timerName) // removing this cleaned up the embed a lot
-            .setDescription(youngTimer.getDemand() + "\n" + timeLeft(youngTimer.getNext())) // Putting here makes it look nicer and fit in portrait mode
+            .setDescription(youngTimer.getDemand() + "\n" + timeLeft(youngTimer.getNext()) +
+                    "\nTo schedule a reminder: -mh remind " + youngTimer.getArea() + " " + youngTimer.getSubArea()) // Putting here makes it look nicer and fit in portrait mode
             .setTimestamp(new Date(youngTimer.getNext().valueOf()))
 //            .addField(retStr)
             .setFooter("at"); // There has to be something in here or there is no footer
@@ -414,7 +469,8 @@ function timeLeft (in_date) {
     var now_date = new Date();
     var retStr = "real soon";
     var ms_left = in_date.valueOf() - now_date.valueOf() ;
-    if (ms_left > 1000) {
+    //console.log(ms_left + " ms left");
+    if (ms_left > 1000*60) {
         retStr = "in ";
         if (ms_left > 1000 * 60 * 60 * 24) {
             //days left
@@ -431,10 +487,12 @@ function timeLeft (in_date) {
             retStr += Math.floor(ms_left / (1000 * 60)) + " minutes ";
             ms_left = ms_left % (1000 * 60);
         }
-        if (ms_left > 1000) {
-            //seconds left
-            retStr += Math.floor(ms_left / 1000) + " seconds";
-        }
+        //if (ms_left > 1000) {
+            ////seconds left
+            //retStr += Math.floor(ms_left / 1000) + " seconds";
+        //}
+    } else {
+        retStr = "in less than a minute";
     }
     return retStr;
 }
@@ -496,11 +554,16 @@ function doRemind (timer) {
                 remind.count = 0;
                 continue;
             }
+            if (remind.count > 0) {
+                remind.count -= 1;
+            }
             if (user.presence !== 'dnd') {
                 //user.send(timer.getAnnounce());
                 usage_str = "You have ";
                 if (remind.count < 0) {
                     usage_str += "unlimited";
+                } else if (remind.count == 0) {
+                    usage_str += "no more";
                 } else {
                     usage_str += remind.count;
                 }
@@ -508,11 +571,13 @@ function doRemind (timer) {
                 if (typeof remind.sub_area !== 'undefined') {
                     usage_str += " " + remind.sub_area;
                 }
-                usage_str += " stop` to end them sooner";
+                if (remind.count == 0) {
+                    usage_str += "` to turn this reminder back on.";
+                } else {
+                    usage_str += " stop` to end them sooner.";
+                }
+                usage_str += " See also `-mh help remind` for other options.";
                 user.send(timer.getAnnounce() + "\n" + usage_str );
-            }
-            if (remind.count > 0) {
-                remind.count -= 1;
             }
         }
     }
@@ -716,6 +781,8 @@ function buildSchedule(timer_request) {
     var upcoming_timers = [];
     var req_hours = timer_request.count;
     var area = timer_request.area;
+    var max_count = 25;
+    var curr_count = 0;
     
     if (isNaN(parseInt(req_hours))) {
         return "Somehow I got an argument that was not an integer.";
@@ -757,8 +824,14 @@ function buildSchedule(timer_request) {
     upcoming_timers.sort( function(a, b) {
         return a.time - b.time;
     });
-    return_str = "I have " + (upcoming_timers.length) + " timers coming up in the next " + req_hours + " hours:\n";
-    for (var i = 0; i < upcoming_timers.length; i++) {
+    return_str = "I have " + (upcoming_timers.length) + " timers coming up in the next " + req_hours + " hours";
+    if (upcoming_timers.length < max_count) {
+        max_count = upcoming_timers.length;
+    } else {
+        return_str += " (truncated to " + max_count + " entries)";
+    }
+    return_str += ":\n";
+    for (var i = 0; i < max_count; i++) {
         return_str += upcoming_timers[i].announce + " " + timeLeft(upcoming_timers[i].time) + "\n";
     }
     return return_str;
