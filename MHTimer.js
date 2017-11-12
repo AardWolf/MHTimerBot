@@ -21,6 +21,40 @@ var settings = {};
 //Only support announcing in 1 channel
 var announce_channel;
 
+//https://stackoverflow.com/questions/12008120/console-log-timestamps-in-chrome
+console.logCopy = console.log.bind(console);
+
+console.log = function()
+{
+    // Timestamp to prepend
+    var timestamp = new Date().toJSON();
+
+    if (arguments.length)
+    {
+        // True array copy so we can call .splice()
+        var args = Array.prototype.slice.call(arguments, 0);
+
+        // If there is a format string then... it must
+        // be a string
+        if (typeof arguments[0] === "string")
+        {
+            // Prepend timestamp to the (possibly format) string
+            args[0] = "[" + timestamp + "] " + arguments[0];
+
+            // Insert the timestamp where it has to be
+            //args.splice(0, 0, "[" + timestamp + "]");
+
+            // Log the whole array
+            this.logCopy.apply(this, args);
+        }
+        else
+        { 
+            // "Normal" log
+            this.logCopy(timestamp, args);
+        }
+    }
+};
+
 process.on('uncaughtException', function (exception) {
   console.log(exception); // to see your exception details in the console
   // if you are on production, maybe you can send the exception details to your
