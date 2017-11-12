@@ -449,7 +449,8 @@ function timeLeft (in_date) {
     var now_date = new Date();
     var retStr = "real soon";
     var ms_left = in_date.valueOf() - now_date.valueOf() ;
-    if (ms_left > 1000) {
+    console.log(ms_left + " ms left");
+    if (ms_left > 1000*60) {
         retStr = "in ";
         if (ms_left > 1000 * 60 * 60 * 24) {
             //days left
@@ -470,6 +471,8 @@ function timeLeft (in_date) {
             ////seconds left
             //retStr += Math.floor(ms_left / 1000) + " seconds";
         //}
+    } else {
+        retStr = "in less than a minute";
     }
     return retStr;
 }
