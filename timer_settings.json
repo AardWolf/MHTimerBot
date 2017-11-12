@@ -1,22 +1,5 @@
 [
  {
-  "area": "test",
-  "sub_area": "test1",
-  "seed_time": "2017-06-02T11:00:00.000Z",
-  "repeat_time": 120000,
-  "announce_string": "**Test** Test timer 0",
-  "demand_string": "**Test** Test demand 0"
- },
- {
-  "area": "test",
-  "sub_area": "test2",
-  "seed_time": "2017-06-02T11:01:00.000Z",
-  "repeat_time": 120000,
-  "announce_string": "**Test** Test timer 1",
-  "demand_string": "**Test** Test demand 1",
-  "demand_offset": 240000
- },
- {
   "area": "fg",
   "sub_area": "close",
   "seed_time": "2017-07-24T12:00:00.000Z",
