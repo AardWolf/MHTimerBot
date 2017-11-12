@@ -278,141 +278,158 @@ function splitString(inString) {
 function timerAliases(tokens) {
     var timerQuery = {};
     var timerName;
+    var found = 0;
     for (var i = 0; i < tokens.length; i++) {
         timerName = tokens[i].toLowerCase();
-        switch (timerName.toLowerCase()) {
-            case 'sg':
-            case 'seasonal':
-            case 'season':
-            case 'garden':
-                timerQuery.area = 'sg';
-                break;
-            case 'fall':
-            case 'autumn':
-                timerQuery.area = 'sg';
-                timerQuery.sub_area = 'autumn';
-                break;
-            case 'spring':
-                timerQuery.area = 'sg';
-                timerQuery.sub_area = 'spring';
-                break;
-            case 'summer':
-                timerQuery.area = 'sg';
-                timerQuery.sub_area = 'summer';
-                break;
-            case 'winter':
-                timerQuery.area = 'sg';
-                timerQuery.sub_area = 'winter';
-                break;
-            case 'fg':
-            case 'grove':
-            case 'gate':
-            case 'realm':
-                timerQuery.area = 'fg';
-                break;
-            case 'open':
-                timerQuery.area = 'fg';
-                timerQuery.sub_area = 'open';
-                break;
-            case 'close':
-            case 'closed':
-            case 'shut':
-                timerQuery.area = 'fg';
-                timerQuery.sub_area = 'close';
-                break;
-            case 'reset':
-            case 'game':
-            case 'rh':
-            case 'midnight':
-                timerQuery.area = 'reset';
-                break;
-            case 'cove':
-            case 'balack':
-            case 'tide':
-                timerQuery.area = 'cove';
-                break;
-            case 'lowtide':
-            case 'low':
-                timerQuery.area = 'cove';
-                timerQuery.sub_area = 'low';
-                break;
-            case 'midtide':
-            case 'mid':
-                timerQuery.area = 'cove';
-                timerQuery.sub_area = 'mid';
-                break;
-            case 'hightide':
-            case 'high':
-                timerQuery.area = 'cove';
-                timerQuery.sub_area = 'high';
-                break;
-            case 'spill':
-            case 'toxic':
-            case 'ts':
-                timerQuery.area = 'spill';
-                break;
-            case 'archduke':
-            case 'ad':
-            case 'archduchess':
-            case 'aardwolf':
-            case 'arch':
-                timerQuery.area = 'spill';
-                timerQuery.sub_area = 'arch';
-                break;
-            case 'grandduke':
-            case 'gd':
-            case 'grandduchess':
-            case 'grand':
-                timerQuery.area = 'spill';
-                timerQuery.sub_area = 'grand';
-                break;
-            case 'duchess':
-            case 'duke':
-                timerQuery.area = 'spill';
-                timerQuery.sub_area = 'duke';
-                break;
-            case 'countess':
-            case 'count':
-                timerQuery.area = 'spill';
-                timerQuery.sub_area = 'count';
-                break;
-            case 'baronness':
-            case 'baron':
-                timerQuery.area = 'spill';
-                timerQuery.sub_area = 'baron';
-                break;
-            case 'lady':
-            case 'lord':
-                timerQuery.area = 'spill';
-                timerQuery.sub_area = 'lord';
-                break;
-            case 'heroine':
-            case 'hero':
-                timerQuery.area = 'spill';
-                timerQuery.sub_area = 'hero';
-                break;
-            case 'once':
-            case '1':
-            case 1:
-                timerQuery.count = 1;
-                break;
-            case 'always':
-            case 'forever':
-            case 'unlimited':
-            case '-1':
-            case -1:
-                timerQuery.count = -1;
-                break;
-            case 'stop':
-            case '0':
-            case 0:
-                timerQuery.count = 0;
-                break;
-            default:
-                if (!isNaN(parseInt(timerName))) {
-                    timerQuery.count = parseInt(timerName);
-                }
-                break;
+        //Check if this is an exact timer name, useful if we can dynamically add new timers
+        for (var j = 0; j < timers_list.length; j++) {
+            if (timers_list[j].getArea() === timerName) {
+                timerQuery.area = timerName;
+                found = 1;
+                j = timers_list.length;
+            }
+            else if (timers_list[j].getSubArea() === timerName) {
+                timerQuery.area = timers_list[j].getArea();
+                timerQuery.sub_area = timerName;
+                found = 1;
+                j = timers_list.length;
+            }
+        }
+        if (found == 0) {
+            switch (timerName) {
+                case 'sg':
+                case 'seasonal':
+                case 'season':
+                case 'garden':
+                    timerQuery.area = 'sg';
+                    break;
+                case 'fall':
+                case 'autumn':
+                    timerQuery.area = 'sg';
+                    timerQuery.sub_area = 'autumn';
+                    break;
+                case 'spring':
+                    timerQuery.area = 'sg';
+                    timerQuery.sub_area = 'spring';
+                    break;
+                case 'summer':
+                    timerQuery.area = 'sg';
+                    timerQuery.sub_area = 'summer';
+                    break;
+                case 'winter':
+                    timerQuery.area = 'sg';
+                    timerQuery.sub_area = 'winter';
+                    break;
+                case 'fg':
+                case 'grove':
+                case 'gate':
+                case 'realm':
+                    timerQuery.area = 'fg';
+                    break;
+                case 'open':
+                    timerQuery.area = 'fg';
+                    timerQuery.sub_area = 'open';
+                    break;
+                case 'close':
+                case 'closed':
+                case 'shut':
+                    timerQuery.area = 'fg';
+                    timerQuery.sub_area = 'close';
+                    break;
+                case 'reset':
+                case 'game':
+                case 'rh':
+                case 'midnight':
+                    timerQuery.area = 'reset';
+                    break;
+                case 'cove':
+                case 'balack':
+                case 'tide':
+                    timerQuery.area = 'cove';
+                    break;
+                case 'lowtide':
+                case 'low':
+                    timerQuery.area = 'cove';
+                    timerQuery.sub_area = 'low';
+                    break;
+                case 'midtide':
+                case 'mid':
+                    timerQuery.area = 'cove';
+                    timerQuery.sub_area = 'mid';
+                    break;
+                case 'hightide':
+                case 'high':
+                    timerQuery.area = 'cove';
+                    timerQuery.sub_area = 'high';
+                    break;
+                case 'spill':
+                case 'toxic':
+                case 'ts':
+                    timerQuery.area = 'spill';
+                    break;
+                case 'archduke':
+                case 'ad':
+                case 'archduchess':
+                case 'aardwolf':
+                case 'arch':
+                    timerQuery.area = 'spill';
+                    timerQuery.sub_area = 'arch';
+                    break;
+                case 'grandduke':
+                case 'gd':
+                case 'grandduchess':
+                case 'grand':
+                    timerQuery.area = 'spill';
+                    timerQuery.sub_area = 'grand';
+                    break;
+                case 'duchess':
+                case 'duke':
+                    timerQuery.area = 'spill';
+                    timerQuery.sub_area = 'duke';
+                    break;
+                case 'countess':
+                case 'count':
+                    timerQuery.area = 'spill';
+                    timerQuery.sub_area = 'count';
+                    break;
+                case 'baronness':
+                case 'baron':
+                    timerQuery.area = 'spill';
+                    timerQuery.sub_area = 'baron';
+                    break;
+                case 'lady':
+                case 'lord':
+                    timerQuery.area = 'spill';
+                    timerQuery.sub_area = 'lord';
+                    break;
+                case 'heroine':
+                case 'hero':
+                    timerQuery.area = 'spill';
+                    timerQuery.sub_area = 'hero';
+                    break;
+                case 'once':
+                case '1':
+                case 1:
+                    timerQuery.count = 1;
+                    break;
+                case 'always':
+                case 'forever':
+                case 'unlimited':
+                case '-1':
+                case -1:
+                    timerQuery.count = -1;
+                    break;
+                case 'stop':
+                case '0':
+                case 0:
+                    timerQuery.count = 0;
+                    break;
+                default:
+                    if (!isNaN(parseInt(timerName))) {
+                        timerQuery.count = parseInt(timerName);
+                    }
+                    break;
+            }
         }
     }
     return timerQuery;
@@ -451,7 +468,7 @@ function timeLeft (in_date) {
     var now_date = new Date();
     var retStr = "real soon";
     var ms_left = in_date.valueOf() - now_date.valueOf() ;
-    console.log(ms_left + " ms left");
+    //console.log(ms_left + " ms left");
     if (ms_left > 1000*60) {
         retStr = "in ";
         if (ms_left > 1000 * 60 * 60 * 24) {
