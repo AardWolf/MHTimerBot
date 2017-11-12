@@ -217,7 +217,7 @@ function messageParse(message) {
             var curr_count = 0;
             while (usage_str.length > 2000) {
                 part_str = usage_str.substr(0,usage_str.lastIndexOf('\n',2000));
-                message.author.send(part_str);
+                message.channel.send(part_str);
                 usage_str = usage_str.substr(part_str.length);
             }
             //Issue 39, use the channel the request came in on
@@ -781,7 +781,7 @@ function buildSchedule(timer_request) {
     var upcoming_timers = [];
     var req_hours = timer_request.count;
     var area = timer_request.area;
-    var max_count = 25;
+    var max_count = 24;
     var curr_count = 0;
     
     if (isNaN(parseInt(req_hours))) {
