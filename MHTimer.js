@@ -456,7 +456,8 @@ function nextTimer(timerName) {
     } else {
         retStr = new Discord.RichEmbed()
 //            .setTitle("next " + timerName) // removing this cleaned up the embed a lot
-            .setDescription(youngTimer.getDemand() + "\n" + timeLeft(youngTimer.getNext())) // Putting here makes it look nicer and fit in portrait mode
+            .setDescription(youngTimer.getDemand() + "\n" + timeLeft(youngTimer.getNext()) +
+                    "\nTo schedule a reminder: -mh remind " + youngTimer.getArea() + " " + youngTimer.getSubArea()) // Putting here makes it look nicer and fit in portrait mode
             .setTimestamp(new Date(youngTimer.getNext().valueOf()))
 //            .addField(retStr)
             .setFooter("at"); // There has to be something in here or there is no footer
