@@ -496,11 +496,16 @@ function doRemind (timer) {
                 remind.count = 0;
                 continue;
             }
+            if (remind.count > 0) {
+                remind.count -= 1;
+            }
             if (user.presence !== 'dnd') {
                 //user.send(timer.getAnnounce());
                 usage_str = "You have ";
                 if (remind.count < 0) {
                     usage_str += "unlimited";
+                } else if (remind.count == 0) {
+                    usage_str += "no more";
                 } else {
                     usage_str += remind.count;
                 }
@@ -508,11 +513,13 @@ function doRemind (timer) {
                 if (typeof remind.sub_area !== 'undefined') {
                     usage_str += " " + remind.sub_area;
                 }
-                usage_str += " stop` to end them sooner";
+                if (remind.count == 0) {
+                    usage_str += "` to turn this reminder back on.";
+                } else {
+                    usage_str += " stop` to end them sooner.";
+                }
+                usage_str += " See also `-mh help remind` for other options.";
                 user.send(timer.getAnnounce() + "\n" + usage_str );
-            }
-            if (remind.count > 0) {
-                remind.count -= 1;
             }
         }
     }
