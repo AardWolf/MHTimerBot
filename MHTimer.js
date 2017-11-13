@@ -234,7 +234,12 @@ function messageParse(message) {
                 message.channel.send("You have to supply mice to find");
             }
             else {
-                message.channel.send(findMouse(tokens.join(" ").trim()));
+                var searchStr = tokens.join(" ").trim().toLowerCase().replace(/ mouse$/,'');
+                if (searchStr.length < 3) {
+                    message.channel.send("Your search string was too short, try again");
+                } else {
+                    findMouse(message.channel, searchStr);
+                }
             }
             break;
                 
@@ -866,25 +871,80 @@ function getMouseList() {
                 mice[i].lowerValue = mice[i].value.toLowerCase();
             }
         }
-    })
+    });
 }
 
-function findMouse(args) {
-    //https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=mouse&item_id=602 (use appropriate mouse numbers)
+function findMouse(channel, args) {
+    var url = 'https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=mouse&item_id=';
     var retStr = "'" + args + "' not found";
     var found = 0;
     var len = args.length;
+    var mouseID = 0;
+    var mouseName;
+    var attractions = [];
     console.log("Check for a string length of " + len)
     for (var i = 0; (i < mice.length && !found); i++) {
         if (mice[i].lowerValue.substring(0,len) === args) {
-            retStr = "'" + args + "' is '" + mice[i].value + "' AKA " + mice[i].id;
+//            retStr = "'" + args + "' is '" + mice[i].value + "' AKA " + mice[i].id;
+            mouseID = mice[i].id;
+            mouseName = mice[i].value;
+            url = url + mouseID;
+            console.log("Lookup: " + url);
+            request( {
+                url: url,
+                json: true
+            }, function (error, response, body) {
+                console.log("Doing a lookup");
+                if (!error && response.statusCode == 200 && Array.isArray(body)) {
+                    //body is an array of objects with: location, stage, total_hunts, rate, cheese
+                    // sort by "rate" but only if hunts > 100
+                    var attractions = [];
+                    for (var j = 0; j < body.length; j++) {
+                        if (body[j].total_hunts >= 100) {
+                            attractions.push(
+                                {   location: body[j].location,
+                                    stage: body[j].stage,
+                                    total_hunts: body[j].total_hunts,
+                                    rate: body[j].rate,
+                                    cheese: body[j].cheese
+                                } );
+                        }
+                    }
+                } else {
+                    console.log("Lookup failed for some reason", error, response, body);
+                    retStr = "Could not process results for '" + args + "', AKA " + mouseName;
+                    channel.send(retStr);
+                }
+                //now to sort that by AR, descending
+                attractions.sort( function (a,b) {
+                    return b.rate - a.rate;
+                });
+                //And then to make a nice output. Or an output
+                retStr = "";
+                for (var j = 0; (j < attractions.length && j < 5); j++) {
+                    if (attractions[j].stage === null) {
+                        attractions[j].stage = "not used";
+                    }
+                    retStr += attractions[j].location + " - " + attractions[j].stage ;
+                    retStr += " - " + attractions[j].cheese + " - " 
+                    retStr += (attractions[j].rate * 1.0 / 100);
+                    retStr += "% - " + attractions[j].total_hunts;
+                    retStr += "\n";
+                }
+                if (retStr.length == 0) {
+                    retStr = mouseName + " either hasn't been seen enough or something broke";
+                } else {
+                    retStr = mouseName + " can be found the following ways:\nLocation - Stage - Cheese - AR - Total Hunts\n" + retStr;
+                }
+                channel.send(retStr);
+            });
             found = 1;
         }
     }
     if (!found) {
         console.log("Nothing found for '", args, "'");
+        channel.send(retStr);
     }
-    return retStr;
 }
 
 //Resources:
