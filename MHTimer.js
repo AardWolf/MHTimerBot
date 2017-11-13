@@ -925,16 +925,16 @@ function findMouse(channel, args) {
                     if (attractions[j].stage === null) {
                         attractions[j].stage = "not used";
                     }
-                    retStr += attractions[j].location + " - " + attractions[j].stage ;
-                    retStr += " - " + attractions[j].cheese + " - " 
+                    retStr += attractions[j].location + "\t" + attractions[j].stage ;
+                    retStr += "\t" + attractions[j].cheese + "\t" 
                     retStr += (attractions[j].rate * 1.0 / 100);
-                    retStr += "% - " + attractions[j].total_hunts;
+                    retStr += "%\t" + attractions[j].total_hunts;
                     retStr += "\n";
                 }
                 if (retStr.length == 0) {
                     retStr = mouseName + " either hasn't been seen enough or something broke";
                 } else {
-                    retStr = mouseName + " can be found the following ways:\nLocation - Stage - Cheese - AR - Total Hunts\n" + retStr;
+                    retStr = mouseName + " can be found the following ways:\nLocation - Stage - Cheese - AR - Total Hunts\n```\n" + retStr + "\n```\n";
                 }
                 channel.send(retStr);
             });
