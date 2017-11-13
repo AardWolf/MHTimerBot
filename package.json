@@ -1,9 +1,16 @@
 {
-  "name" : "MHTimerBot",
-  "description" : "A Discord bot that understands Mousehunt timers",
-  "main" : "MHTimer.js",
-  "license" : "UNLICENSED",
-  "private" : true,
-  "repository" : {"type" : "git", "url" : "https://github.com/AardWolf/MHTimerBot"}, 
-  "version" : "0.4.0"
+  "name": "MHTimerBot",
+  "description": "A Discord bot that understands Mousehunt timers",
+  "main": "MHTimer.js",
+  "license": "UNLICENSED",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AardWolf/MHTimerBot"
+  },
+  "version": "0.4.0",
+  "dependencies": {
+    "discord.js": "^11.2.1",
+    "request": "^2.83.0"
+  }
 }

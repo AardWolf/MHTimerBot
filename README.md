@@ -16,6 +16,8 @@ Timers need a way to catch back up if offline a while.
   -remind season winter once - Will only remind the next time the timer goes  
 * schedule \<area\> [\<number\>] - Shows the timers for the next \<number\> of days for an area  
   -schedule spill 2 - The levels will rise to Arch in 2h31m / The levels will fall through Arch in 1d2h31m
+* find \<mouse\> - Finds a mouse using agiletravels' data. You need up to three characters of the start of the mouse's name
+  -find Ful'mina OR -find ful
 
 ## TO-DO
 

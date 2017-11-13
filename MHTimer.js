@@ -5,6 +5,7 @@
 const Discord = require('discord.js');
 var Timer = require('./timerClass.js');
 var fs = require ('fs');
+var request = require('request'); //Needed to use Jack's tools
 const client = new Discord.Client();
 
 // Globals
@@ -17,6 +18,7 @@ var timers_list = [];
 var reminders = [];
 var file_encoding = 'utf8';
 var settings = {};
+var mice = [];
 
 //Only support announcing in 1 channel
 var announce_channel;
@@ -101,6 +103,9 @@ function Main() {
             }
         });
     });
+    
+    a.then( getMouseList );
+        
 }
 Main();
 
@@ -224,6 +229,20 @@ function messageParse(message) {
             //message.author.send(usage_str);
             message.channel.send(usage_str);
             break;
+        case 'find':
+            if (tokens.length == 0) {
+                message.channel.send("You have to supply mice to find");
+            }
+            else {
+                var searchStr = tokens.join(" ").trim().toLowerCase().replace(/ mouse$/,'');
+                if (searchStr.length < 3) {
+                    message.channel.send("Your search string was too short, try again");
+                } else {
+                    findMouse(message.channel, searchStr);
+                }
+            }
+            break;
+                
         case 'help':
         case 'arrg':
         default:
@@ -248,16 +267,22 @@ function messageParse(message) {
                     usage_str = "Usage: `-mh schedule [<area>] [<number>]` will tell you the timers scheduled for the next `<number>` of hours. Default is 24, max is 240.\n";
                     usage_str += "If you provide an area I will only report on that area.";
                 }
+                else if (tokens[0] === 'find') {
+                    usage_str = "Usage `-mh find <mouse>` will print the top attractions for the mouse, capped at 10.\n";
+                    usage_str += "All attraction data is from <https://mhhunthelper.agiletravels.com/>.\n";
+                    usage_str += "Help populate the database for better information!";
+                }
                 else {
                     //TODO: Update this with schedule
                     usage_str = "I can only provide help for `remind`, `next`, and `schedule`";
                 }
             } else {
                 //TODO: Update this with schedule
-                usage_str = "I know the keywords `next`, `remind`, and `schedule`. You can use `-mh help [next|remind|schedule]` to get specific information.\n";
-                usage_str += "Example: `-mh help next` provides help about the 'next' keyword, `-mh help remind` provides help about the 'remind' keyword.";
+                usage_str = "I know the keywords `find`, `next`, `remind`, and `schedule`. \nYou can use `-mh help [find|next|remind|schedule]` to get specific information about these commands.\n";
+                usage_str += "Example: `-mh help next` provides help about the 'next' keyword, `-mh help remind` provides help about the 'remind' keyword.\n";
+                usage_str += "Pro Tip: **All commands work in PM!**";
             }
-            message.author.send(usage_str);
+            message.channel.send(usage_str);
     }
 }
 
@@ -457,7 +482,7 @@ function nextTimer(timerName) {
         retStr = new Discord.RichEmbed()
 //            .setTitle("next " + timerName) // removing this cleaned up the embed a lot
             .setDescription(youngTimer.getDemand() + "\n" + timeLeft(youngTimer.getNext()) +
-                    "\nTo schedule a reminder: -mh remind " + youngTimer.getArea() + " " + youngTimer.getSubArea()) // Putting here makes it look nicer and fit in portrait mode
+                    "\nTo schedule this reminder: -mh remind " + youngTimer.getArea() + " " + youngTimer.getSubArea()) // Putting here makes it look nicer and fit in portrait mode
             .setTimestamp(new Date(youngTimer.getNext().valueOf()))
 //            .addField(retStr)
             .setFooter("at"); // There has to be something in here or there is no footer
@@ -836,6 +861,113 @@ function buildSchedule(timer_request) {
     }
     return return_str;
     
+}
+
+function getMouseList() {
+    var url = "https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=mouse&item_id=all";
+    request({
+        url: url,
+        json: true
+    }, function (error, response, body) {
+        if (!error && response.statusCode == 200) {
+            console.log("Got a mouse list");
+//            console.log(body);
+            mice = body;
+            for (var i = 0; i < mice.length; i++ ) {
+                mice[i].lowerValue = mice[i].value.toLowerCase();
+            }
+        }
+    });
+}
+
+function findMouse(channel, args) {
+    var url = 'https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=mouse&item_id=';
+    var retStr = "'" + args + "' not found";
+    var found = 0;
+    var len = args.length;
+    var mouseID = 0;
+    var mouseName;
+    var attractions = [];
+//    console.log("Check for a string length of " + len)
+    for (var i = 0; (i < mice.length && !found); i++) {
+        if (mice[i].lowerValue.substring(0,len) === args) {
+//            retStr = "'" + args + "' is '" + mice[i].value + "' AKA " + mice[i].id;
+            mouseID = mice[i].id;
+            mouseName = mice[i].value;
+            url = url + mouseID;
+//            console.log("Lookup: " + url);
+            request( {
+                url: url,
+                json: true
+            }, function (error, response, body) {
+//                console.log("Doing a lookup");
+                if (!error && response.statusCode == 200 && Array.isArray(body)) {
+                    //body is an array of objects with: location, stage, total_hunts, rate, cheese
+                    // sort by "rate" but only if hunts > 100
+                    var attractions = [];
+                    var collengths = { location: 0, stage: 0, total_hunts: 0, cheese: 0};
+                    for (var j = 0; j < body.length; j++) {
+                        if (body[j].total_hunts >= 100) {
+                            attractions.push(
+                                {   location: body[j].location,
+                                    stage: (body[j].stage === null) ? "not used" : body[j].stage,
+                                    total_hunts: body[j].total_hunts,
+                                    rate: body[j].rate,
+                                    cheese: body[j].cheese
+                                } );
+                        }
+                    }
+                } else {
+                    console.log("Lookup failed for some reason", error, response, body);
+                    retStr = "Could not process results for '" + args + "', AKA " + mouseName;
+                    channel.send(retStr);
+                }
+                //now to sort that by AR, descending
+                attractions.sort( function (a,b) {
+                    return b.rate - a.rate;
+                });
+                //And then to make a nice output. Or an output
+                retStr = "";
+                if (attractions.length > 0) {
+                    attractions.unshift({ location: "Location", stage: "Stage", total_hunts: "Total Hunts", rate: "AR", cheese: "Cheese"});
+                    attractions.splice(11);
+                    for (var j = 0; j < attractions.length; j++) {
+                        for (var field in collengths) {
+                            if ( attractions[j].hasOwnProperty(field) &&
+                                (attractions[j][field].length > collengths[field])) { 
+                                collengths[field] = attractions[j][field].length;
+                            }
+                        }
+                    }
+                    retStr += attractions[0].location.padEnd(collengths.location) + ' |';
+                    retStr += attractions[0].stage.padEnd(collengths.stage) + ' |' ;
+                    retStr += attractions[0].cheese.padEnd(collengths.cheese) + ' |' ;
+                    retStr += attractions[0].rate.padEnd(7) + ' |';
+                    retStr += attractions[0].total_hunts.padEnd(collengths.total_hunts);
+                    retStr += "\n";
+                    retStr += '='.padEnd(collengths.location + collengths.stage + collengths.cheese + 15 + collengths.total_hunts,'=') + "\n";
+                    for (var j = 1; j < attractions.length ; j++) {
+                        retStr += attractions[j].location.padEnd(collengths.location) + ' |';
+                        retStr += attractions[j].stage.padEnd(collengths.stage) + ' |' ;
+                        retStr += attractions[j].cheese.padEnd(collengths.cheese) + ' |' ;
+                        retStr += String((attractions[j].rate * 1.0 / 100)).padStart(6) + '% |';
+                        retStr += attractions[j].total_hunts.padStart(collengths.total_hunts);
+                        retStr += "\n";
+                    }
+                    retStr = mouseName + " can be found the following ways:\n```\n" + retStr + "\n```\n";
+                    retStr += "HTML version at: <https://mhhunthelper.agiletravels.com/?mouse=" + mouseID + ">";
+                } else {
+                    retStr = mouseName + " either hasn't been seen enough or something broke";
+                }
+                channel.send(retStr);
+            });
+            found = 1;
+        }
+    }
+    if (!found) {
+//        console.log("Nothing found for '", args, "'");
+        channel.send(retStr);
+    }
 }
 
 //Resources:
