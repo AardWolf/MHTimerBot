@@ -889,21 +889,22 @@ function findMouse(channel, args) {
             mouseID = mice[i].id;
             mouseName = mice[i].value;
             url = url + mouseID;
-            console.log("Lookup: " + url);
+//            console.log("Lookup: " + url);
             request( {
                 url: url,
                 json: true
             }, function (error, response, body) {
-                console.log("Doing a lookup");
+//                console.log("Doing a lookup");
                 if (!error && response.statusCode == 200 && Array.isArray(body)) {
                     //body is an array of objects with: location, stage, total_hunts, rate, cheese
                     // sort by "rate" but only if hunts > 100
                     var attractions = [];
+                    var collengths = { location: 0, stage: 0, total_hunts: 0, cheese: 0};
                     for (var j = 0; j < body.length; j++) {
                         if (body[j].total_hunts >= 100) {
                             attractions.push(
                                 {   location: body[j].location,
-                                    stage: body[j].stage,
+                                    stage: (body[j].stage === null) ? "not used" : body[j].stage,
                                     total_hunts: body[j].total_hunts,
                                     rate: body[j].rate,
                                     cheese: body[j].cheese
@@ -921,20 +922,35 @@ function findMouse(channel, args) {
                 });
                 //And then to make a nice output. Or an output
                 retStr = "";
-                for (var j = 0; (j < attractions.length && j < 5); j++) {
-                    if (attractions[j].stage === null) {
-                        attractions[j].stage = "not used";
+                if (attractions.length > 0) {
+                    attractions.unshift({ location: "Location", stage: "Stage", total_hunts: "Total Hunts", rate: "AR", cheese: "Cheese"});
+                    attractions.splice(11);
+                    for (var j = 0; j < attractions.length; j++) {
+                        for (var field in collengths) {
+                            if ( attractions[j].hasOwnProperty(field) &&
+                                (attractions[j][field].length > collengths[field])) { 
+                                collengths[field] = attractions[j][field].length;
+                            }
+                        }
                     }
-                    retStr += attractions[j].location + "\t" + attractions[j].stage ;
-                    retStr += "\t" + attractions[j].cheese + "\t" 
-                    retStr += (attractions[j].rate * 1.0 / 100);
-                    retStr += "%\t" + attractions[j].total_hunts;
+                    retStr += attractions[0].location.padEnd(collengths.location) + ' |';
+                    retStr += attractions[0].stage.padEnd(collengths.stage) + ' |' ;
+                    retStr += attractions[0].cheese.padEnd(collengths.cheese) + ' |' ;
+                    retStr += attractions[0].rate.padEnd(7) + ' |';
+                    retStr += attractions[0].total_hunts.padEnd(collengths.total_hunts);
                     retStr += "\n";
-                }
-                if (retStr.length == 0) {
-                    retStr = mouseName + " either hasn't been seen enough or something broke";
+                    retStr += '='.padEnd(collengths.location + collengths.stage + collengths.cheese + 15 + collengths.total_hunts,'=') + "\n";
+                    for (var j = 1; j < attractions.length ; j++) {
+                        retStr += attractions[j].location.padEnd(collengths.location) + ' |';
+                        retStr += attractions[j].stage.padEnd(collengths.stage) + ' |' ;
+                        retStr += attractions[j].cheese.padEnd(collengths.cheese) + ' |' ;
+                        retStr += String((attractions[j].rate * 1.0 / 100)).padStart(6) + '% |';
+                        retStr += attractions[j].total_hunts.padStart(collengths.total_hunts);
+                        retStr += "\n";
+                    }
+                    retStr = mouseName + " can be found the following ways:\n```\n" + retStr + "\n```\n";
                 } else {
-                    retStr = mouseName + " can be found the following ways:\nLocation - Stage - Cheese - AR - Total Hunts\n```\n" + retStr + "\n```\n";
+                    retStr = mouseName + " either hasn't been seen enough or something broke";
                 }
                 channel.send(retStr);
             });
