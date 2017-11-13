@@ -267,16 +267,22 @@ function messageParse(message) {
                     usage_str = "Usage: `-mh schedule [<area>] [<number>]` will tell you the timers scheduled for the next `<number>` of hours. Default is 24, max is 240.\n";
                     usage_str += "If you provide an area I will only report on that area.";
                 }
+                else if (tokens[0] === 'find') {
+                    usage_str = "Usage `-mh find <mouse>` will print the top attractions for the mouse, capped at 10.\n";
+                    usage_str += "All attraction data is from <https://mhhunthelper.agiletravels.com/>.\n";
+                    usage_str += "Help populate the database for better information!";
+                }
                 else {
                     //TODO: Update this with schedule
                     usage_str = "I can only provide help for `remind`, `next`, and `schedule`";
                 }
             } else {
                 //TODO: Update this with schedule
-                usage_str = "I know the keywords `next`, `remind`, and `schedule`. You can use `-mh help [next|remind|schedule]` to get specific information.\n";
-                usage_str += "Example: `-mh help next` provides help about the 'next' keyword, `-mh help remind` provides help about the 'remind' keyword.";
+                usage_str = "I know the keywords `find`, `next`, `remind`, and `schedule`. \nYou can use `-mh help [find|next|remind|schedule]` to get specific information about these commands.\n";
+                usage_str += "Example: `-mh help next` provides help about the 'next' keyword, `-mh help remind` provides help about the 'remind' keyword.\n";
+                usage_str += "Pro Tip: **All commands work in PM!**";
             }
-            message.author.send(usage_str);
+            message.channel.send(usage_str);
     }
 }
 
@@ -882,7 +888,7 @@ function findMouse(channel, args) {
     var mouseID = 0;
     var mouseName;
     var attractions = [];
-    console.log("Check for a string length of " + len)
+//    console.log("Check for a string length of " + len)
     for (var i = 0; (i < mice.length && !found); i++) {
         if (mice[i].lowerValue.substring(0,len) === args) {
 //            retStr = "'" + args + "' is '" + mice[i].value + "' AKA " + mice[i].id;
@@ -949,6 +955,7 @@ function findMouse(channel, args) {
                         retStr += "\n";
                     }
                     retStr = mouseName + " can be found the following ways:\n```\n" + retStr + "\n```\n";
+                    retStr += "HTML version at: <https://mhhunthelper.agiletravels.com/?mouse=" + mouseID + ">";
                 } else {
                     retStr = mouseName + " either hasn't been seen enough or something broke";
                 }
@@ -958,7 +965,7 @@ function findMouse(channel, args) {
         }
     }
     if (!found) {
-        console.log("Nothing found for '", args, "'");
+//        console.log("Nothing found for '", args, "'");
         channel.send(retStr);
     }
 }
