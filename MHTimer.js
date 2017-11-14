@@ -99,7 +99,7 @@ function Main() {
     a.then(() => {
         client.on('message', message => {
             if (message.content.startsWith('-mh ')) {
-                console.log(message.channel.type);
+//                console.log(message.channel.type);
                 messageParse(message);
             }
         });
@@ -883,6 +883,7 @@ function getMouseList() {
 }
 
 function findMouse(channel, args) {
+    //NOTE: RH location is https://mhhunthelper.agiletravels.com/tracker.json
     var url = 'https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=mouse&item_id=';
     var retStr = "'" + args + "' not found";
     var found = 0;
