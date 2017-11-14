@@ -99,6 +99,7 @@ function Main() {
     a.then(() => {
         client.on('message', message => {
             if (message.content.startsWith('-mh ')) {
+                console.log(message.channel.type);
                 messageParse(message);
             }
         });
@@ -310,14 +311,14 @@ function timerAliases(tokens) {
         for (var j = 0; j < timers_list.length; j++) {
             if (timers_list[j].getArea() === timerName) {
                 timerQuery.area = timerName;
-                found = 1;
-                j = timers_list.length;
+//                found = 1;
+//                j = timers_list.length;
             }
             else if (timers_list[j].getSubArea() === timerName) {
                 timerQuery.area = timers_list[j].getArea();
                 timerQuery.sub_area = timerName;
-                found = 1;
-                j = timers_list.length;
+//                found = 1;
+//                j = timers_list.length;
             }
         }
         if (found == 0) {
@@ -457,6 +458,7 @@ function timerAliases(tokens) {
             }
         }
     }
+    console.log(timerQuery);
     return timerQuery;
 }
 
