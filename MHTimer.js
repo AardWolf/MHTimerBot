@@ -458,7 +458,7 @@ function timerAliases(tokens) {
             }
         }
     }
-    console.log(timerQuery);
+//    console.log(timerQuery);
     return timerQuery;
 }
 
