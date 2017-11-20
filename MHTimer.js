@@ -19,6 +19,7 @@ var reminders = [];
 var file_encoding = 'utf8';
 var settings = {};
 var mice = [];
+var items = [];
 
 //Only support announcing in 1 channel
 var announce_channel;
@@ -106,6 +107,7 @@ function Main() {
     });
     
     a.then( getMouseList );
+    a.then( getItemList );
         
 }
 Main();
@@ -239,7 +241,20 @@ function messageParse(message) {
                 if (searchStr.length < 3) {
                     message.channel.send("Your search string was too short, try again");
                 } else {
-                    findMouse(message.channel, searchStr);
+                    findMouse(message.channel, searchStr, 'find');
+                }
+            }
+            break;
+        case 'ifind':
+            if (tokens.length == 0) {
+                message.channel.send("You have to supply an item to find");
+            }
+            else {
+                var searchStr = tokens.join(" ").trim().toLowerCase();
+                if (searchStr.length < 3) {
+                    message.channel.send("Your search string was too short, try again");
+                } else {
+                    findItem(message.channel, searchStr, 'ifind');
                 }
             }
             break;
@@ -887,7 +902,7 @@ function getMouseList() {
     });
 }
 
-function findMouse(channel, args) {
+function findMouse(channel, args, command) {
     //NOTE: RH location is https://mhhunthelper.agiletravels.com/tracker.json
     var url = 'https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=mouse&item_id=';
     var retStr = "'" + args + "' not found";
@@ -962,7 +977,7 @@ function findMouse(channel, args) {
                         retStr += attractions[j].total_hunts.padStart(collengths.total_hunts);
                         retStr += "\n";
                     }
-                    retStr = mouseName + " can be found the following ways:\n```\n" + retStr + "\n```\n";
+                    retStr = mouseName + " (mouse) can be found the following ways:\n```\n" + retStr + "\n```\n";
                     retStr += "HTML version at: <https://mhhunthelper.agiletravels.com/?mouse=" + mouseID + ">";
                 } else {
                     retStr = mouseName + " either hasn't been seen enough or something broke";
@@ -973,8 +988,127 @@ function findMouse(channel, args) {
         }
     }
     if (!found) {
+        //If this was an item find try finding a mouse
+        if (command === 'find') {
+            findItem(channel, args, command);
+        } else {
 //        console.log("Nothing found for '", args, "'");
-        channel.send(retStr);
+            channel.send(retStr);
+        }
+    }
+}
+
+function getItemList() {
+    var url = "https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=loot&item_id=all";
+    request({
+        url: url,
+        json: true
+    }, function (error, response, body) {
+        if (!error && response.statusCode == 200) {
+            console.log("Got a loot list");
+//            console.log(body);
+            items = body;
+            for (var i = 0; i < items.length; i++ ) {
+                items[i].lowerValue = items[i].value.toLowerCase();
+            }
+        }
+    });
+}
+
+function findItem(channel, args, command) {
+    //NOTE: RH location is https://mhhunthelper.agiletravels.com/tracker.json
+    var url = 'https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=loot&item_id=';
+    var retStr = "'" + args + "' not found";
+    var found = 0;
+    var len = args.length;
+    var itemID = 0;
+    var itemName;
+    var attractions = [];
+//    console.log("Check for a string length of " + len)
+    for (var i = 0; (i < items.length && !found); i++) {
+        if (items[i].lowerValue.substring(0,len) === args) {
+//            retStr = "'" + args + "' is '" + items[i].value + "' AKA " + items[i].id;
+            itemID = items[i].id;
+            itemName = items[i].value;
+            url = url + itemID;
+//            console.log("Lookup: " + url);
+            request( {
+                url: url,
+                json: true
+            }, function (error, response, body) {
+//                console.log("Doing a lookup");
+                if (!error && response.statusCode == 200 && Array.isArray(body)) {
+                    //body is an array of objects with: location, stage, total_hunts, rate, cheese
+                    // sort by "rate" but only if hunts > 100
+                    var attractions = [];
+                    var collengths = { location: 0, stage: 0, total_hunts: 0, cheese: 0, rate: 0};
+                    for (var j = 0; j < body.length; j++) {
+                        if (body[j].total_hunts >= 100) {
+                            attractions.push(
+                                {   location: body[j].location,
+                                    stage: (body[j].stage === null) ? "not used" : body[j].stage,
+                                    total_hunts: body[j].total_hunts,
+                                    rate: body[j].rate,
+                                    cheese: body[j].cheese
+                                } );
+                        }
+                    }
+                } else {
+                    console.log("Lookup failed for some reason", error, response, body);
+                    retStr = "Could not process results for '" + args + "', AKA " + itemName;
+                    channel.send(retStr);
+                }
+                //now to sort that by AR, descending
+                attractions.sort( function (a,b) {
+                    return b.rate - a.rate;
+                });
+                //And then to make a nice output. Or an output
+                retStr = "";
+                if (attractions.length > 0) {
+                    attractions.unshift({ location: "Location", stage: "Stage", total_hunts: "Total Hunts", rate: "DR", cheese: "Cheese"});
+                    attractions.splice(11);
+                    for (var j = 0; j < attractions.length; j++) {
+                        for (var field in collengths) {
+                            if ( attractions[j].hasOwnProperty(field) &&
+                                (attractions[j][field].length > collengths[field])) { 
+                                collengths[field] = attractions[j][field].length;
+                            }
+                        }
+                    }
+                    collengths.rate += 1; //account for the decimal
+                    retStr += attractions[0].location.padEnd(collengths.location) + ' |';
+                    retStr += attractions[0].stage.padEnd(collengths.stage) + ' |' ;
+                    retStr += attractions[0].cheese.padEnd(collengths.cheese) + ' |' ;
+                    retStr += attractions[0].rate.padEnd(collengths.rate) + ' |';
+                    retStr += attractions[0].total_hunts.padEnd(collengths.total_hunts);
+                    retStr += "\n";
+                    retStr += '='.padEnd(collengths.location + collengths.stage + collengths.cheese + collengths.rate + collengths.total_hunts + 8,'=') + "\n";
+                    for (var j = 1; j < attractions.length ; j++) {
+                        retStr += attractions[j].location.padEnd(collengths.location) + ' |';
+                        retStr += attractions[j].stage.padEnd(collengths.stage) + ' |' ;
+                        retStr += attractions[j].cheese.padEnd(collengths.cheese) + ' |' ;
+                        retStr += String((attractions[j].rate * 1.0 / 100)).padStart(collengths.rate) + ' |';
+                        retStr += attractions[j].total_hunts.padStart(collengths.total_hunts);
+                        retStr += "\n";
+                    }
+                    retStr = itemName + " (loot) can be found the following ways:\n```\n" + retStr + "\n```\n";
+                    retStr += "HTML version at: <https://mhhunthelper.agiletravels.com/?loot=" + itemID + ">";
+                } else {
+                    retStr = itemName + " either hasn't been seen enough or something broke";
+                }
+                channel.send(retStr);
+            });
+            found = 1;
+        }
+    }
+    if (!found) {
+        //If this was an item find try finding a mouse
+        if (command === 'ifind') {
+            findMouse(channel, args, command);
+        } else {
+//        console.log("Nothing found for '", args, "'");
+            channel.send(retStr);
+        }
     }
 }
 
