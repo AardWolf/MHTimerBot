@@ -190,7 +190,15 @@ function messageParse(message) {
         case 'next':
             //TODO - This should be a PM, probably?
             if ((tokens.length === 0) || (typeof timerName.area === 'undefined')) { 
-                message.channel.send("Did you want to know about sg, fg, reset, spill, or cove?"); 
+                if (typeof(tokens[0]) !== 'undefined') {
+                    switch (tokens[0]) {
+                        case 'ronza':
+                            message.channel.send("Don't let aardwolf see you ask or you'll get muted"); //maybe add random things here
+                            break;
+                        default:
+                            message.channel.send("Did you want to know about sg, fg, reset, spill, or cove?"); 
+                    }
+                }
             } else {
                 var retStr = nextTimer(timerName);
                 if (typeof retStr === "string") {
@@ -233,6 +241,7 @@ function messageParse(message) {
             message.channel.send(usage_str);
             break;
         case 'find':
+        case 'mfind':
             if (tokens.length == 0) {
                 message.channel.send("You have to supply mice to find");
             }
@@ -288,13 +297,18 @@ function messageParse(message) {
                     usage_str += "All attraction data is from <https://mhhunthelper.agiletravels.com/>.\n";
                     usage_str += "Help populate the database for better information!";
                 }
+                else if (tokens[0] === 'ifind') {
+                    usage_str = "Usage `-mh ifind <item>` will print the top drop rates for the item, capped at 10.\n";
+                    usage_str += "All drop rate data is from <https://mhhunthelper.agiletravels.com/>.\n";
+                    usage_str += "Help populate the database for better information!";
+                }
                 else {
                     //TODO: Update this with schedule
-                    usage_str = "I can only provide help for `remind`, `next`, and `schedule`";
+                    usage_str = "I can only provide help for `remind`, `next`, `find`, `ifind`, and `schedule`";
                 }
             } else {
                 //TODO: Update this with schedule
-                usage_str = "I know the keywords `find`, `next`, `remind`, and `schedule`. \nYou can use `-mh help [find|next|remind|schedule]` to get specific information about these commands.\n";
+                usage_str = "I know the keywords `find`, `ifind`, `next`, `remind`, and `schedule`. \nYou can use `-mh help [find|ifind|next|remind|schedule]` to get specific information about these commands.\n";
                 usage_str += "Example: `-mh help next` provides help about the 'next' keyword, `-mh help remind` provides help about the 'remind' keyword.\n";
                 usage_str += "Pro Tip: **All commands work in PM!**";
             }
