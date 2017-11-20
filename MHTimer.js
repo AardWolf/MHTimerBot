@@ -1082,6 +1082,10 @@ function findItem(channel, args, command) {
                     attractions.unshift({ location: "Location", stage: "Stage", total_hunts: "Total Hunts", rate: "DR", cheese: "Cheese"});
                     attractions.splice(11);
                     for (var j = 0; j < attractions.length; j++) {
+//                        console.log((attractions[j].rate * 1.0 / 1000).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+                        if (j > 0) {
+                            attractions[j].rate = (attractions[j].rate * 1.0 / 1000).toLocaleString('en-US', {minimumFractionDigits: 3, maximumFractionDigits: 3 });
+                        }
                         for (var field in collengths) {
                             if ( attractions[j].hasOwnProperty(field) &&
                                 (attractions[j][field].length > collengths[field])) { 
@@ -1101,12 +1105,12 @@ function findItem(channel, args, command) {
                         retStr += attractions[j].location.padEnd(collengths.location) + ' |';
                         retStr += attractions[j].stage.padEnd(collengths.stage) + ' |' ;
                         retStr += attractions[j].cheese.padEnd(collengths.cheese) + ' |' ;
-                        retStr += String((attractions[j].rate * 1.0 / 100)).padStart(collengths.rate) + ' |';
+                        retStr += attractions[j].rate.padStart(collengths.rate) + ' |';
                         retStr += attractions[j].total_hunts.padStart(collengths.total_hunts);
                         retStr += "\n";
                     }
                     retStr = itemName + " (loot) can be found the following ways:\n```\n" + retStr + "\n```\n";
-                    retStr += "HTML version at: <https://mhhunthelper.agiletravels.com/?loot=" + itemID + ">";
+                    retStr += "HTML version at: <https://mhhunthelper.agiletravels.com/loot.php?item=" + itemID + ">";
                 } else {
                     retStr = itemName + " either hasn't been seen enough or something broke";
                 }
