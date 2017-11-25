@@ -973,6 +973,9 @@ function findMouse(channel, args, command) {
                     attractions.unshift({ location: "Location", stage: "Stage", total_hunts: "Hunts", rate: "AR", cheese: "Cheese"});
                     attractions.splice(11);
                     for (var j = 0; j < attractions.length; j++) {
+                        if (j > 0) {
+                            attractions[j].total_hunts = integerComma(attractions[j].total_hunts);
+                        }
                         for (var field in collengths) {
                             if ( attractions[j].hasOwnProperty(field) &&
                                 (attractions[j][field].length > collengths[field])) { 
@@ -1099,6 +1102,7 @@ function findItem(channel, args, command) {
 //                        console.log((attractions[j].rate * 1.0 / 1000).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2 }));
                         if (j > 0) {
                             attractions[j].rate = (attractions[j].rate * 1.0 / 1000).toLocaleString('en-US', {minimumFractionDigits: 3, maximumFractionDigits: 3 });
+                            attractions[j].total_hunts = integerComma(attractions[j].total_hunts);
                         }
                         for (var field in collengths) {
                             if ( attractions[j].hasOwnProperty(field) &&
@@ -1150,7 +1154,9 @@ function findItem(channel, args, command) {
     }
 }
 
-
+function integerComma(number) {
+    return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
 
 //Resources:
 //Timezones in Discord: https://www.reddit.com/r/discordapp/comments/68zkfs/timezone_tag_bot/
