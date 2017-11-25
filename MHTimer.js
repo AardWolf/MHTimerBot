@@ -378,6 +378,9 @@ function timerAliases(tokens) {
                 case 'fg':
                 case 'grove':
                 case 'gate':
+                case 'ar':
+                case 'acolyte':
+                case 'ripper':
                 case 'realm':
                     timerQuery.area = 'fg';
                     break;
