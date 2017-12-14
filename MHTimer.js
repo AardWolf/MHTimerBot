@@ -378,6 +378,9 @@ function timerAliases(tokens) {
                 case 'fg':
                 case 'grove':
                 case 'gate':
+                case 'ar':
+                case 'acolyte':
+                case 'ripper':
                 case 'realm':
                     timerQuery.area = 'fg';
                     break;
@@ -925,6 +928,7 @@ function findMouse(channel, args, command) {
     var mouseID = 0;
     var mouseName;
     var attractions = [];
+    var stage_used = 0;
 //    console.log("Check for a string length of " + len)
     for (var i = 0; (i < mice.length && !found); i++) {
         if (mice[i].lowerValue.substring(0,len) === args) {
@@ -945,9 +949,12 @@ function findMouse(channel, args, command) {
                     var collengths = { location: 0, stage: 0, total_hunts: 0, cheese: 0};
                     for (var j = 0; j < body.length; j++) {
                         if (body[j].total_hunts >= 100) {
+                            if (body[j].stage !== null) {
+                                stage_used = 1;
+                            }
                             attractions.push(
                                 {   location: body[j].location,
-                                    stage: (body[j].stage === null) ? "not used" : body[j].stage,
+                                    stage: (body[j].stage === null) ? " N/A " : body[j].stage,
                                     total_hunts: body[j].total_hunts,
                                     rate: body[j].rate,
                                     cheese: body[j].cheese
@@ -966,9 +973,12 @@ function findMouse(channel, args, command) {
                 //And then to make a nice output. Or an output
                 retStr = "";
                 if (attractions.length > 0) {
-                    attractions.unshift({ location: "Location", stage: "Stage", total_hunts: "Total Hunts", rate: "AR", cheese: "Cheese"});
+                    attractions.unshift({ location: "Location", stage: "Stage", total_hunts: "Hunts", rate: "AR", cheese: "Cheese"});
                     attractions.splice(11);
                     for (var j = 0; j < attractions.length; j++) {
+                        if (j > 0) {
+                            attractions[j].total_hunts = integerComma(attractions[j].total_hunts);
+                        }
                         for (var field in collengths) {
                             if ( attractions[j].hasOwnProperty(field) &&
                                 (attractions[j][field].length > collengths[field])) { 
@@ -977,7 +987,11 @@ function findMouse(channel, args, command) {
                         }
                     }
                     retStr += attractions[0].location.padEnd(collengths.location) + ' |';
-                    retStr += attractions[0].stage.padEnd(collengths.stage) + ' |' ;
+                    if (stage_used === 1) {
+                        retStr += attractions[0].stage.padEnd(collengths.stage) + ' |' ;
+                    } else {
+                        collengths.stage = 0;
+                    }
                     retStr += attractions[0].cheese.padEnd(collengths.cheese) + ' |' ;
                     retStr += attractions[0].rate.padEnd(7) + ' |';
                     retStr += attractions[0].total_hunts.padEnd(collengths.total_hunts);
@@ -985,7 +999,9 @@ function findMouse(channel, args, command) {
                     retStr += '='.padEnd(collengths.location + collengths.stage + collengths.cheese + 15 + collengths.total_hunts,'=') + "\n";
                     for (var j = 1; j < attractions.length ; j++) {
                         retStr += attractions[j].location.padEnd(collengths.location) + ' |';
-                        retStr += attractions[j].stage.padEnd(collengths.stage) + ' |' ;
+                        if (stage_used === 1) {
+                            retStr += attractions[j].stage.padEnd(collengths.stage) + ' |' ;
+                        }
                         retStr += attractions[j].cheese.padEnd(collengths.cheese) + ' |' ;
                         retStr += String((attractions[j].rate * 1.0 / 100)).padStart(6) + '% |';
                         retStr += attractions[j].total_hunts.padStart(collengths.total_hunts);
@@ -1038,6 +1054,7 @@ function findItem(channel, args, command) {
     var itemID = 0;
     var itemName;
     var attractions = [];
+    var stage_used = 0;
 //    console.log("Check for a string length of " + len)
     for (var i = 0; (i < items.length && !found); i++) {
         if (items[i].lowerValue.substring(0,len) === args) {
@@ -1058,9 +1075,12 @@ function findItem(channel, args, command) {
                     var collengths = { location: 0, stage: 0, total_hunts: 0, cheese: 0, rate: 0};
                     for (var j = 0; j < body.length; j++) {
                         if (body[j].total_hunts >= 100) {
+                            if (body[j].stage !== null) {
+                                stage_used = 1;
+                            }
                             attractions.push(
                                 {   location: body[j].location,
-                                    stage: (body[j].stage === null) ? "not used" : body[j].stage,
+                                    stage: (body[j].stage === null) ? " N/A " : body[j].stage,
                                     total_hunts: body[j].total_hunts,
                                     rate: body[j].rate,
                                     cheese: body[j].cheese
@@ -1079,12 +1099,13 @@ function findItem(channel, args, command) {
                 //And then to make a nice output. Or an output
                 retStr = "";
                 if (attractions.length > 0) {
-                    attractions.unshift({ location: "Location", stage: "Stage", total_hunts: "Total Hunts", rate: "DR", cheese: "Cheese"});
+                    attractions.unshift({ location: "Location", stage: "Stage", total_hunts: "Hunts", rate: "DR", cheese: "Cheese"});
                     attractions.splice(11);
                     for (var j = 0; j < attractions.length; j++) {
 //                        console.log((attractions[j].rate * 1.0 / 1000).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2 }));
                         if (j > 0) {
                             attractions[j].rate = (attractions[j].rate * 1.0 / 1000).toLocaleString('en-US', {minimumFractionDigits: 3, maximumFractionDigits: 3 });
+                            attractions[j].total_hunts = integerComma(attractions[j].total_hunts);
                         }
                         for (var field in collengths) {
                             if ( attractions[j].hasOwnProperty(field) &&
@@ -1095,7 +1116,11 @@ function findItem(channel, args, command) {
                     }
                     collengths.rate += 1; //account for the decimal
                     retStr += attractions[0].location.padEnd(collengths.location) + ' |';
-                    retStr += attractions[0].stage.padEnd(collengths.stage) + ' |' ;
+                    if (stage_used === 1) {
+                        retStr += attractions[0].stage.padEnd(collengths.stage) + ' |' ;
+                    } else {
+                        collengths.stage = 0;
+                    }
                     retStr += attractions[0].cheese.padEnd(collengths.cheese) + ' |' ;
                     retStr += attractions[0].rate.padEnd(collengths.rate) + ' |';
                     retStr += attractions[0].total_hunts.padEnd(collengths.total_hunts);
@@ -1103,7 +1128,9 @@ function findItem(channel, args, command) {
                     retStr += '='.padEnd(collengths.location + collengths.stage + collengths.cheese + collengths.rate + collengths.total_hunts + 8,'=') + "\n";
                     for (var j = 1; j < attractions.length ; j++) {
                         retStr += attractions[j].location.padEnd(collengths.location) + ' |';
-                        retStr += attractions[j].stage.padEnd(collengths.stage) + ' |' ;
+                        if (stage_used === 1) {
+                            retStr += attractions[j].stage.padEnd(collengths.stage) + ' |' ;
+                        }
                         retStr += attractions[j].cheese.padEnd(collengths.cheese) + ' |' ;
                         retStr += attractions[j].rate.padStart(collengths.rate) + ' |';
                         retStr += attractions[j].total_hunts.padStart(collengths.total_hunts);
@@ -1128,6 +1155,10 @@ function findItem(channel, args, command) {
             channel.send(retStr);
         }
     }
+}
+
+function integerComma(number) {
+    return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
 //Resources:
