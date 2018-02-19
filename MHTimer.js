@@ -20,6 +20,10 @@ var file_encoding = 'utf8';
 var settings = {};
 var mice = [];
 var items = [];
+var last_timestamps = {
+  reminder_save: new Date()
+}
+var refresh_rate = 1000 * 60 * 5; //milliseconds between item, mouse refreshes
 
 //Only support announcing in 1 channel
 var announce_channel;
@@ -51,7 +55,7 @@ console.log = function()
             this.logCopy.apply(this, args);
         }
         else
-        { 
+        {
             // "Normal" log
             this.logCopy(timestamp, args);
         }
@@ -73,7 +77,7 @@ function Main() {
 
     // Create timers list from timers settings file
     a.then( createTimersList );
-    
+
     // Load any saved reminders
     a.then( loadReminders );
 
@@ -82,7 +86,7 @@ function Main() {
         client.on('ready', () => {
             console.log ('I am alive!');
 //            announce_channel = client.guilds.get(guild_id).defaultChannel;
-            
+
             //for each guild find its #timers channel (if it has one)
             for (var [guildkey, guildvalue] of client.guilds) {
                 for (var [chankey, chanvalue] of guildvalue.channels) {
@@ -95,7 +99,7 @@ function Main() {
             }
         });
     });
-    
+
     // Message event router
     a.then(() => {
         client.on('message', message => {
@@ -105,10 +109,10 @@ function Main() {
             }
         });
     });
-    
+
     a.then( getMouseList );
     a.then( getItemList );
-        
+
 }
 Main();
 
@@ -146,9 +150,9 @@ function createTimedAnnouncements(channel) {
     console.log('Creating timeouts');
     var startDate = new Date();
     var temp_timeout;
-    
+
     for (var i = 0; i < timers_list.length; i++) {
-        temp_timeout = setTimeout( 
+        temp_timeout = setTimeout(
             (timer, channel) => {
                 doAnnounce(timer, channel);
                 timer.stopTimeout();
@@ -189,14 +193,14 @@ function messageParse(message) {
     switch (command) {
         case 'next':
             //TODO - This should be a PM, probably?
-            if ((tokens.length === 0) || (typeof timerName.area === 'undefined')) { 
+            if ((tokens.length === 0) || (typeof timerName.area === 'undefined')) {
                 if (typeof(tokens[0]) !== 'undefined') {
                     switch (tokens[0]) {
                         case 'ronza':
                             message.channel.send("Don't let aardwolf see you ask or you'll get muted"); //maybe add random things here
                             break;
                         default:
-                            message.channel.send("Did you want to know about sg, fg, reset, spill, or cove?"); 
+                            message.channel.send("Did you want to know about sg, fg, reset, spill, or cove?");
                     }
                 }
             } else {
@@ -227,7 +231,7 @@ function messageParse(message) {
             var hours = 24;
             if ((tokens.length === 0) || (typeof timerName.count === 'undefined')) {
                 timerName.count = 24;
-            } 
+            }
             usage_str = buildSchedule(timerName);
             var part_str;
             var curr_count = 0;
@@ -267,14 +271,14 @@ function messageParse(message) {
                 }
             }
             break;
-                
+
         case 'help':
         case 'arrg':
         default:
             if (tokens.length > 0) {
                 if (tokens[0] === 'next') {
                     usage_str = "Usage: `-mh next [area/sub-area]` will provide a message about the next related occurrence.\n";
-                    usage_str += "Areas are Seasonal Garden (**sg**), Forbidden Grove (**fg**), Toxic Spill (**ts**), Balack's Cove (**cove**), and the daily **reset**.\n"; 
+                    usage_str += "Areas are Seasonal Garden (**sg**), Forbidden Grove (**fg**), Toxic Spill (**ts**), Balack's Cove (**cove**), and the daily **reset**.\n";
                     usage_str += "Sub areas are the seasons, open/close, spill ranks, and tide levels\n";
                     usage_str += "Example: `-mh next fall` will tell when it is Autumn in the Seasonal Garden."
                 }
@@ -284,7 +288,7 @@ function messageParse(message) {
                     usage_str += "Using a number means I will remind you that many times for that timer.\n";
                     usage_str += "Use the word `always` to have me remind you for every occurrence.\n";
                     usage_str += "Just using `-mh remind` will list all your existing reminders and how to turn off each\n";
-                    usage_str += "Areas are Seasonal Garden (**sg**), Forbidden Grove (**fg**), Toxic Spill (**ts**), Balack's Cove (**cove**), and the daily **reset**.\n"; 
+                    usage_str += "Areas are Seasonal Garden (**sg**), Forbidden Grove (**fg**), Toxic Spill (**ts**), Balack's Cove (**cove**), and the daily **reset**.\n";
                     usage_str += "Sub areas are the seasons, open/close, spill ranks, and tide levels\n";
                     usage_str += "Example: `-mh remind close always` will always PM you 15 minutes before the Forbidden Grove closes.\n";
                 }
@@ -320,7 +324,7 @@ function messageParse(message) {
 function splitString(inString) {
     var returnArray = [];
     var splitRegexp = /[^\s"]+|"([^"]*)"/gi;
-    
+
     do {
         var match = splitRegexp.exec(inString);
         if (match != null ) {
@@ -517,7 +521,7 @@ function nextTimer(timerName) {
         if (typeof(timerName.sub_area) !== 'undefined') {
             sched_syntax += " " + timerName.sub_area;
         }
-            
+
         retStr = new Discord.RichEmbed()
 //            .setTitle("next " + timerName) // removing this cleaned up the embed a lot
             .setDescription(youngTimer.getDemand() + "\n" + timeLeft(youngTimer.getNext()) +
@@ -584,7 +588,7 @@ function saveReminders () {
         }
     }
     fs.writeFile(reminder_filename, JSON.stringify(reminders, null, 1), file_encoding, (err) => {
-        if (err) { 
+        if (err) {
             reject();
             return console.log(err);
         }
@@ -595,7 +599,7 @@ function saveReminders () {
 function doAnnounce (timer, channel) {
     //Announce into a channel, then process any reminders
     channel.send(timer.getAnnounce());
-    
+
     doRemind(timer);
 }
 
@@ -605,7 +609,7 @@ function doRemind (timer) {
     for (key in reminders) {
         remind = reminders[key];
 //        console.log(JSON.stringify(remind, null, 1));
-        if ((timer.getArea() === remind.area) && 
+        if ((timer.getArea() === remind.area) &&
             (remind.count !== 0) &&
             (   (typeof remind.sub_area === 'undefined') ||
                 (typeof timer.getSubArea() !== 'undefined') &&
@@ -657,15 +661,15 @@ function addRemind(timerRequest, message) {
     var timer_found = -1;
     var has_sub_area = 0;
     var turned_off = 0;
-    
+
     if (typeof num === 'undefined') {
         num = 1; //new default is once
     }
-    
+
     if (typeof area === 'undefined') {
         return "I do not know the area you asked for";
     }
-    
+
     for (var i = 0; i < timers_list.length; i++) {
         if (timers_list[i].getArea() === area) {
             if (typeof sub_area === 'undefined') {
@@ -680,7 +684,7 @@ function addRemind(timerRequest, message) {
             }
         }
     }
-   
+
     //confirm it is a valid area
     if (timer_found < 0) {
         for (var i = 0; i < timers_list.length; i++) {
@@ -695,12 +699,12 @@ function addRemind(timerRequest, message) {
     }
     if (timer_found < 0) {
         return "I do not know the area requested, only sg, fg, reset, spill, or cove";
-    } 
-    
+    }
+
     if (has_sub_area == 0) {
         sub_area = undefined;
     }
-    
+
     if (num === 0) {
         //This is the stop case
         var i = reminders.length;
@@ -709,8 +713,8 @@ function addRemind(timerRequest, message) {
             if ((reminders[i].user === message.author.id) &&
                 (reminders[i].area === area))
             {
-                if (has_sub_area && 
-                    (typeof reminders[i].sub_area !== 'undefined') && 
+                if (has_sub_area &&
+                    (typeof reminders[i].sub_area !== 'undefined') &&
                     (reminders[i].sub_area === sub_area))
                 {
                     reminders[i].count = 0;
@@ -743,7 +747,7 @@ function addRemind(timerRequest, message) {
         }
         return response_str;
     }// end stop case
-                    
+
     response_str = "";
     var remind = {  "count" : num,
                     "area" : area,
@@ -808,7 +812,7 @@ function listRemind(message) {
     var timer_str = "";
     var usage_str;
     var found = 0;
-    
+
     for (var i = 0; i < reminders.length; i++) {
         //console.log ("Checking " + reminders[i].user );
         if (reminders[i].user === user) {
@@ -820,7 +824,7 @@ function listRemind(message) {
             }
             if (reminders[i].count === 1) {
                 timer_str += " one more time";
-            } 
+            }
             else if (reminders[i].count === -1) {
                 timer_str += " until you stop it";
             }
@@ -847,7 +851,7 @@ function buildSchedule(timer_request) {
     var area = timer_request.area;
     var max_count = 24;
     var curr_count = 0;
-    
+
     if (isNaN(parseInt(req_hours))) {
         return "Somehow I got an argument that was not an integer.";
     }
@@ -857,11 +861,11 @@ function buildSchedule(timer_request) {
     else if (req_hours >= 240) {
         req_hours = 240;
     }
-    
+
     var time_span = req_hours * 60 * 60 * 1000;
     var cur_time = new Date();
     var end_time = new Date(cur_time.valueOf() + time_span);
-    
+
     //Get the next occurrence for every timer. Compare its interval to determine how many of them to include
     var next_time;
     var timer_interval;
@@ -899,11 +903,23 @@ function buildSchedule(timer_request) {
         return_str += upcoming_timers[i].announce + " " + timeLeft(upcoming_timers[i].time) + "\n";
     }
     return return_str;
-    
+
 }
 
 function getMouseList() {
     var url = "https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=mouse&item_id=all";
+    var now_time = new Date();
+    console.log("Checking dates");
+    if ("mouse_refresh" in last_timestamps) {
+      var refresh_time = new Date(last_timestamps.mouse_refresh.valueOf() + refresh_rate);
+      if (refresh_time < now_time) {
+        last_timestamps.mouse_refresh = now_time;
+      } else {
+        return;
+      }
+    } else {
+      last_timestamps.mouse_refresh = now_time;
+    }
     request({
         url: url,
         json: true
@@ -949,9 +965,6 @@ function findMouse(channel, args, command) {
                     var collengths = { location: 0, stage: 0, total_hunts: 0, cheese: 0};
                     for (var j = 0; j < body.length; j++) {
                         if (body[j].total_hunts >= 100) {
-                            if (body[j].stage !== null) {
-                                stage_used = 1;
-                            }
                             attractions.push(
                                 {   location: body[j].location,
                                     stage: (body[j].stage === null) ? " N/A " : body[j].stage,
@@ -981,9 +994,12 @@ function findMouse(channel, args, command) {
                         }
                         for (var field in collengths) {
                             if ( attractions[j].hasOwnProperty(field) &&
-                                (attractions[j][field].length > collengths[field])) { 
+                                (attractions[j][field].length > collengths[field])) {
                                 collengths[field] = attractions[j][field].length;
                             }
+                        }
+                        if (j > 0 && attractions[j].stage != " N/A ") {
+                          stage_used = 1;
                         }
                     }
                     retStr += attractions[0].location.padEnd(collengths.location) + ' |';
@@ -1024,12 +1040,25 @@ function findMouse(channel, args, command) {
         } else {
 //        console.log("Nothing found for '", args, "'");
             channel.send(retStr);
+            getItemList();
         }
     }
 }
 
 function getItemList() {
     var url = "https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=loot&item_id=all";
+    var now_time = new Date();
+    console.log("Checking dates");
+    if ("item_refresh" in last_timestamps) {
+      var refresh_time = new Date(last_timestamps.item_refresh.valueOf() + refresh_rate);
+      if (refresh_time < now_time) {
+        last_timestamps.item_refresh = now_time;
+      } else {
+        return;
+      }
+    } else {
+      last_timestamps.item_refresh = now_time;
+    }
     request({
         url: url,
         json: true
@@ -1055,6 +1084,7 @@ function findItem(channel, args, command) {
     var itemName;
     var attractions = [];
     var stage_used = 0;
+    var results_limit = 10;
 //    console.log("Check for a string length of " + len)
     for (var i = 0; (i < items.length && !found); i++) {
         if (items[i].lowerValue.substring(0,len) === args) {
@@ -1075,9 +1105,6 @@ function findItem(channel, args, command) {
                     var collengths = { location: 0, stage: 0, total_hunts: 0, cheese: 0, rate: 0};
                     for (var j = 0; j < body.length; j++) {
                         if (body[j].total_hunts >= 100) {
-                            if (body[j].stage !== null) {
-                                stage_used = 1;
-                            }
                             attractions.push(
                                 {   location: body[j].location,
                                     stage: (body[j].stage === null) ? " N/A " : body[j].stage,
@@ -1109,9 +1136,12 @@ function findItem(channel, args, command) {
                         }
                         for (var field in collengths) {
                             if ( attractions[j].hasOwnProperty(field) &&
-                                (attractions[j][field].length > collengths[field])) { 
+                                (attractions[j][field].length > collengths[field])) {
                                 collengths[field] = attractions[j][field].length;
                             }
+                        }
+                        if (j > 0 && attractions[j].stage != " N/A ") {
+                          stage_used = 1;
                         }
                     }
                     collengths.rate += 1; //account for the decimal
@@ -1153,6 +1183,7 @@ function findItem(channel, args, command) {
         } else {
 //        console.log("Nothing found for '", args, "'");
             channel.send(retStr);
+            getMouseList();
         }
     }
 }
@@ -1163,5 +1194,3 @@ function integerComma(number) {
 
 //Resources:
 //Timezones in Discord: https://www.reddit.com/r/discordapp/comments/68zkfs/timezone_tag_bot/
-
-
