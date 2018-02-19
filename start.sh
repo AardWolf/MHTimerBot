@@ -1,4 +1,12 @@
 #!/bin/bash
+SILENT=0
+while getopts 'q' opt ; do
+  case $opt in
+    q) SILENT=1
+       ;;
+  esac
+done
+
 if [ -f MHTimer.pid ]; then
   OLDPID=$( cat MHTimer.pid )
   ps --pid $OLDPID >/dev/null 2>&1
@@ -7,8 +15,10 @@ if [ -f MHTimer.pid ]; then
     echo "Old process was not running, starting up"
     rm -f MHTimer.pid
   else
-    #echo "It looks like MHTimer is running already as $OLDPID"
-    #echo "Try killing it manually, using stop.sh, or remove MHTimer.pid"
+    if [[ $SILENT -eq 0 ]]; then
+      echo "It looks like MHTimer is running already as $OLDPID"
+      echo "Try killing it manually, using stop.sh, or remove MHTimer.pid"
+    fi
     exit
   fi
 fi
