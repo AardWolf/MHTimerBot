@@ -108,13 +108,31 @@ function Main() {
                 messageParse(message);
             }
         });
+        client.on('error', error => {
+          console.log("Error Received");
+          console.log(error);
+          client.destroy();
+          process.exit();
+        });
+        client.on('disconnect', event => {
+          console.log("Close event: " + event.reason);
+          console.log("Close code: " + event.code);
+          client.destroy();
+          process.exit();
+        });
+
     });
 
     a.then( getMouseList );
     a.then( getItemList );
 
 }
-Main();
+try {
+  Main();
+}
+catch(error) {
+  console.log(error);
+}
 
 // Load settings
 function loadSettings(resolve, reject) {
@@ -598,7 +616,11 @@ function saveReminders () {
 
 function doAnnounce (timer, channel) {
     //Announce into a channel, then process any reminders
-    channel.send(timer.getAnnounce());
+    channel.send(timer.getAnnounce())
+      .catch(function(error) {
+          console.log(error);
+          console.log(channel.client.status)
+        });
 
     doRemind(timer);
 }

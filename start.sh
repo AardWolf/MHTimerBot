@@ -1,9 +1,16 @@
 #!/bin/bash
 if [ -f MHTimer.pid ]; then
   OLDPID=$( cat MHTimer.pid )
-  echo "It looks like MHTimer is running already as $OLDPID"
-  echo "Try killing it manually, using stop.sh, or remove MHTimer.pid"
-  exit
+  ps --pid $OLDPID >/dev/null 2>&1
+  rc=$?
+  if [[ $rc -eq 1 ]]; then
+    echo "Old process was not running, starting up"
+    rm -f MHTimer.pid
+  else
+    #echo "It looks like MHTimer is running already as $OLDPID"
+    #echo "Try killing it manually, using stop.sh, or remove MHTimer.pid"
+    exit
+  fi
 fi
 if [ -f MHTimer.log ]; then
   NUM=4
