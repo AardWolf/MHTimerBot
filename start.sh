@@ -7,8 +7,8 @@ if [ -f MHTimer.pid ]; then
     echo "Old process was not running, starting up"
     rm -f MHTimer.pid
   else
-    echo "It looks like MHTimer is running already as $OLDPID"
-    echo "Try killing it manually, using stop.sh, or remove MHTimer.pid"
+    #echo "It looks like MHTimer is running already as $OLDPID"
+    #echo "Try killing it manually, using stop.sh, or remove MHTimer.pid"
     exit
   fi
 fi
