@@ -959,9 +959,25 @@ function getMouseList() {
 
 function findMouse(channel, args, command) {
     //NOTE: RH location is https://mhhunthelper.agiletravels.com/tracker.json
-    var url = 'https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=mouse&item_id=';
+    var url = 'https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=mouse';
     var retStr = "'" + args + "' not found";
     var found = 0;
+    var orig_args = args;
+    
+    //Process args for flags
+    event = "";
+    argArray = args.split(/\s+/);
+    if (argArray.length > 2) {
+        if (argArray[0] == "-e") {
+            event = argArray[1];
+            url += "&timefilter=" + event;
+            argArray.splice(0,2);
+        }
+        args = argArray.join(" ");
+    }
+    
+        
+    
     var len = args.length;
     var mouseID = 0;
     var mouseName;
@@ -973,7 +989,7 @@ function findMouse(channel, args, command) {
 //            retStr = "'" + args + "' is '" + mice[i].value + "' AKA " + mice[i].id;
             mouseID = mice[i].id;
             mouseName = mice[i].value;
-            url = url + mouseID;
+            url += "&item_id=" + mouseID;
 //            console.log("Lookup: " + url);
             request( {
                 url: url,
@@ -1058,7 +1074,7 @@ function findMouse(channel, args, command) {
     if (!found) {
         //If this was an item find try finding a mouse
         if (command === 'find') {
-            findItem(channel, args, command);
+            findItem(channel, orig_args, command);
         } else {
 //        console.log("Nothing found for '", args, "'");
             channel.send(retStr);
@@ -1098,9 +1114,23 @@ function getItemList() {
 
 function findItem(channel, args, command) {
     //NOTE: RH location is https://mhhunthelper.agiletravels.com/tracker.json
-    var url = 'https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=loot&item_id=';
+    var url = 'https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=loot';
     var retStr = "'" + args + "' not found";
     var found = 0;
+    var orig_args = args;
+    
+    //Process args for flags
+    event = "";
+    argArray = args.split(/\s+/);
+    if (argArray.length > 2) {
+        if (argArray[0] == "-e") {
+            event = argArray[1];
+            url += "&timefilter=" + event;
+            argArray.splice(0,2);
+        }
+        args = argArray.join(" ");
+    }
+    
     var len = args.length;
     var itemID = 0;
     var itemName;
@@ -1113,7 +1143,7 @@ function findItem(channel, args, command) {
 //            retStr = "'" + args + "' is '" + items[i].value + "' AKA " + items[i].id;
             itemID = items[i].id;
             itemName = items[i].value;
-            url = url + itemID;
+            url += "&item_id=" + itemID;
 //            console.log("Lookup: " + url);
             request( {
                 url: url,
@@ -1201,7 +1231,7 @@ function findItem(channel, args, command) {
     if (!found) {
         //If this was an item find try finding a mouse
         if (command === 'ifind') {
-            findMouse(channel, args, command);
+            findMouse(channel, orig_args, command);
         } else {
 //        console.log("Nothing found for '", args, "'");
             channel.send(retStr);
