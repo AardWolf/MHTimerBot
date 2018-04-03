@@ -103,10 +103,20 @@ function Main() {
     // Message event router
     a.then(() => {
         client.on('message', message => {
-            if (message.content.startsWith('-mh ')) {
-//                console.log(message.channel.type);
-                messageParse(message);
-            }
+            switch (message.channel.name){
+                case 'larrys-freebies':
+                    if(/^(http[s]?:\/\/htgb\.co\/).*/g.test(message.content.toLowerCase())){
+                        convertRewardLink(message);
+                        
+                    }
+                    break;
+                default:
+                    if (message.content.startsWith('-mh ')) {
+                        //console.log(message.channel.type);
+                        messageParse(message);
+                    }
+                    break;
+            } 
         });
         client.on('error', error => {
           console.log("Error Received");
@@ -336,6 +346,37 @@ function messageParse(message) {
             }
             message.channel.send(usage_str);
     }
+}
+
+function convertRewardLink(message){
+    // Get the redirect url from htgb.co
+    request({
+        url: message.content.split(" ")[0],
+        method: 'GET',
+        followRedirect: false
+        }, function(error, response, body){
+            if(!error && response.statusCode == 301){
+                const facebookURL = response.headers.location;
+                const mousehuntURL = facebookURL.replace('https://apps.facebook.com/mousehunt','https://www.mousehuntgame.com');
+                const queryProperties = {access_token: settings.bitly_token, longUrl: mousehuntURL};
+                // Use Bitly to shorten the non-facebook reward link because people link pretty things
+                request({
+                    url: 'https://api-ssl.bitly.com/v3/shorten',
+                    qs: queryProperties
+                    }, function(error, response, body){
+                        if(!error && response.statusCode == 200){
+                            const responseJSON = JSON.parse(response.body);
+                            console.log("MH reward link converted for non-facebook users");
+                            message.channel.send(responseJSON.data.url + " <-- Non-Facebook Link");
+                        }else{
+                            console.log("Bitly shortener failed for some reason" + error + response + body);
+                        }
+                    });
+                }else{
+                    console.log("GET to htgb.co failed for some reason" + error + response + body);
+                }
+        }
+    );
 }
 
 //Simple utility function to tokenize a string, preserving double quotes
