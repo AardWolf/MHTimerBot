@@ -247,8 +247,7 @@ function messageParse(message) {
                 listRemind(message);
                 // message.channel.send("Did you want me to remind you for sg, fg, reset, spill, or cove?\n" + usage_string);
             } else {
-                message.channel.send(addRemind(timerName, message))
-                                .catch(console.error);
+                message.channel.send(addRemind(timerName, message));
             }
             break;
         case 'sched':
