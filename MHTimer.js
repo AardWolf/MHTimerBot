@@ -208,7 +208,7 @@ function messageParse(message) {
     var command = tokens.shift();
     var timerName; // This has area and sub_area possibly defined
     if (typeof command === 'undefined') {
-        message.channel.send("I didn't understand. I know 'next' and 'remind'");
+        message.channel.send("I didn't understand but you can ask me for help");
         return;
     } else {
         if (tokens.length >= 1) {
@@ -247,7 +247,8 @@ function messageParse(message) {
                 listRemind(message);
                 // message.channel.send("Did you want me to remind you for sg, fg, reset, spill, or cove?\n" + usage_string);
             } else {
-                message.channel.send(addRemind(timerName, message));
+                message.channel.send(addRemind(timerName, message))
+                                .catch(console.error);
             }
             break;
         case 'sched':
@@ -669,6 +670,7 @@ function doAnnounce (timer, channel) {
 function doRemind (timer) {
     //Go through the reminder requests and process each
     var usage_str = "";
+    var err=0;
     for (key in reminders) {
         remind = reminders[key];
 //        console.log(JSON.stringify(remind, null, 1));
@@ -708,7 +710,10 @@ function doRemind (timer) {
                     usage_str += " stop` to end them sooner.";
                 }
                 usage_str += " See also `-mh help remind` for other options.";
-                user.send(timer.getAnnounce() + "\n" + usage_str );
+                user.send(timer.getAnnounce() + "\n" + usage_str )
+                    .then(function() { err = 0; }, //worked
+                        function() { err = 1; remind.count = 0; });
+                // If err=1 then delete the timer because the user blocked the bot
             }
         }
     }
@@ -842,6 +847,7 @@ function addRemind(timerRequest, message) {
             }
         }
     }
+    var save_ok;
     if (found === 0) {
         reminders.push(remind);
         response_str = "Reminder for " + area
@@ -858,13 +864,26 @@ function addRemind(timerRequest, message) {
         else {
             response_str += remind.count + " times";
         }
+        if (message.channel.type == "dm") {
+            save_ok = 1;
+        } else {
+            message.author.send("Hi there! Reminders will be in PM and I'm just making sure I can PM you.")
+                .then(function() { save_ok = 1; }, //worked
+                    function() { save_ok = 0; });
+        }
+        if (save_ok == 0) {
+            response_str = "I am not allowed to PM you so I will not set that timer. Check your Discord permissions.";
+        }
     }
     if (typeof response_str === 'undefined') {
         console.log("response_str got undefined");
         console.log(tokens);
         response_str = "That was a close one, I almost crashed!";
     }
-    saveReminders();
+    // Turns out if people block the bot from chatting with them reminders will fail anyway
+    if ((found + save_ok) >= 1) {
+        saveReminders();
+    }
     return response_str;
 }
 
@@ -898,12 +917,18 @@ function listRemind(message) {
             found++;
         }
     }
+    var err = 0;
 
     if (found > 0) {
-        pm_channel.send(timer_str);
+        pm_channel.send(timer_str)
+            .then(function() { err = 0; }, //worked
+                function() { err = 1; });
     } else {
-        pm_channel.send("I found no reminders for you, sorry");
+        pm_channel.send("I found no reminders for you, sorry")
+            .then(function() { err = 0; }, //worked
+                function() { err = 1; });
     }
+    //TODO: If err=1 then the user has blocked the bot, disable timers?
 }
 
 function buildSchedule(timer_request) {
