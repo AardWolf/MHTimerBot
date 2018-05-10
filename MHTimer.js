@@ -680,16 +680,18 @@ function doRemind (timer) {
                 (timer.getSubArea() === remind.sub_area))
            )
         {
-            var user = client.users.get(remind.user);
-//            console.log("Got a user of " + typeof user + " when I tried with " + remind.user + " for " + remind.area);
-            if (typeof user !== 'object') {
-                remind.count = 0;
-                continue;
-            }
-            if (remind.count > 0) {
-                remind.count -= 1;
-            }
-            if (user.presence !== 'dnd') {
+            //var user = client.users.get(remind.user);
+            // client.users are just cached objects so might not be the best way to get a user object
+            client.fetchUser(remind.user)
+                    .then((user) => {
+                // console.log("Got a user of " + typeof user + " when I tried with " + remind.user + " for " + remind.area);
+                if (typeof user !== 'object') {
+                    remind.fail += 1;
+                    return;
+                }
+                if (remind.count > 0) {
+                    remind.count -= 1;
+                }
                 //user.send(timer.getAnnounce());
                 usage_str = "You have ";
                 if (remind.count < 0) {
@@ -709,11 +711,21 @@ function doRemind (timer) {
                     usage_str += " stop` to end them sooner.";
                 }
                 usage_str += " See also `-mh help remind` for other options.";
+                if (remind.fail) {
+                    usage_str += " There were " + remind.fail + " failures before this got through.\n";
+                }
+                if (remind.fail > 10) {
+                    console.log("I am removing a reminder for " + remind.user + " due to too many failures\n");
+                    remind.count = 0;
+                }
                 user.send(timer.getAnnounce() + "\n" + usage_str )
-                    .then(function() { err = 0; }, //worked
-                        function() { err = 1; remind.count = 0; });
+                    .then(function() { err = 0; remind.fail = 0; }, //worked
+                        function() { err = 1; remind.fail += 1; });
                 // If err=1 then delete the timer because the user blocked the bot
-            }
+            })
+            .catch((err) => {
+                remind.fail += 1;
+            });
         }
     }
     saveReminders();
