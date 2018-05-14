@@ -670,8 +670,9 @@ function doRemind (timer) {
     //Go through the reminder requests and process each
     var usage_str = "";
     var err=0;
-    for (key in reminders) {
-        remind = reminders[key];
+    reminders.forEach(function (remind) {
+//    for (key in reminders) {
+        //remind = reminders[key];
 //        console.log(JSON.stringify(remind, null, 1));
         if ((timer.getArea() === remind.area) &&
             (remind.count !== 0) &&
@@ -682,53 +683,58 @@ function doRemind (timer) {
         {
             //var user = client.users.get(remind.user);
             // client.users are just cached objects so might not be the best way to get a user object
+            // console.log("Processing reminder ",remind);
             client.fetchUser(remind.user)
-                    .then((user) => {
-                // console.log("Got a user of " + typeof user + " when I tried with " + remind.user + " for " + remind.area);
-                if (typeof user !== 'object') {
-                    remind.fail = (remind.fail || 0) + 1;
-                    return;
-                }
-                if (remind.count > 0) {
-                    remind.count -= 1;
-                }
-                //user.send(timer.getAnnounce());
-                usage_str = "You have ";
-                if (remind.count < 0) {
-                    usage_str += "unlimited";
-                } else if (remind.count == 0) {
-                    usage_str += "no more";
-                } else {
-                    usage_str += remind.count;
-                }
-                usage_str += " reminders left for this timer. Use `-mh remind " + remind.area;
-                if (typeof remind.sub_area !== 'undefined') {
-                    usage_str += " " + remind.sub_area;
-                }
-                if (remind.count == 0) {
-                    usage_str += "` to turn this reminder back on.";
-                } else {
-                    usage_str += " stop` to end them sooner.";
-                }
-                usage_str += " See also `-mh help remind` for other options.";
-                if (remind.fail) {
-                    usage_str += " There were " + remind.fail + " failures before this got through.\n";
-                }
-                if (remind.fail > 10) {
-                    console.log("I am removing a reminder for " + remind.user + " due to too many failures\n");
-                    remind.count = 0;
-                }
-                user.send(timer.getAnnounce() + "\n" + usage_str )
-                    .then(function() { err = 0; remind.fail = 0; }, //worked
-                        function() { err = 1; remind.fail = (remind.fail || 0) + 1; });
-                // If err=1 then delete the timer because the user blocked the bot
-            })
-            .catch((err) => {
-                remind.fail = (remind.fail || 0) + 1;
-            });
+                    .then((user) => { sendRemind(user, remind, timer); })
+                    .catch((err) => {
+                        remind.fail = (remind.fail || 0) + 1;
+                        console.log(err);
+                    });
         }
-    }
+    });
     saveReminders();
+}
+
+function sendRemind(user, remind, timer) {
+    //Takes a user object and a remind "object" and sends the reminder
+    // console.log("Got a user of " + typeof user + " when I tried with " + remind.user + " for " + remind.area);
+    if (typeof user !== 'object') {
+        remind.fail = (remind.fail || 0) + 1;
+        return -1;
+    }
+    if (remind.count > 0) {
+        remind.count -= 1;
+    }
+    //user.send(timer.getAnnounce());
+    usage_str = "You have ";
+    if (remind.count < 0) {
+        usage_str += "unlimited";
+    } else if (remind.count == 0) {
+        usage_str += "no more";
+    } else {
+        usage_str += remind.count;
+    }
+    usage_str += " reminders left for this timer. Use `-mh remind " + remind.area;
+    if (typeof remind.sub_area !== 'undefined') {
+        usage_str += " " + remind.sub_area;
+    }
+    if (remind.count == 0) {
+        usage_str += "` to turn this reminder back on.";
+    } else {
+        usage_str += " stop` to end them sooner.";
+    }
+    usage_str += " See also `-mh help remind` for other options.";
+    if (remind.fail) {
+        usage_str += " There were " + remind.fail + " failures before this got through.\n";
+    }
+    if (remind.fail > 10) {
+        console.log("I am removing a reminder for " + remind.user + " due to too many failures\n");
+        remind.count = 0;
+    }
+    // console.log("Processed reminder", remind);
+    user.send(timer.getAnnounce() + "\n" + usage_str )
+        .then(function() { err = 0; remind.fail = 0; }, //worked
+            function() { err = 1; remind.fail = (remind.fail || 0) + 1; });
 }
 
 function addRemind(timerRequest, message) {
