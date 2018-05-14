@@ -932,8 +932,8 @@ function listRemind(message) {
             }
             timer_str += ". " + usage_str + " stop` to turn off\n";
             found++;
-            if (remind.fail) {
-                timer_str += "There have been " + remind.fail + " failed attempts to remind you of this one.\n";
+            if (reminders[i].fail) {
+                timer_str += "There have been " + reminders[i].fail + " failed attempts to remind you of this one.\n";
             }
         }
     }
