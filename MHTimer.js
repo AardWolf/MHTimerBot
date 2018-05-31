@@ -12,6 +12,7 @@ const client = new Discord.Client();
 // var guild_id = '245584660757872640';
 var main_settings_filename = 'settings.json';
 var timer_settings_filename = 'timer_settings.json';
+var hunter_ids_filename = 'hunters.json';
 var reminder_filename = 'reminders.json';
 
 var timers_list = [];
@@ -20,6 +21,7 @@ var file_encoding = 'utf8';
 var settings = {};
 var mice = [];
 var items = [];
+var hunters = {};
 var last_timestamps = {
   reminder_save: new Date()
 }
@@ -80,6 +82,9 @@ function Main() {
 
     // Load any saved reminders
     a.then( loadReminders );
+    
+    // Load any saved hunters
+    a.then( loadHunters );
 
     // Bot start up tasks
     a.then(() => {
@@ -247,7 +252,7 @@ function messageParse(message) {
                 listRemind(message);
                 // message.channel.send("Did you want me to remind you for sg, fg, reset, spill, or cove?\n" + usage_string);
             } else {
-                message.channel.send(addRemind(timerName, message));
+                addRemind(timerName, message);
             }
             break;
         case 'sched':
@@ -297,6 +302,18 @@ function messageParse(message) {
                 } else {
                     findItem(message.channel, searchStr, 'ifind');
                 }
+            }
+            break;
+        case 'iam':
+            if (tokens.length == 0) {
+                message.channel.send("Yes, you are. Provide a hunter ID to set that.");
+            }
+            else if (isNaN(tokens[0])) {
+                message.channel.send("Whatever that is it's not your hunter ID.");
+            }
+            else {
+                // It's gotta be numeric
+                setHunterID(message, tokens[0]);
             }
             break;
 
@@ -884,13 +901,20 @@ function addRemind(timerRequest, message) {
         if (message.channel.type == "dm") {
             save_ok = 1;
         } else {
-            message.author.send("Hi there! Reminders will be in PM and I'm just making sure I can PM you.")
-                .then(function() { save_ok = 1; }, //worked
-                    function() { save_ok = 0; });
+            message.author.send("Hi there! Reminders will be in PM and I'm just making sure I can PM you.\n" + response_str)
+                .then(function()
+                    {
+                        save_ok = 1;
+                        saveReminders();
+                    }, //worked
+                    function()
+                    {
+                        save_ok = 0;
+                    });
         }
-        if (save_ok == 0) {
-            response_str = "I am not allowed to PM you so I will not set that timer. Check your Discord permissions.";
-        }
+//        if (save_ok == 0) {
+//            response_str = "I am not allowed to PM you so I will not set that timer. Check your Discord permissions.";
+//        }
     }
     if (typeof response_str === 'undefined') {
         console.log("response_str got undefined");
@@ -898,10 +922,10 @@ function addRemind(timerRequest, message) {
         response_str = "That was a close one, I almost crashed!";
     }
     // Turns out if people block the bot from chatting with them reminders will fail anyway
-    if ((found + save_ok) >= 1) {
-        saveReminders();
-    }
-    return response_str;
+//    if ((found + save_ok) >= 1) {
+//        saveReminders();
+//    }
+//    return response_str;
 }
 
 function listRemind(message) {
@@ -1325,6 +1349,60 @@ function findItem(channel, args, command) {
         }
     }
 }
+
+function setHunterID(message, hid) {
+    // Accepts a message object and hunter id, sets the author's hunter ID to the passed argument
+    // Also saves the resulting object
+    var hunter = message.author.id;
+    var oldval = 0;
+    var message_str = "";
+    if (isNaN(hid)) {
+        message.channel.send("I'm not sure that `" + hid + "` is a number so I am ignoring you.");
+        return;
+    }
+    if (!hunters[hunter]) {
+        hunters[hunter] = {};
+        console.log(" OMG! A new hunter " + hunter);
+    }
+    if (hunters[hunter]['hid']) {
+        //Replace
+        oldval = hunters[hunter]['hid'];
+        message_str = "You used to be known as `" + oldval + "`. ";
+        console.log("Found an old hid");
+    }
+    hunters[hunter]['hid'] = hid;
+    message_str += "If people look you up they'll see `" + hid + "`. Enjoy your fame!"
+    console.log(hunters);
+    saveHunters(); // TODO: Change this to a scheduled save
+    message.channel.send(message_str);
+}
+
+function loadHunters() {
+    //Read the JSON into the reminders array
+    console.log("loading reminders");
+    fs.readFile(hunter_ids_filename, file_encoding, (err, data) => {
+        if (err) {
+            console.log(err);
+            return undefined;
+        }
+
+        hunters = JSON.parse(data);
+        console.log (Object.keys(hunters).length + " hunters loaded");
+    });
+}
+
+function saveHunters () {
+    //Write out the JSON of the reminders array
+    fs.writeFile(hunter_ids_filename, JSON.stringify(hunters, null, 1), file_encoding, (err) => {
+        if (err) {
+            reject();
+            return console.log(err);
+        }
+    });
+//    console.log("hunters saved: " + hunters.size);
+//    console.log(hunters);
+}
+
 
 function integerComma(number) {
     return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
