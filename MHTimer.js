@@ -12,7 +12,9 @@ const client = new Discord.Client();
 // var guild_id = '245584660757872640';
 var main_settings_filename = 'settings.json';
 var timer_settings_filename = 'timer_settings.json';
+var hunter_ids_filename = 'hunters.json';
 var reminder_filename = 'reminders.json';
+var nickname_urls_filename = 'nicknames.json';
 
 var timers_list = [];
 var reminders = [];
@@ -20,6 +22,9 @@ var file_encoding = 'utf8';
 var settings = {};
 var mice = [];
 var items = [];
+var hunters = {};
+var nicknames = {};
+var nickname_urls = {};
 var last_timestamps = {
   reminder_save: new Date()
 }
@@ -80,6 +85,12 @@ function Main() {
 
     // Load any saved reminders
     a.then( loadReminders );
+    
+    // Load any saved hunters
+    a.then( loadHunters );
+
+    // Load nickname urls
+    a.then( loadNicknameURLs );
 
     // Bot start up tasks
     a.then(() => {
@@ -247,7 +258,7 @@ function messageParse(message) {
                 listRemind(message);
                 // message.channel.send("Did you want me to remind you for sg, fg, reset, spill, or cove?\n" + usage_string);
             } else {
-                message.channel.send(addRemind(timerName, message));
+                addRemind(timerName, message);
             }
             break;
         case 'sched':
@@ -299,9 +310,127 @@ function messageParse(message) {
                 }
             }
             break;
+        case 'iam':
+            if (tokens.length == 0) {
+                message.channel.send("Yes, you are. Provide a hunter ID to set that.");
+            }
+            else if ((tokens.length == 1) && !isNaN(tokens[0])) {
+                setHunterID(message, tokens[0]);
+            }
+            else if ((tokens.length == 1) && (tokens[0].toLowerCase() === "not")) {
+                unsetHunterID(message);
+            }
+            else {
+                if ((tokens[0].toLowerCase() === "in") && (tokens[1])) {
+                    tokens.shift();
+                    var loc = tokens.join(" ").toLowerCase();
+                    if (nicknames["locations"][loc]) {
+                        loc = nicknames["locations"][loc];
+                    }
+                    setHunterProp(message, "location", loc);
+                }
+                else if (((tokens[0].toLowerCase() === "rank") || (tokens[0].toLowerCase() === "title")
+                                || (tokens[0].toLowerCase() === "a"))
+                            && (tokens[1])) {
+                    tokens.shift();
+                    var rank = tokens.join(" ").toLowerCase();
+                    if (nicknames["ranks"][rank]) {
+                        rank = nicknames["ranks"][rank];
+                    }
+                    setHunterProp(message, "rank", rank);
+                }
+                else {
+                    message.channel.send("I'm not sure what to do with that:\n  `-mh iam ###` to set a hunter ID.\n  `-mh iam rank <rank>` to set a rank.\n  `-mh iam in <location>` to set a location");
+                }
+            }
+            break;
+        case 'whois':
+            if (tokens.length == 0) {
+                message.channel.send("Who's who? Who's on first?");
+            }
+            else if ((tokens.length == 1) && !isNaN(tokens[0])) {
+                if (!message.guild) {
+                    message.channel.send("I cannot do this in PM");
+                    return;
+                }
+                var discord_id = getHunterByID(message, tokens[0]);
+                if (!discord_id) {
+                    message.channel.send("I did not find a hunter with `" + tokens[0] + "` as a hunter ID");
+                    return;
+                }
+                client.fetchUser(discord_id)
+                    .then((user) => { 
+                        message.guild.fetchMember(user)
+                            .then((member) => {
+                                message.channel.send("`" + tokens[0] + "` is " + member.displayName);
+                            })
+                            .catch( (err) => {message.channel.send("That person may not be on this server")} );
+                    })
+                    .catch( (err) => {message.channel.send("That person may not have a Discord account any more")} );
+            }
+            else if (tokens.length == 1) {
+                var member;
+                if (message.guild) {
+                    let member = message.mentions.members.first() || message.guild.members
+                        .filter(mem=> (mem.displayName === tokens[0]))
+                        .first();
+                    if (!member) {
+                        message.channel.send("Sorry, I couldn't figure out who you're looking for.");
+                    } else {
+                        var hunter_id = getHunterByDiscordID(message, member.id);
+                        if (hunter_id) {
+                            message.channel.send(member.displayName + " is `" + hunter_id + "` <https://mshnt.ca/p/" + hunter_id + ">");
+                        } else {
+                            message.channel.send("It looks like " + tokens[0] + " didn't set their hunter ID ");
+                        }
+                    }
+                } 
+                else {
+                    message.channel.send("I cannot look up users by name in a PM");
+                    return;
+                }
+            }
+            else {
+                var hunters = [];
+                var property = tokens[0];
+                var search = tokens.join(" ");
+                if ((tokens[0].toLowerCase() === "in") && (tokens[1])) {
+                    tokens.shift();
+                    var loc = tokens.join(" ").toLowerCase();
+                    if (nicknames["locations"][loc]) {
+                        loc = nicknames["locations"][loc];
+                    }
+                    property = "location";
+                    search = loc;
+                    hunters = getHunterByProp(message, "location", loc);
+                }
+                else if (((tokens[0].toLowerCase() === "rank") || (tokens[0].toLowerCase() === "title")
+                            || (tokens[0].toLowerCase() === "a"))
+                            && (tokens[1])) {
+                    tokens.shift();
+                    var rank = tokens.join(" ").toLowerCase();
+                    if (nicknames["ranks"][rank]) {
+                        rank = nicknames["ranks"][rank];
+                    }
+                    property = "rank";
+                    search = rank;
+                    hunters = getHunterByProp(message, "rank", rank);
+                }
+                else {
+                    message.channel.send("I'm not sure what to do with that:\n  `-mh whois [###|<mention>]` to look up specific hunters.\n  `-mh whois [in|a] [<location>|<rank>]` to find up to 5 random new friends.");
+                }
+                if (hunters.length) {
+//                    console.log(hunters);
+                    message.channel.send(hunters.length + " random hunters: `" + hunters.join("`, `") + "`");
+                } else {
+                    message.channel.send("I couldn't find any hunters with `" + property + "` matching `" + (search) + "`");
+                }
+            }
+            break;
 
         case 'help':
         case 'arrg':
+        case 'aarg':
         default:
             if (tokens.length > 0) {
                 if (tokens[0] === 'next') {
@@ -334,9 +463,23 @@ function messageParse(message) {
                     usage_str += "All drop rate data is from <https://mhhunthelper.agiletravels.com/>.\n";
                     usage_str += "Help populate the database for better information!";
                 }
+                else if (tokens[0] === 'iam') {
+                    usage_str = "Usage `-mh iam <####>` will set your hunter ID. **This must be done before the other options will work.**\n";
+                    usage_str += "  `-mh iam in <location>` will set your hunting location. Nicknames are allowed.\n";
+                    usage_str += "  `-mh iam rank <rank>` will set your rank. Nicknames are allowed.\n";
+                    usage_str += "  `-mh iam not` will remove you from results.\n";
+                    usage_str += "Setting your location and rank means that when people search for those things you can be randomly added to the results.";
+                }
+                else if (tokens[0] === 'whois') {
+                    usage_str = "Usage `-mh whois <####>` will try to look up a Discord user by MH ID. Only works if they set their ID.\n";
+                    usage_str += "  `-mh whois <user>` will try to look up a hunter ID based on a user in the server.\n";
+                    usage_str += "  `-mh whois in <location>` will find up to 5 random hunters in that location.\n";
+                    usage_str += "  `-mh whois rank <rank>` will find up to 5 random hunters with that rank.\n";
+                    usage_str += "Setting your location and rank means that when people search for those things you can be randomly added to the results.";
+                }
                 else {
                     //TODO: Update this with schedule
-                    usage_str = "I can only provide help for `remind`, `next`, `find`, `ifind`, and `schedule`";
+                    usage_str = "I don't know that one but I know `iam`, `whois`, `remind`, `next`, `find`, `ifind`, and `schedule`";
                 }
             } else {
                 //TODO: Update this with schedule
@@ -884,13 +1027,20 @@ function addRemind(timerRequest, message) {
         if (message.channel.type == "dm") {
             save_ok = 1;
         } else {
-            message.author.send("Hi there! Reminders will be in PM and I'm just making sure I can PM you.")
-                .then(function() { save_ok = 1; }, //worked
-                    function() { save_ok = 0; });
+            message.author.send("Hi there! Reminders will be in PM and I'm just making sure I can PM you.\n" + response_str)
+                .then(function()
+                    {
+                        save_ok = 1;
+                        saveReminders();
+                    }, //worked
+                    function()
+                    {
+                        save_ok = 0;
+                    });
         }
-        if (save_ok == 0) {
-            response_str = "I am not allowed to PM you so I will not set that timer. Check your Discord permissions.";
-        }
+//        if (save_ok == 0) {
+//            response_str = "I am not allowed to PM you so I will not set that timer. Check your Discord permissions.";
+//        }
     }
     if (typeof response_str === 'undefined') {
         console.log("response_str got undefined");
@@ -898,10 +1048,10 @@ function addRemind(timerRequest, message) {
         response_str = "That was a close one, I almost crashed!";
     }
     // Turns out if people block the bot from chatting with them reminders will fail anyway
-    if ((found + save_ok) >= 1) {
-        saveReminders();
-    }
-    return response_str;
+//    if ((found + save_ok) >= 1) {
+//        saveReminders();
+//    }
+//    return response_str;
 }
 
 function listRemind(message) {
@@ -1041,6 +1191,8 @@ function getMouseList() {
             }
         }
     });
+    getNicknames("mice");
+    
 }
 
 function findMouse(channel, args, command) {
@@ -1060,6 +1212,10 @@ function findMouse(channel, args, command) {
             argArray.splice(0,2);
         }
         args = argArray.join(" ");
+    }
+    //Check if it's a nickname
+    if (nicknames["mice"][args]) {
+        args = nicknames["mice"][args];
     }
     
         
@@ -1196,6 +1352,7 @@ function getItemList() {
             }
         }
     });
+    getNicknames("loot");
 }
 
 function findItem(channel, args, command) {
@@ -1215,6 +1372,10 @@ function findItem(channel, args, command) {
             argArray.splice(0,2);
         }
         args = argArray.join(" ");
+    }
+    //Check if it's a nickname
+    if (nicknames["loot"][args]) {
+        args = nicknames["loot"][args];
     }
     
     var len = args.length;
@@ -1326,9 +1487,203 @@ function findItem(channel, args, command) {
     }
 }
 
+function unsetHunterID(message) {
+    //Unsets the hunter's id (and all other friend-related settings)
+    //Currently all settings are friend-related
+    var hunter = message.author.id;
+    var did_delete = 0;
+    if (hunters[hunter]) {
+        delete hunters[hunter];
+        saveHunters();
+        message.channel.send("OK, you have been deleted from results.");
+    } else {
+        message.channel.send("I didn't do anything but that's because you didn't do anything either.");
+    }
+}
+
+function setHunterID(message, hid) {
+    // Accepts a message object and hunter id, sets the author's hunter ID to the passed argument
+    // Also saves the resulting object
+    var hunter = message.author.id;
+    var oldval = 0;
+    var message_str = "";
+    if (isNaN(hid)) {
+        message.channel.send("I'm not sure that `" + hid + "` is a number so I am ignoring you.");
+        return;
+    }
+    if (!hunters[hunter]) {
+        hunters[hunter] = {};
+        console.log(" OMG! A new hunter " + hunter);
+    }
+    if (hunters[hunter]['hid']) {
+        //Replace
+        oldval = hunters[hunter]['hid'];
+        message_str = "You used to be known as `" + oldval + "`. ";
+        console.log("Found an old hid");
+    }
+    hunters[hunter]['hid'] = hid;
+    message_str += "If people look you up they'll see `" + hid + "`."
+//    console.log(hunters);
+    saveHunters(); // TODO: Change this to a scheduled save
+    message.channel.send(message_str);
+}
+
+function setHunterProp(message, property, value) {
+    // Accepts a message object and hunter id, sets the author's hunter ID to the passed argument
+    // Also saves the resulting object
+    var hunter = message.author.id;
+    var oldval = 0;
+    var message_str = "";
+    if ((!hunters[hunter]) || (!hunters[hunter]['hid'])) {
+        message.channel.send("I don't know who you are so you can't set that now, set your hunter ID first");
+        return;
+    }
+    if (hunters[hunter][property]) {
+        oldval = hunters[hunter][property];
+        message_str = "Your " + property + " used to be `" + oldval + "`. ";
+    }
+
+    hunters[hunter][property] = value;
+    message_str += "Your " + property + " is set to `" + value + "`."
+    saveHunters(); // TODO: Change this to a scheduled save
+    message.channel.send(message_str);
+}
+
+
+function loadHunters() {
+    //Read the JSON into the reminders array
+    console.log("loading hunters");
+    fs.readFile(hunter_ids_filename, file_encoding, (err, data) => {
+        if (err) {
+            console.log(err);
+            return undefined;
+        }
+
+        hunters = JSON.parse(data);
+        console.log (Object.keys(hunters).length + " hunters loaded");
+    });
+}
+
+function loadNicknameURLs() {
+    //Read the JSON into the reminders array
+    console.log("loading nicknames");
+    fs.readFile(nickname_urls_filename, file_encoding, (err, data) => {
+        if (err) {
+            console.log(err);
+            return undefined;
+        }
+
+        nickname_urls = JSON.parse(data);
+        console.log (Object.keys(nickname_urls).length + " nickname sources loaded");
+        nicknames = {}; //Clear it out
+        for (var key in nickname_urls) {
+            getNicknames(key);
+        }
+    });
+}
+
+
+function saveHunters () {
+    //Write out the JSON of the reminders array
+    fs.writeFile(hunter_ids_filename, JSON.stringify(hunters, null, 1), file_encoding, (err) => {
+        if (err) {
+            reject();
+            return console.log(err);
+        }
+    });
+//    console.log("hunters saved: " + hunters.size);
+//    console.log(hunters);
+}
+
+function getNicknames() {
+    // Wrapper function to get all the nicknames
+    nicknames = {}; //Clear it out
+    for (var key in nickname_urls) {
+        getNicknames(key);
+    }
+}
+
+function getNicknames(type) {
+    if (!nickname_urls[type]) {
+        console.log("Received " + type + " but I don't know that URL");
+        return false;
+    }
+    nicknames[type] = {};
+    //It returns a CSV, not a JSON
+    request({
+        url: nickname_urls[type]
+    }, function (error, response, body) {
+        if (!error && response.statusCode == 200) {
+            lines = body.split(/[\r\n]+/);
+            lines.shift(); // Remove the header
+            for (var i = 0; i < lines.length; i++ ) {
+                line = lines[i].toLowerCase().split(',', 2);
+                if (line.length === 2) {
+                    nicknames[type][line[0]] = line[1];
+                }
+            }
+        }
+        console.log(Object.keys(nicknames[type]).length + " " + type + " nicknames loaded");
+    });
+}
+
+function getLootNicknames() {
+    nicknames["loot"] = {};
+    var url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQRxGO1iLgX6N2P2iUT57ftCbh5lv_cmnatC6F8NevrdYDtumjcIJw-ooAqm1vIjSu6b0HfP4v2DYil/pub?gid=1181602359&single=true&output=csv";
+    //It returns a CSV, not a JSON
+    request({
+        url: url
+    }, function (error, response, body) {
+        if (!error && response.statusCode == 200) {
+            lines = body.split(/[\r\n]+/);
+            lines.shift(); // Remove the header
+            for (var i = 0; i < lines.length; i++ ) {
+                line = lines[i].toLowerCase().split(',', 2);
+                if (line.length === 2) {
+                    nicknames["loot"][line[0]] = line[1];
+                }
+            }
+        }
+    });
+}
+
+function getHunterByID(message, hid) {
+    //Find the account for the user identified by the hid
+    var keys = Object.keys(hunters);
+    for (var i = 0; i < keys.length; i++) {
+        if (hunters[keys[i]]["hid"] == hid) {
+            return keys[i];
+        }
+    }
+}
+
+function getHunterByDiscordID(message, id) {
+    //Find the account for the user identified by the author.id. Easiest case
+    if (hunters[id] && hunters[id]["hid"]) {
+        return hunters[id]["hid"]
+    }
+    return 0;
+}
+
+function getHunterByProp(message, property, string) {
+    //Find random hunter ids to befriend
+    var valid = [];
+    var keys = Object.keys(hunters);
+//    console.log("Checking " + keys.length + " hunters to see if '" + property + "' is '" + string + "'");
+    for (var i = 0; i < keys.length; i++) {
+        if (hunters[keys[i]][property] === string) {
+            valid.push(hunters[keys[i]]["hid"]);
+        }
+    }
+    return valid.sort( function() { return 0.5 - Math.random() } ).slice(0,5);
+}
+
 function integerComma(number) {
     return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
 //Resources:
 //Timezones in Discord: https://www.reddit.com/r/discordapp/comments/68zkfs/timezone_tag_bot/
+//Location nicknames as csv: https://docs.google.com/spreadsheets/d/e/2PACX-1vQRxGO1iLgX6N2P2iUT57ftCbh5lv_cmnatC6F8NevrdYDtumjcIJw-ooAqm1vIjSu6b0HfP4v2DYil/pub?gid=0&single=true&output=csv
+//Loot nicknames as csv:     https://docs.google.com/spreadsheets/d/e/2PACX-1vQRxGO1iLgX6N2P2iUT57ftCbh5lv_cmnatC6F8NevrdYDtumjcIJw-ooAqm1vIjSu6b0HfP4v2DYil/pub?gid=1181602359&single=true&output=csv
+//Mice nicknames as csv:     https://docs.google.com/spreadsheets/d/e/2PACX-1vQRxGO1iLgX6N2P2iUT57ftCbh5lv_cmnatC6F8NevrdYDtumjcIJw-ooAqm1vIjSu6b0HfP4v2DYil/pub?gid=762700375&single=true&output=csv

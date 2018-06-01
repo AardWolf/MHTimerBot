@@ -8,3 +8,5 @@ node_modules
 .timers.json
 /reminders.json
 /.reminders.json
+/hunters.json
+hunters.json
