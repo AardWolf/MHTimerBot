@@ -430,6 +430,7 @@ function messageParse(message) {
 
         case 'help':
         case 'arrg':
+        case 'aarg':
         default:
             if (tokens.length > 0) {
                 if (tokens[0] === 'next') {
@@ -467,6 +468,13 @@ function messageParse(message) {
                     usage_str += "  `-mh iam in <location>` will set your hunting location. Nicknames are allowed.\n";
                     usage_str += "  `-mh iam rank <rank>` will set your rank. Nicknames are allowed.\n";
                     usage_str += "  `-mh iam not` will remove you from results.\n";
+                    usage_str += "Setting your location and rank means that when people search for those things you can be randomly added to the results.";
+                }
+                else if (tokens[0] === 'whois') {
+                    usage_str = "Usage `-mh whois <####>` will try to look up a Discord user by MH ID. Only works if they set their ID.\n";
+                    usage_str += "  `-mh whois <user>` will try to look up a hunter ID based on a user in the server.\n";
+                    usage_str += "  `-mh whois in <location>` will find up to 5 random hunters in that location.\n";
+                    usage_str += "  `-mh whois rank <rank>` will find up to 5 random hunters with that rank.\n";
                     usage_str += "Setting your location and rank means that when people search for those things you can be randomly added to the results.";
                 }
                 else {
