@@ -1121,6 +1121,10 @@ function findMouse(channel, args, command) {
         }
         args = argArray.join(" ");
     }
+    //Check if it's a nickname
+    if (nicknames["mice"][args]) {
+        args = nicknames["mice"][args];
+    }
     
         
     
@@ -1276,6 +1280,10 @@ function findItem(channel, args, command) {
             argArray.splice(0,2);
         }
         args = argArray.join(" ");
+    }
+    //Check if it's a nickname
+    if (nicknames["loot"][args]) {
+        args = nicknames["loot"][args];
     }
     
     var len = args.length;
