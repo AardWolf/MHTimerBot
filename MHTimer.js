@@ -329,7 +329,8 @@ function messageParse(message) {
                     }
                     setHunterProp(message, "location", loc);
                 }
-                else if (((tokens[0].toLowerCase() === "rank") || (tokens[0].toLowerCase() === "title"))
+                else if (((tokens[0].toLowerCase() === "rank") || (tokens[0].toLowerCase() === "title")
+                                || (tokens[0].toLowerCase() === "a"))
                             && (tokens[1])) {
                     tokens.shift();
                     var rank = tokens.join(" ").toLowerCase();
@@ -340,6 +341,89 @@ function messageParse(message) {
                 }
                 else {
                     message.channel.send("I'm not sure what to do with that:\n  `-mh iam ###` to set a hunter ID.\n  `-mh iam rank <rank>` to set a rank.\n  `-mh iam in <location>` to set a location");
+                }
+            }
+            break;
+        case 'whois':
+            if (tokens.length == 0) {
+                message.channel.send("Who's who? Who's on first?");
+            }
+            else if ((tokens.length == 1) && !isNaN(tokens[0])) {
+                if (!message.guild) {
+                    message.channel.send("I cannot do this in PM");
+                    return;
+                }
+                var discord_id = getHunterByID(message, tokens[0]);
+                if (!discord_id) {
+                    message.channel.send("I did not find a hunter with `" + tokens[0] + "` as a hunter ID");
+                    return;
+                }
+                client.fetchUser(discord_id)
+                    .then((user) => { 
+                        message.guild.fetchMember(user)
+                            .then((member) => {
+                                message.channel.send("`" + tokens[0] + "` is " + member.displayName);
+                            })
+                            .catch( (err) => {message.channel.send("That person may not be on this server")} );
+                    })
+                    .catch( (err) => {message.channel.send("That person may not have a Discord account any more")} );
+            }
+            else if (tokens.length == 1) {
+                var member;
+                if (message.guild) {
+                    let member = message.mentions.members.first() || message.guild.members
+                        .filter(mem=> (mem.displayName === tokens[0]))
+                        .first();
+                    if (!member) {
+                        message.channel.send("Sorry, I couldn't figure out who you're looking for.");
+                    } else {
+                        var hunter_id = getHunterByDiscordID(message, member.id);
+                        if (hunter_id) {
+                            message.channel.send(member.displayName + " is `" + hunter_id + "` <https://mshnt.ca/p/" + hunter_id + ">");
+                        } else {
+                            message.channel.send("It looks like " + tokens[0] + " didn't set their hunter ID ");
+                        }
+                    }
+                } 
+                else {
+                    message.channel.send("I cannot look up users by name in a PM");
+                    return;
+                }
+            }
+            else {
+                var hunters = [];
+                var property = tokens[0];
+                var search = tokens.join(" ");
+                if ((tokens[0].toLowerCase() === "in") && (tokens[1])) {
+                    tokens.shift();
+                    var loc = tokens.join(" ").toLowerCase();
+                    if (nicknames["locations"][loc]) {
+                        loc = nicknames["locations"][loc];
+                    }
+                    property = "location";
+                    search = loc;
+                    hunters = getHunterByProp(message, "location", loc);
+                }
+                else if (((tokens[0].toLowerCase() === "rank") || (tokens[0].toLowerCase() === "title")
+                            || (tokens[0].toLowerCase() === "a"))
+                            && (tokens[1])) {
+                    tokens.shift();
+                    var rank = tokens.join(" ").toLowerCase();
+                    if (nicknames["ranks"][rank]) {
+                        rank = nicknames["ranks"][rank];
+                    }
+                    property = "rank";
+                    search = rank;
+                    hunters = getHunterByProp(message, "rank", rank);
+                }
+                else {
+                    message.channel.send("I'm not sure what to do with that:\n  `-mh whois [###|<mention>]` to look up specific hunters.\n  `-mh whois [in|a] [<location>|<rank>]` to find up to 5 random new friends.");
+                }
+                if (hunters.length) {
+//                    console.log(hunters);
+                    message.channel.send(hunters.length + " random hunters: `" + hunters.join("`, `") + "`");
+                } else {
+                    message.channel.send("I couldn't find any hunters with `" + property + "` matching `" + (search) + "`");
                 }
             }
             break;
@@ -387,7 +471,7 @@ function messageParse(message) {
                 }
                 else {
                     //TODO: Update this with schedule
-                    usage_str = "I can only provide help for `remind`, `next`, `find`, `ifind`, and `schedule`";
+                    usage_str = "I don't know that one but I know `iam`, `whois`, `remind`, `next`, `find`, `ifind`, and `schedule`";
                 }
             } else {
                 //TODO: Update this with schedule
@@ -1555,6 +1639,36 @@ function getLootNicknames() {
     });
 }
 
+function getHunterByID(message, hid) {
+    //Find the account for the user identified by the hid
+    var keys = Object.keys(hunters);
+    for (var i = 0; i < keys.length; i++) {
+        if (hunters[keys[i]]["hid"] == hid) {
+            return keys[i];
+        }
+    }
+}
+
+function getHunterByDiscordID(message, id) {
+    //Find the account for the user identified by the author.id. Easiest case
+    if (hunters[id] && hunters[id]["hid"]) {
+        return hunters[id]["hid"]
+    }
+    return 0;
+}
+
+function getHunterByProp(message, property, string) {
+    //Find random hunter ids to befriend
+    var valid = [];
+    var keys = Object.keys(hunters);
+//    console.log("Checking " + keys.length + " hunters to see if '" + property + "' is '" + string + "'");
+    for (var i = 0; i < keys.length; i++) {
+        if (hunters[keys[i]][property] === string) {
+            valid.push(hunters[keys[i]]["hid"]);
+        }
+    }
+    return valid.sort( function() { return 0.5 - Math.random() } ).slice(0,5);
+}
 
 function integerComma(number) {
     return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
