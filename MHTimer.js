@@ -14,6 +14,7 @@ var main_settings_filename = 'settings.json';
 var timer_settings_filename = 'timer_settings.json';
 var hunter_ids_filename = 'hunters.json';
 var reminder_filename = 'reminders.json';
+var nickname_urls_filename = 'nicknames.json';
 
 var timers_list = [];
 var reminders = [];
@@ -22,6 +23,8 @@ var settings = {};
 var mice = [];
 var items = [];
 var hunters = {};
+var nicknames = {};
+var nickname_urls = {};
 var last_timestamps = {
   reminder_save: new Date()
 }
@@ -85,6 +88,9 @@ function Main() {
     
     // Load any saved hunters
     a.then( loadHunters );
+
+    // Load nickname urls
+    a.then( loadNicknameURLs );
 
     // Bot start up tasks
     a.then(() => {
@@ -308,12 +314,33 @@ function messageParse(message) {
             if (tokens.length == 0) {
                 message.channel.send("Yes, you are. Provide a hunter ID to set that.");
             }
-            else if (isNaN(tokens[0])) {
-                message.channel.send("Whatever that is it's not your hunter ID.");
+            else if ((tokens.length == 1) && !isNaN(tokens[0])) {
+                setHunterID(message, tokens[0]);
+            }
+            else if ((tokens.length == 1) && (tokens[0].toLowerCase() === "not")) {
+                unsetHunterID(message);
             }
             else {
-                // It's gotta be numeric
-                setHunterID(message, tokens[0]);
+                if ((tokens[0].toLowerCase() === "in") && (tokens[1])) {
+                    tokens.shift();
+                    var loc = tokens.join(" ").toLowerCase();
+                    if (nicknames["locations"][loc]) {
+                        loc = nicknames["locations"][loc];
+                    }
+                    setHunterProp(message, "location", loc);
+                }
+                else if (((tokens[0].toLowerCase() === "rank") || (tokens[0].toLowerCase() === "title"))
+                            && (tokens[1])) {
+                    tokens.shift();
+                    var rank = tokens.join(" ").toLowerCase();
+                    if (nicknames["ranks"][rank]) {
+                        rank = nicknames["ranks"][rank];
+                    }
+                    setHunterProp(message, "rank", rank);
+                }
+                else {
+                    message.channel.send("I'm not sure what to do with that:\n  `-mh iam ###` to set a hunter ID.\n  `-mh iam rank <rank>` to set a rank.\n  `-mh iam in <location>` to set a location");
+                }
             }
             break;
 
@@ -350,6 +377,13 @@ function messageParse(message) {
                     usage_str = "Usage `-mh ifind <item>` will print the top drop rates for the item, capped at 10.\n";
                     usage_str += "All drop rate data is from <https://mhhunthelper.agiletravels.com/>.\n";
                     usage_str += "Help populate the database for better information!";
+                }
+                else if (tokens[0] === 'iam') {
+                    usage_str = "Usage `-mh iam <####>` will set your hunter ID. **This must be done before the other options will work.**\n";
+                    usage_str += "  `-mh iam in <location>` will set your hunting location. Nicknames are allowed.\n";
+                    usage_str += "  `-mh iam rank <rank>` will set your rank. Nicknames are allowed.\n";
+                    usage_str += "  `-mh iam not` will remove you from results.\n";
+                    usage_str += "Setting your location and rank means that when people search for those things you can be randomly added to the results.";
                 }
                 else {
                     //TODO: Update this with schedule
@@ -1065,6 +1099,7 @@ function getMouseList() {
             }
         }
     });
+    getNicknames("mice");
 }
 
 function findMouse(channel, args, command) {
@@ -1220,6 +1255,7 @@ function getItemList() {
             }
         }
     });
+    getNicknames("loot");
 }
 
 function findItem(channel, args, command) {
@@ -1350,6 +1386,20 @@ function findItem(channel, args, command) {
     }
 }
 
+function unsetHunterID(message) {
+    //Unsets the hunter's id (and all other friend-related settings)
+    //Currently all settings are friend-related
+    var hunter = message.author.id;
+    var did_delete = 0;
+    if (hunters[hunter]) {
+        delete hunters[hunter];
+        saveHunters();
+        message.channel.send("OK, you have been deleted from results.");
+    } else {
+        message.channel.send("I didn't do anything but that's because you didn't do anything either.");
+    }
+}
+
 function setHunterID(message, hid) {
     // Accepts a message object and hunter id, sets the author's hunter ID to the passed argument
     // Also saves the resulting object
@@ -1371,15 +1421,37 @@ function setHunterID(message, hid) {
         console.log("Found an old hid");
     }
     hunters[hunter]['hid'] = hid;
-    message_str += "If people look you up they'll see `" + hid + "`. Enjoy your fame!"
-    console.log(hunters);
+    message_str += "If people look you up they'll see `" + hid + "`."
+//    console.log(hunters);
     saveHunters(); // TODO: Change this to a scheduled save
     message.channel.send(message_str);
 }
 
+function setHunterProp(message, property, value) {
+    // Accepts a message object and hunter id, sets the author's hunter ID to the passed argument
+    // Also saves the resulting object
+    var hunter = message.author.id;
+    var oldval = 0;
+    var message_str = "";
+    if ((!hunters[hunter]) || (!hunters[hunter]['hid'])) {
+        message.channel.send("I don't know who you are so you can't set that now, set your hunter ID first");
+        return;
+    }
+    if (hunters[hunter][property]) {
+        oldval = hunters[hunter][property];
+        message_str = "Your " + property + " used to be `" + oldval + "`. ";
+    }
+
+    hunters[hunter][property] = value;
+    message_str += "Your " + property + " is set to `" + value + "`."
+    saveHunters(); // TODO: Change this to a scheduled save
+    message.channel.send(message_str);
+}
+
+
 function loadHunters() {
     //Read the JSON into the reminders array
-    console.log("loading reminders");
+    console.log("loading hunters");
     fs.readFile(hunter_ids_filename, file_encoding, (err, data) => {
         if (err) {
             console.log(err);
@@ -1390,6 +1462,25 @@ function loadHunters() {
         console.log (Object.keys(hunters).length + " hunters loaded");
     });
 }
+
+function loadNicknameURLs() {
+    //Read the JSON into the reminders array
+    console.log("loading nicknames");
+    fs.readFile(nickname_urls_filename, file_encoding, (err, data) => {
+        if (err) {
+            console.log(err);
+            return undefined;
+        }
+
+        nickname_urls = JSON.parse(data);
+        console.log (Object.keys(nickname_urls).length + " nickname sources loaded");
+        nicknames = {}; //Clear it out
+        for (var key in nickname_urls) {
+            getNicknames(key);
+        }
+    });
+}
+
 
 function saveHunters () {
     //Write out the JSON of the reminders array
@@ -1403,6 +1494,58 @@ function saveHunters () {
 //    console.log(hunters);
 }
 
+function getNicknames() {
+    // Wrapper function to get all the nicknames
+    nicknames = {}; //Clear it out
+    for (var key in nickname_urls) {
+        getNicknames(key);
+    }
+}
+
+function getNicknames(type) {
+    if (!nickname_urls[type]) {
+        console.log("Received " + type + " but I don't know that URL");
+        return false;
+    }
+    nicknames[type] = {};
+    //It returns a CSV, not a JSON
+    request({
+        url: nickname_urls[type]
+    }, function (error, response, body) {
+        if (!error && response.statusCode == 200) {
+            lines = body.split(/[\r\n]+/);
+            lines.shift(); // Remove the header
+            for (var i = 0; i < lines.length; i++ ) {
+                line = lines[i].toLowerCase().split(',', 2);
+                if (line.length === 2) {
+                    nicknames[type][line[0]] = line[1];
+                }
+            }
+        }
+        console.log(Object.keys(nicknames[type]).length + " " + type + " nicknames loaded");
+    });
+}
+
+function getLootNicknames() {
+    nicknames["loot"] = {};
+    var url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQRxGO1iLgX6N2P2iUT57ftCbh5lv_cmnatC6F8NevrdYDtumjcIJw-ooAqm1vIjSu6b0HfP4v2DYil/pub?gid=1181602359&single=true&output=csv";
+    //It returns a CSV, not a JSON
+    request({
+        url: url
+    }, function (error, response, body) {
+        if (!error && response.statusCode == 200) {
+            lines = body.split(/[\r\n]+/);
+            lines.shift(); // Remove the header
+            for (var i = 0; i < lines.length; i++ ) {
+                line = lines[i].toLowerCase().split(',', 2);
+                if (line.length === 2) {
+                    nicknames["loot"][line[0]] = line[1];
+                }
+            }
+        }
+    });
+}
+
 
 function integerComma(number) {
     return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
@@ -1410,3 +1553,6 @@ function integerComma(number) {
 
 //Resources:
 //Timezones in Discord: https://www.reddit.com/r/discordapp/comments/68zkfs/timezone_tag_bot/
+//Location nicknames as csv: https://docs.google.com/spreadsheets/d/e/2PACX-1vQRxGO1iLgX6N2P2iUT57ftCbh5lv_cmnatC6F8NevrdYDtumjcIJw-ooAqm1vIjSu6b0HfP4v2DYil/pub?gid=0&single=true&output=csv
+//Loot nicknames as csv:     https://docs.google.com/spreadsheets/d/e/2PACX-1vQRxGO1iLgX6N2P2iUT57ftCbh5lv_cmnatC6F8NevrdYDtumjcIJw-ooAqm1vIjSu6b0HfP4v2DYil/pub?gid=1181602359&single=true&output=csv
+//Mice nicknames as csv:     https://docs.google.com/spreadsheets/d/e/2PACX-1vQRxGO1iLgX6N2P2iUT57ftCbh5lv_cmnatC6F8NevrdYDtumjcIJw-ooAqm1vIjSu6b0HfP4v2DYil/pub?gid=762700375&single=true&output=csv
