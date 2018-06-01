@@ -1100,6 +1100,7 @@ function getMouseList() {
         }
     });
     getNicknames("mice");
+    
 }
 
 function findMouse(channel, args, command) {
