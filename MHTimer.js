@@ -372,7 +372,7 @@ function messageParse(message) {
                 var member;
                 if (message.guild) {
                     let member = message.mentions.members.first() || message.guild.members
-                        .filter(mem=> (mem.displayName === tokens[0]))
+                        .filter(mem=> (mem.displayName.toLowerCase() === tokens[0].toLowerCase()))
                         .first();
                     if (!member) {
                         message.channel.send("Sorry, I couldn't figure out who you're looking for.");
