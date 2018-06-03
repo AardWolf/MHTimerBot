@@ -229,7 +229,7 @@ function messageParse(message) {
         }
     }
     var usage_string;
-    switch (command) {
+    switch (command.toLowerCase()) {
         case 'next':
             //TODO - This should be a PM, probably?
             if ((tokens.length === 0) || (typeof timerName.area === 'undefined')) {
