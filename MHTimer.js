@@ -229,7 +229,7 @@ function messageParse(message) {
         }
     }
     var usage_string;
-    switch (command) {
+    switch (command.toLowerCase()) {
         case 'next':
             //TODO - This should be a PM, probably?
             if ((tokens.length === 0) || (typeof timerName.area === 'undefined')) {
@@ -339,6 +339,11 @@ function messageParse(message) {
                     }
                     setHunterProp(message, "rank", rank);
                 }
+                else if ((tokens[0].toLowerCase().substring(0,3) === "snu") && (tokens[1])) {
+                    tokens.shift();
+                    var snuid = tokens.join(" ").toLowerCase();
+                    setHunterProp(message, "snuid", snuid);
+                }
                 else {
                     message.channel.send("I'm not sure what to do with that:\n  `-mh iam ###` to set a hunter ID.\n  `-mh iam rank <rank>` to set a rank.\n  `-mh iam in <location>` to set a location");
                 }
@@ -348,21 +353,32 @@ function messageParse(message) {
             if (tokens.length == 0) {
                 message.channel.send("Who's who? Who's on first?");
             }
-            else if ((tokens.length == 1) && !isNaN(tokens[0])) {
+            else if (((tokens.length == 1) && !isNaN(tokens[0])) ||
+                     ((tokens[0].toLowerCase().substring(0,3) === "snu") &&
+                      (tokens.length == 2)))
+            {
+                var type = "hid";
+                if (tokens.length == 2) {
+                    // snuid lookup
+                    type = "snuid";
+                    tokens.shift();
+                }
                 if (!message.guild) {
                     message.channel.send("I cannot do this in PM");
                     return;
                 }
-                var discord_id = getHunterByID(message, tokens[0]);
+                var discord_id = getHunterByID(message, tokens[0], type);
                 if (!discord_id) {
                     message.channel.send("I did not find a hunter with `" + tokens[0] + "` as a hunter ID");
                     return;
                 }
+                var hid = getHunterByDiscordID(message, discord_id);
                 client.fetchUser(discord_id)
                     .then((user) => { 
                         message.guild.fetchMember(user)
                             .then((member) => {
-                                message.channel.send("`" + tokens[0] + "` is " + member.displayName);
+                                message.channel.send("`" + tokens[0] + "` is " + member.displayName + " <https://mshnt.ca/p/" +
+                                     hid + ">");
                             })
                             .catch( (err) => {message.channel.send("That person may not be on this server")} );
                     })
@@ -1647,11 +1663,11 @@ function getLootNicknames() {
     });
 }
 
-function getHunterByID(message, hid) {
+function getHunterByID(message, hid, type) {
     //Find the account for the user identified by the hid
     var keys = Object.keys(hunters);
     for (var i = 0; i < keys.length; i++) {
-        if (hunters[keys[i]]["hid"] == hid) {
+        if (hunters[keys[i]][type] == hid) {
             return keys[i];
         }
     }
