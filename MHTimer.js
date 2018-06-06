@@ -85,7 +85,7 @@ function Main() {
 
     // Load any saved reminders
     a.then( loadReminders );
-    
+
     // Load any saved hunters
     a.then( loadHunters );
 
@@ -118,16 +118,18 @@ function Main() {
                 case 'larrys-freebies':
                     if(/^(http[s]?:\/\/htgb\.co\/).*/g.test(message.content.toLowerCase())){
                         convertRewardLink(message);
-                        
+
                     }
                     break;
                 default:
-                    if (message.content.startsWith('-mh ')) {
+					if (message.channel.type === 'dm') {
+                        messageParse(message);
+					} else if (message.content.startsWith('-mh ')) {
                         //console.log(message.channel.type);
                         messageParse(message);
                     }
                     break;
-            } 
+            }
         });
         client.on('error', error => {
           console.log("Error Received");
@@ -215,7 +217,10 @@ function createTimedAnnouncements(channel) {
 function messageParse(message) {
     var tokens = [];
     tokens = splitString(message.content);
-    tokens.shift();
+
+	if (tokens[0] === '-mh') // coming from chat channel '-mh command...'
+		tokens.shift();
+
     var command = tokens.shift();
     var timerName; // This has area and sub_area possibly defined
     if (typeof command === 'undefined') {
@@ -374,7 +379,7 @@ function messageParse(message) {
                 }
                 var hid = getHunterByDiscordID(message, discord_id);
                 client.fetchUser(discord_id)
-                    .then((user) => { 
+                    .then((user) => {
                         message.guild.fetchMember(user)
                             .then((member) => {
                                 message.channel.send("`" + tokens[0] + "` is " + member.displayName + " <https://mshnt.ca/p/" +
@@ -400,7 +405,7 @@ function messageParse(message) {
                             message.channel.send("It looks like " + tokens[0] + " didn't set their hunter ID ");
                         }
                     }
-                } 
+                }
                 else {
                     message.channel.send("I cannot look up users by name in a PM");
                     return;
@@ -1208,7 +1213,7 @@ function getMouseList() {
         }
     });
     getNicknames("mice");
-    
+
 }
 
 function findMouse(channel, args, command) {
@@ -1217,7 +1222,7 @@ function findMouse(channel, args, command) {
     var retStr = "'" + args + "' not found";
     var found = 0;
     var orig_args = args;
-    
+
     //Process args for flags
     event = "";
     argArray = args.split(/\s+/);
@@ -1233,9 +1238,9 @@ function findMouse(channel, args, command) {
     if (nicknames["mice"][args]) {
         args = nicknames["mice"][args];
     }
-    
-        
-    
+
+
+
     var len = args.length;
     var mouseID = 0;
     var mouseName;
@@ -1377,7 +1382,7 @@ function findItem(channel, args, command) {
     var retStr = "'" + args + "' not found";
     var found = 0;
     var orig_args = args;
-    
+
     //Process args for flags
     event = "";
     argArray = args.split(/\s+/);
@@ -1393,7 +1398,7 @@ function findItem(channel, args, command) {
     if (nicknames["loot"][args]) {
         args = nicknames["loot"][args];
     }
-    
+
     var len = args.length;
     var itemID = 0;
     var itemName;
