@@ -114,6 +114,9 @@ function Main() {
     // Message event router
     a.then(() => {
         client.on('message', message => {
+            if (message.author.id === client.user.id) {
+                return;
+            }
             switch (message.channel.name){
                 case 'larrys-freebies':
                     if(/^(http[s]?:\/\/htgb\.co\/).*/g.test(message.content.toLowerCase())){
@@ -125,7 +128,6 @@ function Main() {
                     if (message.channel.type === 'dm') {
                         messageParse(message);
                     } else if (message.content.startsWith('-mh ')) {
-                        //console.log(message.channel.type);
                         messageParse(message);
                     }
                     break;
