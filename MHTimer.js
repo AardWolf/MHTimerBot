@@ -122,9 +122,9 @@ function Main() {
                     }
                     break;
                 default:
-					if (message.channel.type === 'dm') {
+                    if (message.channel.type === 'dm') {
                         messageParse(message);
-					} else if (message.content.startsWith('-mh ')) {
+                    } else if (message.content.startsWith('-mh ')) {
                         //console.log(message.channel.type);
                         messageParse(message);
                     }
@@ -218,8 +218,8 @@ function messageParse(message) {
     var tokens = [];
     tokens = splitString(message.content);
 
-	if (tokens[0] === '-mh') // coming from chat channel '-mh command...'
-		tokens.shift();
+    if (tokens[0] === '-mh') // coming from chat channel '-mh command...'
+        tokens.shift();
 
     var command = tokens.shift();
     var timerName; // This has area and sub_area possibly defined
