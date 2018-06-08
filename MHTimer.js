@@ -2,23 +2,27 @@
   MHTimer Bot
 */
 // Import required modules
-const Discord = require('discord.js');
-var Timer = require('./timerClass.js');
-var fs = require ('fs');
-var request = require('request'); //Needed to use Jack's tools
-const client = new Discord.Client();
+const { Discord, ClientUser, TextChannel, Message, RichEmbed } = require('discord.js');
+
+const Timer = require('./timerClass.js');
+// Access local URIs, like files.
+const fs = require('fs');
+// Access external URIs, like @devjacksmith 's tools.
+const request = require('request');
 
 // Globals
 // var guild_id = '245584660757872640';
-var main_settings_filename = 'settings.json';
-var timer_settings_filename = 'timer_settings.json';
-var hunter_ids_filename = 'hunters.json';
-var reminder_filename = 'reminders.json';
-var nickname_urls_filename = 'nicknames.json';
+const client = new Discord.Client();
+const main_settings_filename = 'settings.json',
+    timer_settings_filename = 'timer_settings.json',
+    hunter_ids_filename = 'hunters.json',
+    reminder_filename = 'reminders.json',
+    nickname_urls_filename = 'nicknames.json';
 
-var timers_list = [];
+const timers_list = [];
+/** @type {TimerReminder[]} */
 var reminders = [];
-var file_encoding = 'utf8';
+const file_encoding = 'utf8';
 var settings = {};
 var mice = [];
 var items = [];
@@ -159,7 +163,12 @@ catch(error) {
   console.log(error);
 }
 
-// Load settings
+/**
+ * Load settings from the 'main_settings_filename'
+ * 
+ * @param {callback} resolve A callback for successful execution
+ * @param {callback} reject A callback if an error occurred.
+ */
 function loadSettings(resolve, reject) {
     fs.readFile(main_settings_filename, file_encoding, (err, data) => {
         if (err) {
@@ -172,8 +181,12 @@ function loadSettings(resolve, reject) {
     });
 }
 
-// Read individual timer settings from a file and Create
-//function createTimersList(resolve, reject) {
+/**
+ * Read individual timer settings from a file and create the associated timers.
+ *
+ * @param {callback} resolve A callback for successful execution.
+ * @param {callback} reject A callback if an error occurred.
+ */
 function createTimersList(resolve, reject) {
     fs.readFile(timer_settings_filename, file_encoding, (err, data) => {
         if (err) {
@@ -182,13 +195,17 @@ function createTimersList(resolve, reject) {
         }
 
         var obj = JSON.parse(data);
-        for (var i = 0; i < obj.length; i++ ) {
+        for (var i = 0; i < obj.length; i++ )
             timers_list.push(new Timer(obj[i]));
-//            console.log('Added ' + i + ' ' + obj[i].area);
-        }
     });
 }
 
+/**
+ * When the bot initializes, go through all known Timers and schedule their next announcement.
+ * Also sets up the conversion from a single timeout-based call into a repeated-every-X interval.
+ * 
+ * @param {TextChannel} channel A channel interface on which announcements should be sent.
+ */
 function createTimedAnnouncements(channel) {
     console.log('Creating timeouts');
     var startDate = new Date();
@@ -197,13 +214,14 @@ function createTimedAnnouncements(channel) {
     for (var i = 0; i < timers_list.length; i++) {
         temp_timeout = setTimeout(
             (timer, channel) => {
+                // When activated, print the associated announcement.
                 doAnnounce(timer, channel);
                 timer.stopTimeout();
-                var temp_timer = setInterval((timer, channel) => {
-                    doAnnounce(timer, channel);
-                }, timer.getRepeat(), timer, channel);
-                timer.setInterval(temp_timer);
-//                console.log ("created a repeating timer for every " + repeat_time + " for " + announce);
+                // Schedule the announcement on a repeated interval.
+                let interval = setInterval(
+                    (timer, channel) => { doAnnounce(timer, channel); },
+                    timer.getRepeat(), timer, channel);
+                timer.setInterval(interval);
             },
               (timers_list[i].getNext().valueOf() - timers_list[i].getAnnounceOffset() - startDate.valueOf()),
               timers_list[i],
@@ -212,10 +230,15 @@ function createTimedAnnouncements(channel) {
         timers_list[i].setTimeout(temp_timeout);
 //        console.log(timers_list[i].getAnnounce() + " next happens in " + (timers_list[i].getNext().valueOf() - startDate.valueOf() ) + " ms");
     }
-    console.log ("Let's say that " +timers_list.length + " timeouts got created");
+    console.log ("Let's say that " + timers_list.length + " timeouts got created");
 }
 
-//The meat of user interaction. Receives the message that starts with the magic character and decides if it knows what to do next
+/**
+ * The meat of user interaction. Receives the message that starts with the magic
+ * character and decides if it knows what to do next.
+ *
+ * @param {Message} message a Discord message to parse
+ */
 function messageParse(message) {
     var tokens = [];
     tokens = splitString(message.content);
@@ -361,7 +384,7 @@ function messageParse(message) {
                 message.channel.send("Who's who? Who's on first?");
             }
             else if (((tokens.length == 1) && !isNaN(tokens[0])) ||
-                     ((tokens[0].toLowerCase().substring(0,3) === "snu") &&
+                     ((tokens[0].toLowerCase().substring(0, 3) === "snu") &&
                       (tokens.length == 2)))
             {
                 var type = "hid";
@@ -374,28 +397,28 @@ function messageParse(message) {
                     message.channel.send("I cannot do this in PM");
                     return;
                 }
-                var discord_id = getHunterByID(message, tokens[0], type);
+                var discord_id = getHunterByID(tokens[0], type);
                 if (!discord_id) {
                     message.channel.send("I did not find a hunter with `" + tokens[0] + "` as a hunter ID");
                     return;
                 }
-                var hid = getHunterByDiscordID(message, discord_id);
+                var hid = getHunterByDiscordID(discord_id);
                 client.fetchUser(discord_id)
-                    .then((user) => {
+                    .then(user => {
                         message.guild.fetchMember(user)
-                            .then((member) => {
+                            .then(member => {
                                 message.channel.send("`" + tokens[0] + "` is " + member.displayName + " <https://mshnt.ca/p/" +
                                      hid + ">");
                             })
-                            .catch( (err) => {message.channel.send("That person may not be on this server")} );
+                            .catch(err => {message.channel.send("That person may not be on this server")} );
                     })
-                    .catch( (err) => {message.channel.send("That person may not have a Discord account any more")} );
+                    .catch(err => {message.channel.send("That person may not have a Discord account any more")} );
             }
             else if (tokens.length == 1) {
                 var member;
                 if (message.guild) {
                     let member = message.mentions.members.first() || message.guild.members
-                        .filter(mem=> (mem.displayName.toLowerCase() === tokens[0].toLowerCase()))
+                        .filter(mem => (mem.displayName.toLowerCase() === tokens[0].toLowerCase()))
                         .first();
                     if (!member) {
                         message.channel.send("Sorry, I couldn't figure out who you're looking for.");
@@ -425,7 +448,7 @@ function messageParse(message) {
                     }
                     property = "location";
                     search = loc;
-                    hunters = getHunterByProp(message, "location", loc);
+                    hunters = getHunterByProp("location", loc);
                 }
                 else if (((tokens[0].toLowerCase() === "rank") || (tokens[0].toLowerCase() === "title")
                             || (tokens[0].toLowerCase() === "a"))
@@ -437,7 +460,7 @@ function messageParse(message) {
                     }
                     property = "rank";
                     search = rank;
-                    hunters = getHunterByProp(message, "rank", rank);
+                    hunters = getHunterByProp("rank", rank);
                 }
                 else {
                     message.channel.send("I'm not sure what to do with that:\n  `-mh whois [###|<mention>]` to look up specific hunters.\n  `-mh whois [in|a] [<location>|<rank>]` to find up to 5 random new friends.");
@@ -514,51 +537,77 @@ function messageParse(message) {
     }
 }
 
+/**
+ * Convert a HitGrab shortlink into a BitLy shortlink that does not send the clicker to Facebook.
+ * If successful, sends the converted link to the same channel that received the input message.
+ * 
+ * @param {Message} message a Discord message containing a htgb.co URL.
+ */
 function convertRewardLink(message){
     // Get the redirect url from htgb.co
     request({
         url: message.content.split(" ")[0],
         method: 'GET',
         followRedirect: false
-        }, function(error, response, body){
-            if(!error && response.statusCode == 301){
-                const facebookURL = response.headers.location;
-                const mousehuntURL = facebookURL.replace('https://apps.facebook.com/mousehunt','https://www.mousehuntgame.com');
-                const queryProperties = {access_token: settings.bitly_token, longUrl: mousehuntURL};
-                // Use Bitly to shorten the non-facebook reward link because people link pretty things
-                request({
-                    url: 'https://api-ssl.bitly.com/v3/shorten',
-                    qs: queryProperties
-                    }, function(error, response, body){
-                        if(!error && response.statusCode == 200){
-                            const responseJSON = JSON.parse(response.body);
-                            console.log("MH reward link converted for non-facebook users");
-                            message.channel.send(responseJSON.data.url + " <-- Non-Facebook Link");
-                        }else{
-                            console.log("Bitly shortener failed for some reason" + error + response + body);
-                        }
-                    });
-                }else{
-                    console.log("GET to htgb.co failed for some reason" + error + response + body);
+    }, function (error, response, body) {
+        if (!error && response.statusCode == 301) {
+            const facebookURL = response.headers.location;
+            const mousehuntURL = facebookURL.replace('https://apps.facebook.com/mousehunt', 'https://www.mousehuntgame.com');
+            const queryProperties = { access_token: settings.bitly_token, longUrl: mousehuntURL };
+            // Use Bitly to shorten the non-facebook reward link because people link pretty things
+            request({
+                url: 'https://api-ssl.bitly.com/v3/shorten',
+                qs: queryProperties
+            }, function (error, response, body) {
+                if (!error && response.statusCode == 200) {
+                    const responseJSON = JSON.parse(response.body);
+                    console.log("MH reward link converted for non-facebook users");
+                    message.channel.send(responseJSON.data.url + " <-- Non-Facebook Link");
+                } else {
+                    console.log("Bitly shortener failed for some reason" + error + response + body);
                 }
+            });
+        } else {
+            console.log("GET to htgb.co failed for some reason" + error + response + body);
         }
-    );
+    });
 }
 
-//Simple utility function to tokenize a string, preserving double quotes
-function splitString(inString) {
-    var returnArray = [];
-    var splitRegexp = /[^\s"]+|"([^"]*)"/gi;
+/**
+ * Simple utility function to tokenize a string, preserving double quotes.
+ * Returns an array of the detected words from the input string.
+ *
+ * @param {string} input A string to split into tokens.
+ * @returns {string[]} array
+ */
+function splitString(input) {
+    const tokens = [];
+    const splitRegexp = /[^\s"]+|"([^"]*)"/gi;
 
     do {
-        var match = splitRegexp.exec(inString);
-        if (match != null ) {
-            returnArray.push(match[1] ? match[1] : match[0]);
+        let match = splitRegexp.exec(input);
+        if (match) {
+            // If we captured a group (i.e. a quoted phrase), push that, otherwise push the match (i.e. a single word).
+            tokens.push(match[1] ? match[1] : match[0]);
         }
-    } while (match != null);
-    return returnArray;
+    } while (match);
+    return tokens;
 }
 
+/**
+ * @typedef {Object} ReminderRequest
+ * @property {string} [area] The area of a Timer
+ * @property {string} [sub_area] The sub-area of a Timer
+ * @property {number} [count] The number of times a Timer should activate before this reminder is removed.
+ */
+
+/**
+ * Attempt to find a Timer that satisfies the input tokens.
+ * Returns a ReminderRequest of unknown state (may have some or all properties).
+ *
+ * @param {string[]} tokens a set of tokens which may match known Timer areas or sub-areas.
+ * @returns {ReminderRequest}
+ */
 function timerAliases(tokens) {
     var timerQuery = {};
     var timerName;
@@ -719,43 +768,41 @@ function timerAliases(tokens) {
             }
         }
     }
-//    console.log(timerQuery);
+
     return timerQuery;
 }
 
-//Returns the next occurrence of the class of timers
-//TODO - this should take an array as an argument and process the words passed in
+/**
+ * Returns the next occurrence of the class of timers as a RichEmbed, or a string if no
+ * Timer matched the input TimerRequest.
+ * TODO - this should take an array as an argument and process the words passed in
+ * @param {any} timerName
+ * @returns {RichEmbed|string}
+ */
 function nextTimer(timerName) {
-    var retStr = "I do not know that timer but I do know: sg, fg, reset, spill, cove and their sub-areas";
-    var youngTimer;
-
-    for (var timer of timers_list) {
-        if (timer.getArea() === timerName.area) {
-            if ((typeof timerName.sub_area === 'undefined') || (timerName.sub_area === timer.getSubArea())) {
-                if ((typeof youngTimer === 'undefined') || (timer.getNext() <= youngTimer.getNext())) {
+    // Inspect all known timers to determine the one that matches the requested area, and occurs soonest.
+    const area = timerName.area,
+        sub = timer.sub_area;
+    let youngTimer;
+    for (var timer of timers_list)
+        if (timer.getArea() === area)
+            if (!sub || sub === timer.getSubArea())
+                if (!youngTimer || timer.getNext() <= youngTimer.getNext())
                     youngTimer = timer;
-                }
-            }
-        }
-    }
 
-    if (typeof youngTimer == 'undefined') {
-        return retStr;
-    } else {
-        var sched_syntax = "-mh remind " + timerName.area;
-        if (typeof(timerName.sub_area) !== 'undefined') {
-            sched_syntax += " " + timerName.sub_area;
-        }
+    if (!youngTimer)
+        return "I do not know that timer but I do know: sg, fg, reset, spill, cove and their sub-areas";
 
-        retStr = new Discord.RichEmbed()
-//            .setTitle("next " + timerName) // removing this cleaned up the embed a lot
-            .setDescription(youngTimer.getDemand() + "\n" + timeLeft(youngTimer.getNext()) +
-                    "\nTo schedule this reminder: " + sched_syntax) // Putting here makes it look nicer and fit in portrait mode
-            .setTimestamp(new Date(youngTimer.getNext().valueOf()))
-//            .addField(retStr)
-            .setFooter("at"); // There has to be something in here or there is no footer
-    }
-    return retStr;
+    const sched_syntax = "-mh remind " + area + (sub ? " " + sub : "");
+    return (new Discord.RichEmbed()
+        .setDescription(youngTimer.getDemand()
+            + "\n" + timeLeft(youngTimer.getNext())
+            // Putting here makes it look nicer and fit in portrait mode
+            + "\nTo schedule this reminder: `" + sched_syntax + "`"
+        )
+        .setTimestamp(new Date(youngTimer.getNext().valueOf()))
+        .setFooter("at") // There has to be something in here or there is no footer
+    );
 }
 
 function timeLeft (in_date) {
@@ -790,13 +837,25 @@ function timeLeft (in_date) {
     return retStr;
 }
 
+
+/**
+ * @typedef {Object} TimerReminder
+ * @property {ClientUser} user The Discord user who requested the reminder.
+ * @property {number} count The number of remaining times this reminder will activate.
+ * @property {string} area The area to which this reminder applies, e.g. "fg"
+ * @property {string} [sub_area] A logical "location" within the area, e.g. "close" or "open" for Forbidden Grove.
+ * @property {number} [fail] The number of times this particular reminder encountered an error (during send, etc.)
+ */
+
+/**
+ * Read the reminders JSON file, and populate the array for use
+ */
 function loadReminders() {
-    //Read the JSON into the reminders array
     console.log("loading reminders");
     fs.readFile(reminder_filename, file_encoding, (err, data) => {
         if (err) {
             console.log(err);
-            return undefined;
+            return;
         }
 
         reminders = JSON.parse(data);
@@ -804,12 +863,35 @@ function loadReminders() {
     });
 }
 
-function saveReminders () {
-    //Write out the JSON of the reminders array
-    var i = reminders.length;
-    while (i--) {
-        if (reminders[i].count === 0) {
-            reminders.splice(i, 1);
+/**
+ * Serialize the reminders array to the reminders JSON file, to guard against data loss
+ * from crashes, disconnects, reboots, etc.
+ */
+function saveReminders() {
+    // Remove any expired timers - no need to save them.
+    if (reminders.length) {
+        // Move expired reminders to the end.
+        reminders.sort((a, b) => { return b.count - a.count; });
+
+        // Find the first non-expired one.
+        let i = reminders.length,
+            numExpired = 0;
+        while (i--) {
+            if (reminders[i].count === 0)
+                ++numExpired;
+            else
+                break;
+        }
+        if (numExpired === reminders.length)
+            reminders = [];
+        else if (numExpired) {
+            // Advance to the next record (which should be expired and a valid index).
+            ++i;
+            // If the current reminder is expired, splice it and the others away.
+            if (i < reminders.length && reminders[i].count === 0) {
+                let discarded = reminders.splice(i, numExpired);
+                console.log(`Spliced ${discarded.length} expired records. ${reminders.length} remaining.`);
+            }
         }
     }
     fs.writeFile(reminder_filename, JSON.stringify(reminders, null, 1), file_encoding, (err) => {
@@ -818,78 +900,95 @@ function saveReminders () {
             return console.log(err);
         }
     });
-//    console.log("Reminders saved: " + reminders.length);
 }
 
-function doAnnounce (timer, channel) {
-    //Announce into a channel, then process any reminders
+/**
+ * Send the given timer's announcement to the given channel, and then process
+ * any reminders that chatters may have set up.
+ * 
+ * @param {Timer} timer The timer being announced.
+ * @param {TextChannel} channel The Discord channel that will receive the message.
+ */
+function doAnnounce(timer, channel) {
     channel.send(timer.getAnnounce())
-      .catch(function(error) {
+      .catch(error => {
           console.log(error);
           console.log(channel.client.status)
-        });
+      });
 
     doRemind(timer);
 }
 
-function doRemind (timer) {
-    //Go through the reminder requests and process each
-    var usage_str = "";
-    var err=0;
-    reminders.forEach(function (remind) {
-//    for (key in reminders) {
-        //remind = reminders[key];
-//        console.log(JSON.stringify(remind, null, 1));
-        if ((timer.getArea() === remind.area) &&
-            (remind.count !== 0) &&
-            (   (typeof remind.sub_area === 'undefined') ||
-                (typeof timer.getSubArea() !== 'undefined') &&
-                (timer.getSubArea() === remind.sub_area))
-           )
-        {
-            //var user = client.users.get(remind.user);
-            // client.users are just cached objects so might not be the best way to get a user object
-            // console.log("Processing reminder ",remind);
-            client.fetchUser(remind.user)
-                    .then((user) => { sendRemind(user, remind, timer); })
-                    .catch((err) => {
-                        remind.fail = (remind.fail || 0) + 1;
-                        console.log(err);
-                    });
-        }
+/**
+ * Locate any known reminders that reference this timer, and send a PM to
+ * the chatter who requested it.
+ * 
+ * @param {Timer} timer The activated timer.
+ */
+function doRemind(timer) {
+    // Cache these values.
+    const area = timer.getArea(),
+        sub = timer.getSubArea();
+
+    reminders.forEach(reminder => {
+        if (area !== reminder.area)
+            return;
+        if (reminder.count === 0)
+            return;
+        // If there no sub-area for this timer, or the one specified matches
+        // that of the reminder, activate the reminder.
+        if (!sub || sub === reminder.sub_area)
+            client.fetchUser(reminder.user)
+                .then(user => { sendRemind(user, reminder, timer); })
+                .catch(err => {
+                    reminder.fail = (reminder.fail || 0) + 1;
+                    console.log(err);
+                });
     });
+
+    // Serialize the current reminders and their updated remaining counts.
     saveReminders();
 }
 
+/**
+ * Takes a user object and a reminder "object" and sends the reminder text via PM.
+ * @param {ClientUser} user
+ * @param {TimerReminder} remind
+ * @param {Timer} timer
+ */
 function sendRemind(user, remind, timer) {
-    //Takes a user object and a remind "object" and sends the reminder
-    // console.log("Got a user of " + typeof user + " when I tried with " + remind.user + " for " + remind.area);
-    if (typeof user !== 'object') {
+    // Don't remind invalid users, or chat with bots.
+    if (!user || user.bot) {
         remind.fail = (remind.fail || 0) + 1;
         return -1;
     }
-    if (remind.count > 0) {
-        remind.count -= 1;
-    }
-    //user.send(timer.getAnnounce());
-    usage_str = "You have ";
+
+    // For non-perpetual reminders, decrement the counter.
+    if (remind.count > 0)
+        --remind.count;
+
+    // Describe the remaining reminders.
+    let count_str = "You have ";
     if (remind.count < 0) {
-        usage_str += "unlimited";
+        count_str += "unlimited";
     } else if (remind.count == 0) {
-        usage_str += "no more";
+        count_str += "no more";
     } else {
-        usage_str += remind.count;
+        count_str += remind.count;
     }
-    usage_str += " reminders left for this timer. Use `-mh remind " + remind.area;
+    count_str += " reminders left for this timer.";
+
+    // How to add or remove additional counts.
+    let alter_str = "Use `-mh remind " + remind.area;
     if (typeof remind.sub_area !== 'undefined') {
-        usage_str += " " + remind.sub_area;
+        alter_str += " " + remind.sub_area;
     }
     if (remind.count == 0) {
-        usage_str += "` to turn this reminder back on.";
+        alter_str += "` to turn this reminder back on.";
     } else {
-        usage_str += " stop` to end them sooner.";
+        alter_str += " stop` to end them sooner.";
     }
-    usage_str += " See also `-mh help remind` for other options.";
+    alter_str += " See also `-mh help remind` for other options.";
     if (remind.fail) {
         usage_str += " There were " + remind.fail + " failures before this got through.\n";
     }
@@ -899,10 +998,16 @@ function sendRemind(user, remind, timer) {
     }
     // console.log("Processed reminder", remind);
     user.send(timer.getAnnounce() + "\n" + usage_str )
-        .then(function() { err = 0; remind.fail = 0; }, //worked
-            function() { err = 1; remind.fail = (remind.fail || 0) + 1; });
+        .then(() => { err = 0; remind.fail = 0; }, //worked
+            () => { err = 1; remind.fail = (remind.fail || 0) + 1; });
 }
 
+/**
+ * Add (or remove) a reminder
+ * 
+ * @param {any} timerRequest
+ * @param {Message} message the Discord message that initiated this request.
+ */
 function addRemind(timerRequest, message) {
     //Add (or remove) a reminder
     var area = timerRequest.area;
@@ -1077,53 +1182,58 @@ function addRemind(timerRequest, message) {
 //    return response_str;
 }
 
+/**
+ * List the reminders for the user, and PM them the result.
+ * 
+ * @param {Message} message a Discord message containing the request to list reminders.
+ */
 function listRemind(message) {
-    // List the reminders for the user, PM them the result
-    var user = message.author.id;
-    var pm_channel = message.author;
+    const user = message.author.id,
+        pm_channel = message.author;
     var timer_str = "";
     var usage_str;
     var found = 0;
 
-    for (var i = 0; i < reminders.length; i++) {
-        //console.log ("Checking " + reminders[i].user );
-        if (reminders[i].user === user) {
-            timer_str += "Timer:    " + reminders[i].area;
-            usage_str = "`-mh remind " + reminders[i].area;
-            if (typeof reminders[i].sub_area !== 'undefined') {
-                timer_str += " (" + reminders[i].sub_area + ")";
-                usage_str += " " + reminders[i].sub_area;
-            }
-            if (reminders[i].count === 1) {
-                timer_str += " one more time";
-            }
-            else if (reminders[i].count === -1) {
-                timer_str += " until you stop it";
-            }
-            else {
-                timer_str += " " + reminders[i].count + " times";
-            }
-            timer_str += ". " + usage_str + " stop` to turn off\n";
-            found++;
-            if (reminders[i].fail) {
-                timer_str += "There have been " + reminders[i].fail + " failed attempts to remind you of this one.\n";
-            }
+    const userReminders = reminders.filter(reminder => { return reminder.user === user; });
+    userReminders.forEach(reminder => {
+        timer_str += "Timer:\t" + reminder.area;
+        usage_str = "`-mh remind " + reminder.area;
+        if (reminder.sub_area) {
+            timer_str += " (" + reminder.sub_area + ")";
+            usage_str += " " + reminder.sub_area;
         }
-    }
-    var err = 0;
 
-    if (found > 0) {
-        pm_channel.send(timer_str)
-            .then(function() { err = 0; }, //worked
-                function() { err = 1; });
-    } else {
-        pm_channel.send("I found no reminders for you, sorry")
-            .then(function() { err = 0; }, //worked
-                function() { err = 1; });
-    }
+        if (reminder.count === 1)
+            timer_str += " one more time";
+        else if (reminder.count === -1)
+            timer_str += " until you stop it";
+        else
+            timer_str += " " + reminder.count + " times";
+
+        timer_str += ".\n\t" + usage_str + " stop` to turn off\n";
+
+        if (reminder.fail)
+            timer_str += "There have been " + reminder.fail + " failed attempts to activate this reminder.\n";
+        timer_str += "\n";
+    });
+
+    let err = 0;
+    pm_channel.send(userReminders.length ? timer_str : "I found no reminders for you, sorry.")
+        .then(
+            () => { err = 0; }, // Successful callback
+            () => { err = 1; }  // Error callback
+        );
     //TODO: If err=1 then the user has blocked the bot, disable timers?
 }
 
+/**
+ * Compute which timers are coming up in the next bit of time, for the requested area.
+ * Returns a ready-to-print string listing up to 24 of the found timers, with their "demand" and when they will activate.
+ * TODO: should this return a RichEmbed?
+ * 
+ * @param {{area: string, count: number}} timer_request A request that indicates the number of hours to search ahead, and the area in which to search
+ * @returns {string} a ready-to-print string containing the timer's demand, and how soon it will occur.
+ */
 function buildSchedule(timer_request) {
     //Build a list of timers coming up in the next bit of time
     var return_str = "";
@@ -1187,10 +1297,15 @@ function buildSchedule(timer_request) {
 
 }
 
+/**
+ * Initialize (or refresh) the known mice lists from @devjacksmith's tools.
+ * Updates the mouse nicknames as well.
+ */
 function getMouseList() {
-    var url = "https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=mouse&item_id=all";
     var now_time = new Date();
-    console.log("Checking dates");
+    console.log("Checking mouse dates");
+    
+    // Only request a mouse list update every so often.
     if ("mouse_refresh" in last_timestamps) {
       var refresh_time = new Date(last_timestamps.mouse_refresh.valueOf() + refresh_rate);
       if (refresh_time < now_time) {
@@ -1201,21 +1316,24 @@ function getMouseList() {
     } else {
       last_timestamps.mouse_refresh = now_time;
     }
+
+    // Query @devjacksmith's tools for mouse lists.
+    const url = "https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=mouse&item_id=all";
     request({
         url: url,
         json: true
-    }, function (error, response, body) {
+    }, (error, response, body) => {
         if (!error && response.statusCode == 200) {
             console.log("Got a mouse list");
-//            console.log(body);
             mice = body;
-            for (var i = 0; i < mice.length; i++ ) {
+            for (let i of mice) {
                 mice[i].lowerValue = mice[i].value.toLowerCase();
             }
         }
     });
-    getNicknames("mice");
 
+    // Populate the nickname values for mice.
+    getNicknames("mice");
 }
 
 function findMouse(channel, args, command) {
@@ -1232,7 +1350,7 @@ function findMouse(channel, args, command) {
         if (argArray[0] == "-e") {
             event = argArray[1];
             url += "&timefilter=" + event;
-            argArray.splice(0,2);
+            argArray.splice(0, 2);
         }
         args = argArray.join(" ");
     }
@@ -1249,7 +1367,7 @@ function findMouse(channel, args, command) {
     var attractions = [];
     var stage_used = 0;
 //    console.log("Check for a string length of " + len)
-    for (var i = 0; (i < mice.length && !found); i++) {
+    for (let i = 0; (i < mice.length && !found); i++) {
         if (mice[i].lowerValue.substring(0,len) === args) {
 //            retStr = "'" + args + "' is '" + mice[i].value + "' AKA " + mice[i].id;
             mouseID = mice[i].id;
@@ -1266,7 +1384,7 @@ function findMouse(channel, args, command) {
                     // sort by "rate" but only if hunts > 100
                     var attractions = [];
                     var collengths = { location: 0, stage: 0, total_hunts: 0, cheese: 0};
-                    for (var j = 0; j < body.length; j++) {
+                    for (let j = 0; j < body.length; j++) {
                         if (body[j].total_hunts >= 100) {
                             attractions.push(
                                 {   location: body[j].location,
@@ -1348,8 +1466,11 @@ function findMouse(channel, args, command) {
     }
 }
 
+/**
+ * Initialize (or refresh) the known loot lists from @devjacksmith's tools.
+ * Updates the loot nicknames as well.
+ */
 function getItemList() {
-    var url = "https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=loot&item_id=all";
     var now_time = new Date();
     console.log("Checking dates");
     if ("item_refresh" in last_timestamps) {
@@ -1362,17 +1483,17 @@ function getItemList() {
     } else {
       last_timestamps.item_refresh = now_time;
     }
+
+    const url = "https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=loot&item_id=all";
     request({
         url: url,
         json: true
-    }, function (error, response, body) {
+    }, (error, response, body) => {
         if (!error && response.statusCode == 200) {
             console.log("Got a loot list");
-//            console.log(body);
             items = body;
-            for (var i = 0; i < items.length; i++ ) {
+            for (let i of items)
                 items[i].lowerValue = items[i].value.toLowerCase();
-            }
         }
     });
     getNicknames("loot");
@@ -1510,11 +1631,15 @@ function findItem(channel, args, command) {
     }
 }
 
+/**
+ * Unsets the hunter's id (and all other friend-related settings), and messages the user back.
+ * Currently all settings are friend-related.
+ * If a change was made, the new data object is serialized.
+ *
+ * @param {Message} message A Discord message object
+ */
 function unsetHunterID(message) {
-    //Unsets the hunter's id (and all other friend-related settings)
-    //Currently all settings are friend-related
-    var hunter = message.author.id;
-    var did_delete = 0;
+    let hunter = message.author.id;
     if (hunters[hunter]) {
         delete hunters[hunter];
         saveHunters();
@@ -1524,12 +1649,16 @@ function unsetHunterID(message) {
     }
 }
 
+/**
+ * Sets the message author's hunter ID to the passed argument, and messages the user back.
+ * If a change was made, the new data object is serialized.
+ * 
+ * @param {Message} message a Discord message object from a user
+ * @param {string} hid a "Hunter ID" string, which should parse to a number.
+ */
 function setHunterID(message, hid) {
-    // Accepts a message object and hunter id, sets the author's hunter ID to the passed argument
-    // Also saves the resulting object
-    var hunter = message.author.id;
-    var oldval = 0;
-    var message_str = "";
+    let hunter = message.author.id;
+    let message_str = "";
     if (isNaN(hid)) {
         message.channel.send("I'm not sure that `" + hid + "` is a number so I am ignoring you.");
         return;
@@ -1540,41 +1669,46 @@ function setHunterID(message, hid) {
     }
     if (hunters[hunter]['hid']) {
         //Replace
-        oldval = hunters[hunter]['hid'];
-        message_str = "You used to be known as `" + oldval + "`. ";
+        message_str = "You used to be known as `" + hunters[hunter]['hid'] + "`. ";
         console.log("Found an old hid");
     }
     hunters[hunter]['hid'] = hid;
     message_str += "If people look you up they'll see `" + hid + "`."
-//    console.log(hunters);
+
     saveHunters(); // TODO: Change this to a scheduled save
     message.channel.send(message_str);
 }
 
+/**
+ * Accepts a message object and hunter id, sets the author's hunter ID to the passed argument
+ * If a change was made, the new data object is serialized.
+ *
+ * @param {Message} message a Discord message object
+ * @param {string} property the property key for the given user, e.g. 'hid', 'rank', 'location'
+ * @param {any} value the property's new value.
+ */
 function setHunterProp(message, property, value) {
-    // Accepts a message object and hunter id, sets the author's hunter ID to the passed argument
-    // Also saves the resulting object
-    var hunter = message.author.id;
-    var oldval = 0;
-    var message_str = "";
+    let hunter = message.author.id;
+    let message_str = "";
     if ((!hunters[hunter]) || (!hunters[hunter]['hid'])) {
         message.channel.send("I don't know who you are so you can't set that now, set your hunter ID first");
         return;
     }
     if (hunters[hunter][property]) {
-        oldval = hunters[hunter][property];
-        message_str = "Your " + property + " used to be `" + oldval + "`. ";
+        message_str = "Your " + property + " used to be `" + hunters[hunter][property] + "`. ";
     }
 
     hunters[hunter][property] = value;
     message_str += "Your " + property + " is set to `" + value + "`."
+
     saveHunters(); // TODO: Change this to a scheduled save
     message.channel.send(message_str);
 }
 
-
+/**
+ * Read the JSON datafile with hunter data, storing its contents in the 'hunters' global object.
+ */
 function loadHunters() {
-    //Read the JSON into the reminders array
     console.log("loading hunters");
     fs.readFile(hunter_ids_filename, file_encoding, (err, data) => {
         if (err) {
@@ -1587,8 +1721,10 @@ function loadHunters() {
     });
 }
 
+/**
+ * Read the JSON datafile with nickname URLs, storing its contents in the 'nickname_urls' global object
+ */
 function loadNicknameURLs() {
-    //Read the JSON into the reminders array
     console.log("loading nicknames");
     fs.readFile(nickname_urls_filename, file_encoding, (err, data) => {
         if (err) {
@@ -1605,27 +1741,38 @@ function loadNicknameURLs() {
     });
 }
 
-
-function saveHunters () {
-    //Write out the JSON of the reminders array
+/**
+ * Serialize the 'hunters' global object into a JSON datafile, replacing the target file.
+ */
+function saveHunters() {
     fs.writeFile(hunter_ids_filename, JSON.stringify(hunters, null, 1), file_encoding, (err) => {
         if (err) {
             reject();
             return console.log(err);
         }
     });
-//    console.log("hunters saved: " + hunters.size);
-//    console.log(hunters);
 }
 
+/**
+ * Wrapper function to get all the nicknames. Reinitializes the 'nicknames'
+ * global based on the contents of the 'nickname_urls' object.
+ */
 function getNicknames() {
-    // Wrapper function to get all the nicknames
     nicknames = {}; //Clear it out
     for (var key in nickname_urls) {
         getNicknames(key);
     }
 }
 
+/**
+ * Read the CSV exported from a Google Sheets file containing nicknames, and
+ * initialize the specific 'nickname' property denoted by 'type'.
+ * 
+ * // TODO use the Google Sheets REST API or an Apps Script webapp for
+ * better control / formatting (e.g. JSON output, referencing sheets by name)
+ * 
+ * @param {string} type The type of nickname to populate. Determines the sheet that is read.
+ */
 function getNicknames(type) {
     if (!nickname_urls[type]) {
         console.log("Received " + type + " but I don't know that URL");
@@ -1650,57 +1797,76 @@ function getNicknames(type) {
     });
 }
 
-function getLootNicknames() {
-    nicknames["loot"] = {};
-    var url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQRxGO1iLgX6N2P2iUT57ftCbh5lv_cmnatC6F8NevrdYDtumjcIJw-ooAqm1vIjSu6b0HfP4v2DYil/pub?gid=1181602359&single=true&output=csv";
-    //It returns a CSV, not a JSON
-    request({
-        url: url
-    }, function (error, response, body) {
-        if (!error && response.statusCode == 200) {
-            lines = body.split(/[\r\n]+/);
-            lines.shift(); // Remove the header
-            for (var i = 0; i < lines.length; i++ ) {
-                line = lines[i].toLowerCase().split(',', 2);
-                if (line.length === 2) {
-                    nicknames["loot"][line[0]] = line[1];
-                }
-            }
-        }
-    });
+//function getLootNicknames() {
+//    nicknames["loot"] = {};
+//    var url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQRxGO1iLgX6N2P2iUT57ftCbh5lv_cmnatC6F8NevrdYDtumjcIJw-ooAqm1vIjSu6b0HfP4v2DYil/pub?gid=1181602359&single=true&output=csv";
+//    //It returns a CSV, not a JSON
+//    request({
+//        url: url
+//    }, function (error, response, body) {
+//        if (!error && response.statusCode == 200) {
+//            lines = body.split(/[\r\n]+/);
+//            lines.shift(); // Remove the header
+//            for (var i = 0; i < lines.length; i++ ) {
+//                line = lines[i].toLowerCase().split(',', 2);
+//                if (line.length === 2) {
+//                    nicknames["loot"][line[0]] = line[1];
+//                }
+//            }
+//        }
+//    });
+//}
+
+/**
+ * Find the Discord account for the user with the given hunter ID
+ *
+ * @param {string} hid The hunter ID to look up
+ * @param {string} type (should be 'hid', but could be any property).
+ * @returns {any} The discord ID, or undefined if the hunter ID was not registered.
+ */
+function getHunterByID(hid, type) {
+    for (let key in hunters)
+        if (hunters[key][type] === hid)
+            return key;
+
+    return "No hunter with that id.";
 }
 
-function getHunterByID(message, hid, type) {
-    //Find the account for the user identified by the hid
-    var keys = Object.keys(hunters);
-    for (var i = 0; i < keys.length; i++) {
-        if (hunters[keys[i]][type] == hid) {
-            return keys[i];
-        }
-    }
-}
-
-function getHunterByDiscordID(message, id) {
-    //Find the account for the user identified by the author.id. Easiest case
-    if (hunters[id] && hunters[id]["hid"]) {
+/**
+ * Find the account for the user identified by the author.id. Easiest case
+ * 
+ * @param {string} id the Discord ID of a registered hunter.
+ * @returns {string} the hunter ID of the registered hunter having that Discord ID.
+ */
+function getHunterByDiscordID(id) {
+    if (hunters[id] && hunters[id]["hid"])
         return hunters[id]["hid"]
-    }
+
     return 0;
 }
 
-function getHunterByProp(message, property, string) {
-    //Find random hunter ids to befriend
-    var valid = [];
-    var keys = Object.keys(hunters);
-//    console.log("Checking " + keys.length + " hunters to see if '" + property + "' is '" + string + "'");
-    for (var i = 0; i < keys.length; i++) {
-        if (hunters[keys[i]][property] === string) {
-            valid.push(hunters[keys[i]]["hid"]);
-        }
-    }
-    return valid.sort( function() { return 0.5 - Math.random() } ).slice(0,5);
+/**
+ * Find random hunter ids to befriend, based on the desired property and criterion.
+ *
+ * @param {string} property a hunter attribute, like "location" or "rank"
+ * @param {string} criterion user-entered input.
+ * @returns {string[]} an array of up to 5 hunter ids where the property value matched the user's criterion
+ */
+function getHunterByProp(property, criterion) {
+    const valid = [];
+    Object.keys(hunters).forEach(key => {
+        if (hunters[key][property] === criterion)
+            valid.push(hunters[key].hid);
+    });
+
+    return valid.sort(() => { return 0.5 - Math.random() }).slice(0, 5);
 }
 
+/**
+ * Convert the input number into a formatted string, e.g. 1234 -> 1,234
+ * @param {number} number
+ * @returns {string} A comma-formatted string.
+ */
 function integerComma(number) {
     return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
