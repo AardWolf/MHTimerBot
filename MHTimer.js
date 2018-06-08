@@ -3,6 +3,7 @@
 */
 // Import required modules
 const { Discord, ClientUser, TextChannel, Message, RichEmbed } = require('discord.js');
+const { DateTime, Duration, Interval } = require('luxon');
 
 const Timer = require('./timerClass.js');
 // Access local URIs, like files.
@@ -19,6 +20,7 @@ const main_settings_filename = 'settings.json',
     reminder_filename = 'reminders.json',
     nickname_urls_filename = 'nicknames.json';
 
+/** @type Timer[] */
 const timers_list = [];
 /** @type {TimerReminder[]} */
 var reminders = [];
@@ -29,10 +31,11 @@ var items = [];
 var hunters = {};
 var nicknames = {};
 var nickname_urls = {};
-var last_timestamps = {
-  reminder_save: new Date()
+/** @type {Object <string, DateTime>} */
+const last_timestamps = {
+    reminder_save: DateTime.utc()
 }
-var refresh_rate = 1000 * 60 * 5; //milliseconds between item, mouse refreshes
+const refresh_rate = Duration.fromObject({ minutes: 5 });
 
 //Only support announcing in 1 channel
 var announce_channel;
@@ -43,7 +46,7 @@ console.logCopy = console.log.bind(console);
 console.log = function()
 {
     // Timestamp to prepend
-    var timestamp = new Date().toJSON();
+    var timestamp = DateTime.utc().toJSON();
 
     if (arguments.length)
     {
@@ -207,12 +210,11 @@ function createTimersList(resolve, reject) {
  * @param {TextChannel} channel A channel interface on which announcements should be sent.
  */
 function createTimedAnnouncements(channel) {
-    console.log('Creating timeouts');
-    var startDate = new Date();
-    var temp_timeout;
-
-    for (var i = 0; i < timers_list.length; i++) {
-        temp_timeout = setTimeout(
+    console.log('Initializing announcements...');
+    const startDate = DateTime.utc();
+    
+    timers_list.forEach(timer => {
+        let timeout = setTimeout(
             (timer, channel) => {
                 // When activated, print the associated announcement.
                 doAnnounce(timer, channel);
@@ -221,15 +223,13 @@ function createTimedAnnouncements(channel) {
                 let interval = setInterval(
                     (timer, channel) => { doAnnounce(timer, channel); },
                     timer.getRepeat(), timer, channel);
-                timer.setInterval(interval);
+                timer.storeInterval(interval);
             },
-              (timers_list[i].getNext().valueOf() - timers_list[i].getAnnounceOffset() - startDate.valueOf()),
-              timers_list[i],
-              channel
-        );
-        timers_list[i].setTimeout(temp_timeout);
-//        console.log(timers_list[i].getAnnounce() + " next happens in " + (timers_list[i].getNext().valueOf() - startDate.valueOf() ) + " ms");
-    }
+            DateTime.fromJSDate(timer.getNext()).diff(startDate).minus(timer.getAnnounceOffset()).as('millis'),
+            timer,
+            channel);
+        timer.storeTimeout(timeout);
+    });
     console.log ("Let's say that " + timers_list.length + " timeouts got created");
 }
 
@@ -805,35 +805,46 @@ function nextTimer(timerName) {
     );
 }
 
-function timeLeft (in_date) {
-    var now_date = new Date();
-    var retStr = "real soon";
-    var ms_left = in_date.valueOf() - now_date.valueOf() ;
-    //console.log(ms_left + " ms left");
-    if (ms_left > 1000*60) {
-        retStr = "in ";
-        if (ms_left > 1000 * 60 * 60 * 24) {
-            //days left
-            retStr += Math.floor(ms_left / (1000 * 60 * 60 * 24)) + " days ";
-            ms_left = ms_left % (1000 * 60 * 60 * 24);
-        }
-        if (ms_left > 1000 * 60 * 60) {
-            //hours left
-            retStr += Math.floor(ms_left / (1000 * 60 * 60)) + " hours ";
-            ms_left = ms_left % (1000 * 60 * 60);
-        }
-        if (ms_left > 1000 * 60) {
-            //minutes left
-            retStr += Math.floor(ms_left / (1000 * 60)) + " minutes ";
-            ms_left = ms_left % (1000 * 60);
-        }
-        //if (ms_left > 1000) {
-            ////seconds left
-            //retStr += Math.floor(ms_left / 1000) + " seconds";
-        //}
-    } else {
-        retStr = "in less than a minute";
-    }
+/**
+ * Returns a string ending that specifies the (human-comprehensible) amount of
+ * time remaining before the given input.
+ * Ex "in 35 days, 14 hours, and 1 minute" 
+ *
+ * @param {Date} in_date The impending time that humans must be warned about.
+ * @returns {string} A timestring that indicates the amount of time left before the given Date.
+ */
+function timeLeft(in_date) {
+    const units = ["days", "hours", "minutes"];
+    const remaining = DateTime.fromJSDate(in_date).diffNow(units);
+    
+    // Make a nice string, but only if there are more than 60 seconds remaining.
+    if (remaining.as("milliseconds") < 60 * 1000)
+        return "in less than a minute";
+
+    // We could use 'Duration#toFormat', but then we will always get days,
+    // hours, and minutes, even if the duration is very short.
+    // return remaining.toFormat("'in' dd 'days,' HH 'hours, and ' mm 'minutes");
+    // return remaining.toFormat("'in' dd':'HH':'mm");
+
+    // Push any nonzero units into an array, adding "s" as appropriate.
+    const labels = [];
+    units.forEach((unit) => {
+        let val = remaining.get(unit);
+        if (val)
+            labels.push(String(val) + ((val !== 1) ? "s" : ""));
+    });
+    // `labels` should not be empty at this point.
+
+    // Join the labels together with commas. We use extra logic for the 'and'
+    // return labels.join(", ");
+    let retStr = "in ", line = 0, numLines = labels.length;
+    for (; line < numLines - 2; ++line)
+        retStr += labels[line] + ", ";
+    if (numLines > 1)
+        retStr += labels[line] + (numLines > 2 ? ", and " : " and ") + labels[line + 1];
+    else
+        retStr += labels[line];
+
     return retStr;
 }
 
@@ -1235,66 +1246,62 @@ function listRemind(message) {
  * @returns {string} a ready-to-print string containing the timer's demand, and how soon it will occur.
  */
 function buildSchedule(timer_request) {
-    //Build a list of timers coming up in the next bit of time
-    var return_str = "";
-    var upcoming_timers = [];
-    var req_hours = timer_request.count;
-    var area = timer_request.area;
-    var max_count = 24;
-    var curr_count = 0;
+    // All timers and requests have areas.
+    const area = timer_request.area;
+    if (!area)
+        return "Invalid area given - where did you want to look for upcoming timers?";
 
-    if (isNaN(parseInt(req_hours))) {
-        return "Somehow I got an argument that was not an integer.";
+    // Search from 1 to 10 days out.
+    let req_hours = Duration.fromObject({ hours: timer_request.count });
+    if (!req_hours.isValid) {
+        return "Invalid timespan given - how many hours did you want to look ahead?";
     }
-    else if (req_hours <= 0) {
-        req_hours = 24;
-    }
-    else if (req_hours >= 240) {
-        req_hours = 240;
-    }
+    else if (req_hours.as('hours') <= 0)
+        req_hours = req_hours.set({ hours: 24 });
+    else if (req_hours.as('hours') >= 240)
+        req_hours = req_hours.set({ hours: 240 });
+    const time_span = req_hours.as('milliseconds');
 
-    var time_span = req_hours * 60 * 60 * 1000;
-    var cur_time = new Date();
-    var end_time = new Date(cur_time.valueOf() + time_span);
-
+    
     //Get the next occurrence for every timer. Compare its interval to determine how many of them to include
-    var next_time;
-    var timer_interval;
-    for (var i = 0; i < timers_list.length; i++) {
-        if ((typeof area !== 'undefined') && (timers_list[i].getArea() !== area)) {
-            continue;
+    const searchInterval = Interval.after(DateTime.utc(), req_hours);
+    /** @type {{time: Date, message: string}[]} */
+    const upcoming_timers = [];
+    const max_timers = 24;
+    timers_list.forEach(timer => {
+        // The timer must apply to the desired area.
+        if (timer.getArea() !== area)
+            return;
+        // This timer's next invocation must be within the desired interval.
+        let next = timer.getNext(),
+            increment = timer.getRepeat(),
+            message = timer.getDemand()
+        while (searchInterval.contains(next)) {
+            upcoming_timers.push({
+                time: next,
+                message: message
+            });
+            // Check if future instances will also be in the interval.
+            next = DateTime.fromJSDate(next).plus(increment).toJSDate();
         }
-        next_time = timers_list[i].getNext();
-        if (next_time <= end_time) {
-            upcoming_timers.push({  time: next_time.valueOf(),
-                                    announce: timers_list[i].getDemand()
-                                 });
-            timer_interval = timers_list[i].getRepeat();
-            //console.log("Schedule: " + (next_time.getTime()) + " AND " + (timer_interval) + " and " + end_time.getTime());
-            while ((next_time.getTime() + timer_interval) < end_time.getTime()) {
-                next_time.setTime(next_time.getTime() + timer_interval);
-                upcoming_timers.push({  time: next_time.getTime(),
-                                        announce: timers_list[i].getDemand()
-                                     });
-            }
-        }
-    }
-    //Now we have an array of upcoming timers, let's sort it
-    upcoming_timers.sort( function(a, b) {
-        return a.time - b.time;
     });
-    return_str = "I have " + (upcoming_timers.length) + " timers coming up in the next " + req_hours + " hours";
-    if (upcoming_timers.length < max_count) {
-        max_count = upcoming_timers.length;
-    } else {
-        return_str += " (truncated to " + max_count + " entries)";
-    }
-    return_str += ":\n";
-    for (var i = 0; i < max_count; i++) {
-        return_str += upcoming_timers[i].announce + " " + timeLeft(upcoming_timers[i].time) + "\n";
-    }
-    return return_str;
 
+    // Sort the list of upcoming timers in this area by time, so that the soonest is printed first.
+    upcoming_timers.sort((a, b) => { return a.time - b.time; });
+
+    // Make a nice message to display.
+    let return_str = "I have " + (upcoming_timers.length) + " timers coming up in the next " + req_hours.as('hours') + " hours";
+    if (upcoming_timers.length > max_timers) {
+        return_str += ". Here are the next " + max_timers + " of them";
+        upcoming_timers.splice(max_timers, upcoming_timers.length)
+    }
+    return_str += upcoming_timers.length ? ":\n" : ".";
+
+    upcoming_timers.reduce((str, val) => {
+        return str + val.message + timeLeft(val.time) + "\n";
+    }, return_str);
+
+    return return_str;
 }
 
 /**
@@ -1302,20 +1309,15 @@ function buildSchedule(timer_request) {
  * Updates the mouse nicknames as well.
  */
 function getMouseList() {
-    var now_time = new Date();
     console.log("Checking mouse dates");
-    
+    const now = DateTime.utc();
     // Only request a mouse list update every so often.
     if ("mouse_refresh" in last_timestamps) {
-      var refresh_time = new Date(last_timestamps.mouse_refresh.valueOf() + refresh_rate);
-      if (refresh_time < now_time) {
-        last_timestamps.mouse_refresh = now_time;
-      } else {
-        return;
-      }
-    } else {
-      last_timestamps.mouse_refresh = now_time;
+        let next_refresh = last_timestamps.mouse_refresh.plus(refresh_rate);
+        if (now < next_refresh)
+            return;
     }
+    last_timestamps.mouse_refresh = now;
 
     // Query @devjacksmith's tools for mouse lists.
     const url = "https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=mouse&item_id=all";
@@ -1471,18 +1473,14 @@ function findMouse(channel, args, command) {
  * Updates the loot nicknames as well.
  */
 function getItemList() {
-    var now_time = new Date();
-    console.log("Checking dates");
+    console.log("Checking item dates");
+    const now = DateTime.utc();
     if ("item_refresh" in last_timestamps) {
-      var refresh_time = new Date(last_timestamps.item_refresh.valueOf() + refresh_rate);
-      if (refresh_time < now_time) {
-        last_timestamps.item_refresh = now_time;
-      } else {
-        return;
-      }
-    } else {
-      last_timestamps.item_refresh = now_time;
+        let next_refresh = last_timestamps.item_refresh.plus(refresh_rate);
+        if (now < next_refresh)
+            return;
     }
+    last_timestamps.item_refresh = now;
 
     const url = "https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=loot&item_id=all";
     request({
