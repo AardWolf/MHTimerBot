@@ -152,7 +152,6 @@ function Main() {
           client.destroy();
           process.exit();
         });
-
     });
 
     a.then( getMouseList );
@@ -211,8 +210,6 @@ function createTimersList(resolve, reject) {
  */
 function createTimedAnnouncements(channel) {
     console.log('Initializing announcements...');
-    const startDate = DateTime.utc();
-    
     timers_list.forEach(timer => {
         let timeout = setTimeout(
             (timer, channel) => {
@@ -225,7 +222,7 @@ function createTimedAnnouncements(channel) {
                     timer.getRepeat(), timer, channel);
                 timer.storeInterval(interval);
             },
-            DateTime.fromJSDate(timer.getNext()).diff(startDate).minus(timer.getAnnounceOffset()).as('millis'),
+            timer.getNext().diffNow().minus(timer.getAdvanceNotice()).as('millis'),
             timer,
             channel);
         timer.storeTimeout(timeout);
@@ -782,25 +779,42 @@ function timerAliases(tokens) {
 function nextTimer(timerName) {
     // Inspect all known timers to determine the one that matches the requested area, and occurs soonest.
     const area = timerName.area,
-        sub = timer.sub_area;
-    let youngTimer;
-    for (var timer of timers_list)
+        sub = timerName.sub_area;
+    let nextTimer;
+    for (let timer of timers_list)
         if (timer.getArea() === area)
             if (!sub || sub === timer.getSubArea())
-                if (!youngTimer || timer.getNext() <= youngTimer.getNext())
-                    youngTimer = timer;
+                if (!nextTimer || timer.getNext() < nextTimer.getNext())
+                    nextTimer = timer;
 
-    if (!youngTimer)
-        return "I do not know that timer but I do know: sg, fg, reset, spill, cove and their sub-areas";
+    if (!nextTimer) {
+        let details = {};
+        timers_list.forEach(timer => {
+            let area = `\`${timer.getArea()}\``;
+            if (!details[area])
+                details[area] = [];
+            if (timer.getSubArea())
+                details[area].push(timer.getSubArea());
+        });
+        let names = [];
+        for (let area in details) {
+            let description = area;
+            if (details[area].length)
+                description += ` (${details[area].join(", ")})`;
+            names.push(description);
+        }
+
+        return `I do not know that timer, but I do know:\n${names.join("\n")}`;
+    }
 
     const sched_syntax = "-mh remind " + area + (sub ? " " + sub : "");
     return (new Discord.RichEmbed()
-        .setDescription(youngTimer.getDemand()
-            + "\n" + timeLeft(youngTimer.getNext())
+        .setDescription(nextTimer.getDemand()
+            + "\n" + timeLeft(nextTimer.getNext())
             // Putting here makes it look nicer and fit in portrait mode
             + "\nTo schedule this reminder: `" + sched_syntax + "`"
         )
-        .setTimestamp(new Date(youngTimer.getNext().valueOf()))
+        .setTimestamp(nextTimer.getNext().toJSDate()))
         .setFooter("at") // There has to be something in here or there is no footer
     );
 }
@@ -810,12 +824,12 @@ function nextTimer(timerName) {
  * time remaining before the given input.
  * Ex "in 35 days, 14 hours, and 1 minute" 
  *
- * @param {Date} in_date The impending time that humans must be warned about.
+ * @param {DateTime} in_date The impending time that humans must be warned about.
  * @returns {string} A timestring that indicates the amount of time left before the given Date.
  */
 function timeLeft(in_date) {
     const units = ["days", "hours", "minutes"];
-    const remaining = DateTime.fromJSDate(in_date).diffNow(units);
+    const remaining = in_date.diffNow(units);
     
     // Make a nice string, but only if there are more than 60 seconds remaining.
     if (remaining.as("milliseconds") < 60 * 1000)
@@ -828,7 +842,7 @@ function timeLeft(in_date) {
 
     // Push any nonzero units into an array, adding "s" as appropriate.
     const labels = [];
-    units.forEach((unit) => {
+    units.forEach(unit => {
         let val = remaining.get(unit);
         if (val)
             labels.push(String(val) + ((val !== 1) ? "s" : ""));
@@ -882,7 +896,7 @@ function saveReminders() {
     // Remove any expired timers - no need to save them.
     if (reminders.length) {
         // Move expired reminders to the end.
-        reminders.sort((a, b) => { return b.count - a.count; });
+        reminders.sort((a, b) => { return a.count === 0 ? 1 : (b.count - a.count); });
 
         // Find the first non-expired one.
         let i = reminders.length,
@@ -921,6 +935,7 @@ function saveReminders() {
  * @param {TextChannel} channel The Discord channel that will receive the message.
  */
 function doAnnounce(timer, channel) {
+    timer.advance();
     channel.send(timer.getAnnounce())
       .catch(error => {
           console.log(error);
@@ -941,21 +956,18 @@ function doRemind(timer) {
     const area = timer.getArea(),
         sub = timer.getSubArea();
 
-    reminders.forEach(reminder => {
-        if (area !== reminder.area)
-            return;
-        if (reminder.count === 0)
-            return;
-        // If there no sub-area for this timer, or the one specified matches
-        // that of the reminder, activate the reminder.
-        if (!sub || sub === reminder.sub_area)
-            client.fetchUser(reminder.user)
-                .then(user => { sendRemind(user, reminder, timer); })
-                .catch(err => {
-                    reminder.fail = (reminder.fail || 0) + 1;
-                    console.log(err);
-                });
-    });
+    reminders.filter(reminder => { return area === reminder.area && reminder.count !== 0 })
+        .forEach(reminder => {
+            // If there no sub-area for this timer, or the one specified matches
+            // that of the reminder, activate the reminder.
+            if (!sub || sub === reminder.sub_area)
+                client.fetchUser(reminder.user)
+                    .then(user => { sendRemind(user, reminder, timer); })
+                    .catch(err => {
+                        reminder.fail = (reminder.fail || 0) + 1;
+                        console.log(err);
+                    });
+        });
 
     // Serialize the current reminders and their updated remaining counts.
     saveReminders();
@@ -963,6 +975,7 @@ function doRemind(timer) {
 
 /**
  * Takes a user object and a reminder "object" and sends the reminder text via PM.
+ *
  * @param {ClientUser} user
  * @param {TimerReminder} remind
  * @param {Timer} timer
@@ -1251,40 +1264,27 @@ function buildSchedule(timer_request) {
     if (!area)
         return "Invalid area given - where did you want to look for upcoming timers?";
 
-    // Search from 1 to 10 days out.
+    // Search from 1 hour to 10 days out.
     let req_hours = Duration.fromObject({ hours: timer_request.count });
     if (!req_hours.isValid) {
         return "Invalid timespan given - how many hours did you want to look ahead?";
     }
     else if (req_hours.as('hours') <= 0)
         req_hours = req_hours.set({ hours: 24 });
-    else if (req_hours.as('hours') >= 240)
-        req_hours = req_hours.set({ hours: 240 });
-    const time_span = req_hours.as('milliseconds');
+    else if (req_hours.as('days') >= 10)
+        req_hours = req_hours.shiftTo('days').set({ days: 10 });
 
-    
-    //Get the next occurrence for every timer. Compare its interval to determine how many of them to include
-    const searchInterval = Interval.after(DateTime.utc(), req_hours);
-    /** @type {{time: Date, message: string}[]} */
+    // Get the next occurrence for every timer. Compare its interval to determine how many of them to include
+    const until = DateTime.utc().plus(req_hours);
+    /** @type {{time: DateTime, message: string}[]} */
     const upcoming_timers = [];
     const max_timers = 24;
-    timers_list.forEach(timer => {
-        // The timer must apply to the desired area.
-        if (timer.getArea() !== area)
-            return;
-        // This timer's next invocation must be within the desired interval.
-        let next = timer.getNext(),
-            increment = timer.getRepeat(),
-            message = timer.getDemand()
-        while (searchInterval.contains(next)) {
-            upcoming_timers.push({
-                time: next,
-                message: message
-            });
-            // Check if future instances will also be in the interval.
-            next = DateTime.fromJSDate(next).plus(increment).toJSDate();
-        }
-    });
+    timers_list.filter(timer => { return timer.getArea() === area; })
+        .forEach(timer => {
+            let message = timer.getDemand();
+            for (let time of timer.upcoming(until))
+                upcoming_timers.push({ time: time, message: message });
+        });
 
     // Sort the list of upcoming timers in this area by time, so that the soonest is printed first.
     upcoming_timers.sort((a, b) => { return a.time - b.time; });
@@ -1494,6 +1494,8 @@ function getItemList() {
                 items[i].lowerValue = items[i].value.toLowerCase();
         }
     });
+
+    // Populate the nickname values for loot.
     getNicknames("loot");
 }
 
