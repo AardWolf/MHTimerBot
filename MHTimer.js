@@ -103,17 +103,18 @@ function Main() {
     a.then(() => {
         client.on('ready', () => {
             console.log ('I am alive!');
-//            announce_channel = client.guilds.get(guild_id).defaultChannel;
 
             //for each guild find its #timers channel (if it has one)
             for (var [guildkey, guildvalue] of client.guilds) {
-                for (var [chankey, chanvalue] of guildvalue.channels) {
+                let canAnnounce = false;
+                for (var [chankey, chanvalue] of guildvalue.channels)
                     if (chanvalue.name === "timers") {
-                        console.log("Found #timers as " + chankey + " on guild " + guildvalue.name);
                         createTimedAnnouncements(chanvalue);
-//                        chanvalue.send("Is this thing on?");
+                        canAnnounce = true;
                     }
-                }
+
+                if (!canAnnounce)
+                    console.log(`No #timers channel in guild '${guildvalue.name}'.`);
             }
         });
     });
@@ -600,173 +601,285 @@ function splitString(input) {
 
 /**
  * Attempt to find a Timer that satisfies the input tokens.
- * Returns a ReminderRequest of unknown state (may have some or all properties).
+ * Returns a ReminderRequest of unknown state (may have some or all properties set).
  *
  * @param {string[]} tokens a set of tokens which may match known Timer areas or sub-areas.
  * @returns {ReminderRequest}
  */
 function timerAliases(tokens) {
-    var timerQuery = {};
-    var timerName;
-    var found = 0;
-    for (var i = 0; i < tokens.length; i++) {
-        timerName = tokens[i].toLowerCase();
-        //Check if this is an exact timer name, useful if we can dynamically add new timers
-        for (var j = 0; j < timers_list.length; j++) {
-            if (timers_list[j].getArea() === timerName) {
-                timerQuery.area = timerName;
-//                found = 1;
-//                j = timers_list.length;
-            }
-            else if (timers_list[j].getSubArea() === timerName) {
-                timerQuery.area = timers_list[j].getArea();
-                timerQuery.sub_area = timerName;
-//                found = 1;
-//                j = timers_list.length;
+    const newReminder = {
+        area: null,
+        sub_area: null,
+        count: null
+    };
+    const timerAreas = timers_list.map(timer => { return timer.getArea(); });
+    const timerSubAreas = timers_list.map(timer => { return timer.getSubArea(); });
+    // Scan the input tokens and attempt to match them to a known timer.
+    for (let i = 0; i < tokens.length; i++) {
+        let token = tokens[i].toLowerCase();
+
+        // Check if this is an exact timer name, useful if we can dynamically add new timers.
+        let areaIndex = timerAreas.indexOf(token);
+        if (areaIndex !== -1) {
+            newReminder.area = token;
+            continue;
+        } else {
+            let subIndex = timerSubAreas.indexOf(token);
+            if (subIndex !== -1) {
+                newReminder.area = timerAreas[subIndex];
+                newReminder.sub_area = token;
+                continue;
             }
         }
-        if (found == 0) {
-            switch (timerName) {
-                case 'sg':
-                case 'seasonal':
-                case 'season':
-                case 'garden':
-                    timerQuery.area = 'sg';
-                    break;
-                case 'fall':
-                case 'autumn':
-                    timerQuery.area = 'sg';
-                    timerQuery.sub_area = 'autumn';
-                    break;
-                case 'spring':
-                    timerQuery.area = 'sg';
-                    timerQuery.sub_area = 'spring';
-                    break;
-                case 'summer':
-                    timerQuery.area = 'sg';
-                    timerQuery.sub_area = 'summer';
-                    break;
-                case 'winter':
-                    timerQuery.area = 'sg';
-                    timerQuery.sub_area = 'winter';
-                    break;
-                case 'fg':
-                case 'grove':
-                case 'gate':
-                case 'ar':
-                case 'acolyte':
-                case 'ripper':
-                case 'realm':
-                    timerQuery.area = 'fg';
-                    break;
-                case 'open':
-                    timerQuery.area = 'fg';
-                    timerQuery.sub_area = 'open';
-                    break;
-                case 'close':
-                case 'closed':
-                case 'shut':
-                    timerQuery.area = 'fg';
-                    timerQuery.sub_area = 'close';
-                    break;
-                case 'reset':
-                case 'game':
-                case 'rh':
-                case 'midnight':
-                    timerQuery.area = 'reset';
-                    break;
-                case 'cove':
-                case 'balack':
-                case 'tide':
-                    timerQuery.area = 'cove';
-                    break;
-                case 'lowtide':
-                case 'low':
-                    timerQuery.area = 'cove';
-                    timerQuery.sub_area = 'low';
-                    break;
-                case 'midtide':
-                case 'mid':
-                    timerQuery.area = 'cove';
-                    timerQuery.sub_area = 'mid';
-                    break;
-                case 'hightide':
-                case 'high':
-                    timerQuery.area = 'cove';
-                    timerQuery.sub_area = 'high';
-                    break;
-                case 'spill':
-                case 'toxic':
-                case 'ts':
-                    timerQuery.area = 'spill';
-                    break;
-                case 'archduke':
-                case 'ad':
-                case 'archduchess':
-                case 'aardwolf':
-                case 'arch':
-                    timerQuery.area = 'spill';
-                    timerQuery.sub_area = 'arch';
-                    break;
-                case 'grandduke':
-                case 'gd':
-                case 'grandduchess':
-                case 'grand':
-                    timerQuery.area = 'spill';
-                    timerQuery.sub_area = 'grand';
-                    break;
-                case 'duchess':
-                case 'duke':
-                    timerQuery.area = 'spill';
-                    timerQuery.sub_area = 'duke';
-                    break;
-                case 'countess':
-                case 'count':
-                    timerQuery.area = 'spill';
-                    timerQuery.sub_area = 'count';
-                    break;
-                case 'baronness':
-                case 'baron':
-                    timerQuery.area = 'spill';
-                    timerQuery.sub_area = 'baron';
-                    break;
-                case 'lady':
-                case 'lord':
-                    timerQuery.area = 'spill';
-                    timerQuery.sub_area = 'lord';
-                    break;
-                case 'heroine':
-                case 'hero':
-                    timerQuery.area = 'spill';
-                    timerQuery.sub_area = 'hero';
-                    break;
-                case 'once':
-                case '1':
-                case 1:
-                    timerQuery.count = 1;
-                    break;
-                case 'always':
-                case 'forever':
-                case 'unlimited':
-                case '-1':
-                case -1:
-                    timerQuery.count = -1;
-                    break;
-                case 'stop':
-                case '0':
-                case 0:
-                    timerQuery.count = 0;
-                    break;
-                default:
-                    if (!isNaN(parseInt(timerName))) {
-                        timerQuery.count = parseInt(timerName);
-                    }
-                    break;
-            }
+
+        // Attempt to find an area from this token
+        if (!newReminder.area && parseTokenForArea(token, newReminder))
+            continue;
+
+        // Attempt to find a sub-area from this token.
+        if (!newReminder.sub_area && parseTokenForSubArea(token, newReminder))
+            continue;
+
+        // Attempt to find a count from this token.
+        if (!newReminder.count && parseTokenForCount(token, newReminder))
+            continue;
+
+        // Upon reaching here, the token has no area, sub-area, or count information, or those fields
+        // were already set, and thus it was not parsed for them.
+        if (newReminder.area && newReminder.sub_area && newReminder.count !== null) {
+            console.log(`Parsing user input to find timers, got an extra token '${String(token)}' from input '${tokens}'.`);
+            break;
         }
     }
 
-    return timerQuery;
+    return newReminder;
+}
+
+/**
+ * Attempt to match the input string to known Timer areas. If successful, updates the given reminder.
+ *
+ * @param {string} token a word or phrase from a Discord message
+ * @param {ReminderRequest} newReminder the reminder request being built from the entirety of the input Discord message
+ * @returns {boolean} if the token parsed to an area.
+ */
+function parseTokenForArea(token, newReminder) {
+    switch (token) {
+        // Seasonal Garden aliases
+        case 'sg':
+        case 'seasonal':
+        case 'season':
+        case 'garden':
+            newReminder.area = 'sg';
+            break;
+
+        // Forbidden Grove aliases
+        case 'fg':
+        case 'grove':
+        case 'gate':
+        case 'ar':
+        case 'acolyte':
+        case 'ripper':
+        case 'realm':
+            newReminder.area = 'fg';
+            break;
+
+        // Game Reset / Relic Hunter movement aliases
+        case 'reset':
+        case 'game':
+        case 'rh':
+        case 'midnight':
+            newReminder.area = 'reset';
+            break;
+
+        // Balack's Cove aliases
+        case 'cove':
+        case 'balack':
+        case 'tide':
+            newReminder.area = 'cove';
+            break;
+
+        // Toxic Spill aliases
+        case 'spill':
+        case 'toxic':
+        case 'ts':
+            newReminder.area = 'spill';
+            break;
+
+        // This token is not a known timer area.
+        default:
+            return false;
+    }
+    return true;
+}
+
+/**
+ * Attempt to match the input string to known Timer sub-areas. If successful, updates the given reminder.
+ * Overwrites any previously-specified area.
+ *
+ * @param {string} token
+ * @param {ReminderRequest} newReminder
+ * @returns {boolean} if the token parsed to a sub-area.
+ */
+function parseTokenForSubArea(token, newReminder) {
+    switch (token) {
+        // Seasonal Garden seasons aliases.
+        case 'fall':
+        case 'autumn':
+            newReminder.area = 'sg';
+            newReminder.sub_area = 'autumn';
+            break;
+        case 'spring':
+            newReminder.area = 'sg';
+            newReminder.sub_area = 'spring';
+            break;
+        case 'summer':
+            newReminder.area = 'sg';
+            newReminder.sub_area = 'summer';
+            break;
+        case 'winter':
+            newReminder.area = 'sg';
+            newReminder.sub_area = 'winter';
+            break;
+
+        // Forbidden Grove gate state aliases.
+        case 'open':
+        case "opens":
+        case 'opened':
+        case 'opening':
+            newReminder.area = 'fg';
+            newReminder.sub_area = 'open';
+            break;
+        case 'close':
+        case 'closed':
+        case 'closing':
+        case 'shut':
+            newReminder.area = 'fg';
+            newReminder.sub_area = 'close';
+            break;
+
+        // Balack's Cove tide aliases.
+        case 'low-tide':
+        case 'lowtide':
+        case 'low':
+            newReminder.area = 'cove';
+            newReminder.sub_area = 'low';
+            break;
+        case 'mid-tide':
+        case 'midtide':
+        case 'mid':
+            newReminder.area = 'cove';
+            newReminder.sub_area = 'mid';
+            break;
+        case 'high-tide':
+        case 'hightide':
+        case 'high':
+            newReminder.area = 'cove';
+            newReminder.sub_area = 'high';
+            break;
+
+        // Toxic Spill severity level aliases.
+        case 'archduke':
+        case 'ad':
+        case 'archduchess':
+        case 'aardwolf':
+        case 'arch':
+            newReminder.area = 'spill';
+            newReminder.sub_area = 'arch';
+            break;
+        case 'grandduke':
+        case 'gd':
+        case 'grandduchess':
+        case 'grand':
+            newReminder.area = 'spill';
+            newReminder.sub_area = 'grand';
+            break;
+        case 'duchess':
+        case 'duke':
+            newReminder.area = 'spill';
+            newReminder.sub_area = 'duke';
+            break;
+        case 'countess':
+        case 'count':
+            newReminder.area = 'spill';
+            newReminder.sub_area = 'count';
+            break;
+        case 'baronness':
+        case 'baron':
+            newReminder.area = 'spill';
+            newReminder.sub_area = 'baron';
+            break;
+        case 'lady':
+        case 'lord':
+            newReminder.area = 'spill';
+            newReminder.sub_area = 'lord';
+            break;
+        case 'heroine':
+        case 'hero':
+            newReminder.area = 'spill';
+            newReminder.sub_area = 'hero';
+            break;
+
+        // This token did not match any known Timer sub-areas.
+        default:
+            return false;
+    }
+    return true;
+}
+
+/**
+ * Attempt to match the input string to a positive integer. If successful, updates the given reminder.
+ * Overwrites any previously-specified count.
+ *
+ * @param {string} token
+ * @param {ReminderRequest} newReminder
+ * @returns {boolean} if the token parsed to a integer
+ */
+function parseTokenForCount(token, newReminder) {
+    switch (token) {
+        // Words for numbers...
+        case 'once':
+        case 'one':
+            newReminder.count = 1;
+            break;
+
+        case 'twice':
+        case 'two':
+            newReminder.count = 2;
+            break;
+
+        case 'thrice':
+        case 'three':
+            newReminder.count = 3;
+
+        case 'always':
+        case 'forever':
+        case 'unlimited':
+        case 'inf':
+        case 'infinity':
+            newReminder.count = -1;
+            break;
+
+        case 'never':
+        case 'end':
+        case 'forget':
+        case 'quit':
+        case 'stop':
+            newReminder.count = 0;
+            break;
+
+        // If it is an actual number, then we can just use it as normal. Note that parseInt will
+        // take garbage input like unrepresentably large numbers and coerce to + /-Infinity.
+        default:
+            if (!isNaN(parseInt(token, 10))) {
+                let val = parseInt(token, 10);
+                if (val == Infinity || val < 0)
+                    val = -1;
+                newReminder.count = val;
+                break;
+            }
+            return false;
+    }
+    return true;
 }
 
 /**
@@ -1013,17 +1126,18 @@ function sendRemind(user, remind, timer) {
         alter_str += " stop` to end them sooner.";
     }
     alter_str += " See also `-mh help remind` for other options.";
+
     if (remind.fail) {
         usage_str += " There were " + remind.fail + " failures before this got through.\n";
-    }
-    if (remind.fail > 10) {
-        console.log("I am removing a reminder for " + remind.user + " due to too many failures\n");
-        remind.count = 0;
+        if (remind.fail > 10) {
+            console.log("I am removing a reminder for " + remind.user + " due to too many failures\n");
+            remind.count = 0;
+        }
     }
     // console.log("Processed reminder", remind);
     user.send(timer.getAnnounce() + "\n" + usage_str )
-        .then(() => { err = 0; remind.fail = 0; }, //worked
-            () => { err = 1; remind.fail = (remind.fail || 0) + 1; });
+        .then(() => { remind.fail = 0; }, //worked
+            () => { remind.fail = (remind.fail || 0) + 1; });
 }
 
 /**
@@ -1220,7 +1334,7 @@ function listRemind(message) {
 
     const userReminders = reminders.filter(reminder => { return reminder.user === user; });
     userReminders.forEach(reminder => {
-        timer_str += "Timer:\t" + reminder.area;
+        timer_str += "\nTimer:\t" + reminder.area;
         usage_str = "`-mh remind " + reminder.area;
         if (reminder.sub_area) {
             timer_str += " (" + reminder.sub_area + ")";
@@ -1238,7 +1352,6 @@ function listRemind(message) {
 
         if (reminder.fail)
             timer_str += "There have been " + reminder.fail + " failed attempts to activate this reminder.\n";
-        timer_str += "\n";
     });
 
     let err = 0;
@@ -1663,12 +1776,15 @@ function setHunterID(message, hid) {
         message.channel.send("I'm not sure that `" + hid + "` is a number so I am ignoring you.");
         return;
     }
+
+    // Initialize the data for any new registrants.
     if (!hunters[hunter]) {
         hunters[hunter] = {};
         console.log(" OMG! A new hunter " + hunter);
     }
+
+    // If they already registered a hunter ID, update it.
     if (hunters[hunter]['hid']) {
-        //Replace
         message_str = "You used to be known as `" + hunters[hunter]['hid'] + "`. ";
         console.log("Found an old hid");
     }
@@ -1691,7 +1807,7 @@ function setHunterProp(message, property, value) {
     let hunter = message.author.id;
     let message_str = "";
     if ((!hunters[hunter]) || (!hunters[hunter]['hid'])) {
-        message.channel.send("I don't know who you are so you can't set that now, set your hunter ID first");
+        message.channel.send("I don't know who you are so you can't set that now; set your hunter ID first.");
         return;
     }
     if (hunters[hunter][property]) {
