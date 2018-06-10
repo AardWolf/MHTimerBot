@@ -476,7 +476,9 @@ function messageParse(message) {
         case 'arrg':
         case 'aarg':
         default:
-            if (tokens.length > 0) {
+            // TODO: dynamic help text - iterate known keyword commands and their arguments.
+            let usage_str = "";
+            if (tokens.length) {
                 if (tokens[0] === 'next') {
                     usage_str = "Usage: `-mh next [area/sub-area]` will provide a message about the next related occurrence.\n";
                     usage_str += "Areas are Seasonal Garden (**sg**), Forbidden Grove (**fg**), Toxic Spill (**ts**), Balack's Cove (**cove**), and the daily **reset**.\n";
@@ -484,7 +486,7 @@ function messageParse(message) {
                     usage_str += "Example: `-mh next fall` will tell when it is Autumn in the Seasonal Garden."
                 }
                 else if (tokens[0] === 'remind') {
-                    usage_str = "Usage: `-mh remind [area/sub-area] [<number>/always/stop]` will control my reminder function relating to you specifically.\n";
+                    usage_str = "Usage: `-mh remind [area | sub-area] [<number> | always | stop]` will control my reminder function relating to you specifically.\n";
                     usage_str += "Using the word `stop` will turn off a reminder if it exists.\n";
                     usage_str += "Using a number means I will remind you that many times for that timer.\n";
                     usage_str += "Use the word `always` to have me remind you for every occurrence.\n";
@@ -547,7 +549,7 @@ function convertRewardLink(message){
         url: message.content.split(" ")[0],
         method: 'GET',
         followRedirect: false
-    }, function (error, response, body) {
+    }, (error, response, body) => {
         if (!error && response.statusCode == 301) {
             const facebookURL = response.headers.location;
             const mousehuntURL = facebookURL.replace('https://apps.facebook.com/mousehunt', 'https://www.mousehuntgame.com');
@@ -556,7 +558,7 @@ function convertRewardLink(message){
             request({
                 url: 'https://api-ssl.bitly.com/v3/shorten',
                 qs: queryProperties
-            }, function (error, response, body) {
+            }, (error, response, body) => {
                 if (!error && response.statusCode == 200) {
                     const responseJSON = JSON.parse(response.body);
                     console.log("MH reward link converted for non-facebook users");
@@ -1807,19 +1809,16 @@ function setHunterID(message, hid) {
  */
 function setHunterProp(message, property, value) {
     let hunter = message.author.id;
-    let message_str = "";
     if ((!hunters[hunter]) || (!hunters[hunter]['hid'])) {
         message.channel.send("I don't know who you are so you can't set that now; set your hunter ID first.");
         return;
     }
-    if (hunters[hunter][property]) {
-        message_str = "Your " + property + " used to be `" + hunters[hunter][property] + "`. ";
-    }
 
+    let message_str = !hunters[hunter][property] ? "" : `Your ${property} used to be \`${hunters[hunter][property]}\`.`;
     hunters[hunter][property] = value;
-    message_str += "Your " + property + " is set to `" + value + "`."
-
     saveHunters(); // TODO: Change this to a scheduled save
+
+    message_str += `Your ${property} is set to \`${value}\``;
     message.channel.send(message_str);
 }
 
@@ -1893,47 +1892,26 @@ function getNicknames() {
  */
 function getNicknames(type) {
     if (!nickname_urls[type]) {
-        console.log("Received " + type + " but I don't know that URL");
+        console.log(`Received ${type} but I don't know that URL.`);
         return false;
     }
     nicknames[type] = {};
-    //It returns a CSV, not a JSON
+    // It returns a string as CSV, not JSON.
     request({
         url: nickname_urls[type]
-    }, function (error, response, body) {
+    }, (error, response, body) => {
         if (!error && response.statusCode == 200) {
-            lines = body.split(/[\r\n]+/);
-            lines.shift(); // Remove the header
-            for (var i = 0; i < lines.length; i++ ) {
-                line = lines[i].toLowerCase().split(',', 2);
-                if (line.length === 2) {
-                    nicknames[type][line[0]] = line[1];
-                }
+            let rows = body.split(/[\r\n]+/);
+            let headers = rows.shift();
+            for (let row of rows) {
+                let cols = row.toLowerCase().split(',', 2);
+                if (cols.length === 2)
+                    nicknames[type][cols[0]] = cols[1];
             }
         }
-        console.log(Object.keys(nicknames[type]).length + " " + type + " nicknames loaded");
+        console.log(`Loaded ${Object.keys(nicknames[type]).length} nicknames of type '${type}.`);
     });
 }
-
-//function getLootNicknames() {
-//    nicknames["loot"] = {};
-//    var url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQRxGO1iLgX6N2P2iUT57ftCbh5lv_cmnatC6F8NevrdYDtumjcIJw-ooAqm1vIjSu6b0HfP4v2DYil/pub?gid=1181602359&single=true&output=csv";
-//    //It returns a CSV, not a JSON
-//    request({
-//        url: url
-//    }, function (error, response, body) {
-//        if (!error && response.statusCode == 200) {
-//            lines = body.split(/[\r\n]+/);
-//            lines.shift(); // Remove the header
-//            for (var i = 0; i < lines.length; i++ ) {
-//                line = lines[i].toLowerCase().split(',', 2);
-//                if (line.length === 2) {
-//                    nicknames["loot"][line[0]] = line[1];
-//                }
-//            }
-//        }
-//    });
-//}
 
 /**
  * Find the first Discord account for the user with the given input property.
