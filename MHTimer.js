@@ -433,64 +433,9 @@ function parseUserMessage(message) {
         case 'arrg':
         case 'aarg':
         default:
-            // TODO: dynamic help text - iterate known keyword commands and their arguments.
-            let usage_str = "";
-            if (tokens.length) {
-                if (tokens[0] === 'next') {
-                    usage_str = "Usage: `-mh next [area/sub-area]` will provide a message about the next related occurrence.\n";
-                    usage_str += "Areas are Seasonal Garden (**sg**), Forbidden Grove (**fg**), Toxic Spill (**ts**), Balack's Cove (**cove**), and the daily **reset**.\n";
-                    usage_str += "Sub areas are the seasons, open/close, spill ranks, and tide levels\n";
-                    usage_str += "Example: `-mh next fall` will tell when it is Autumn in the Seasonal Garden."
-                }
-                else if (tokens[0] === 'remind') {
-                    usage_str = "Usage: `-mh remind [area | sub-area] [<number> | always | stop]` will control my reminder function relating to you specifically.\n";
-                    usage_str += "Using the word `stop` will turn off a reminder if it exists.\n";
-                    usage_str += "Using a number means I will remind you that many times for that timer.\n";
-                    usage_str += "Use the word `always` to have me remind you for every occurrence.\n";
-                    usage_str += "Just using `-mh remind` will list all your existing reminders and how to turn off each\n";
-                    usage_str += "Areas are Seasonal Garden (**sg**), Forbidden Grove (**fg**), Toxic Spill (**ts**), Balack's Cove (**cove**), and the daily **reset**.\n";
-                    usage_str += "Sub areas are the seasons, open/close, spill ranks, and tide levels\n";
-                    usage_str += "Example: `-mh remind close always` will always PM you 15 minutes before the Forbidden Grove closes.\n";
-                }
-                else if (tokens[0].substring(0,5) === 'sched') {
-                    usage_str = "Usage: `-mh schedule [<area>] [<number>]` will tell you the timers scheduled for the next `<number>` of hours. Default is 24, max is 240.\n";
-                    usage_str += "If you provide an area I will only report on that area.";
-                }
-                else if (tokens[0] === 'find') {
-                    usage_str = "Usage `-mh find <mouse>` will print the top attractions for the mouse, capped at 10.\n";
-                    usage_str += "All attraction data is from <https://mhhunthelper.agiletravels.com/>.\n";
-                    usage_str += "Help populate the database for better information!";
-                }
-                else if (tokens[0] === 'ifind') {
-                    usage_str = "Usage `-mh ifind <item>` will print the top drop rates for the item, capped at 10.\n";
-                    usage_str += "All drop rate data is from <https://mhhunthelper.agiletravels.com/>.\n";
-                    usage_str += "Help populate the database for better information!";
-                }
-                else if (tokens[0] === 'iam') {
-                    usage_str = "Usage `-mh iam <####>` will set your hunter ID. **This must be done before the other options will work.**\n";
-                    usage_str += "  `-mh iam in <location>` will set your hunting location. Nicknames are allowed.\n";
-                    usage_str += "  `-mh iam rank <rank>` will set your rank. Nicknames are allowed.\n";
-                    usage_str += "  `-mh iam not` will remove you from results.\n";
-                    usage_str += "Setting your location and rank means that when people search for those things you can be randomly added to the results.";
-                }
-                else if (tokens[0] === 'whois') {
-                    usage_str = "Usage `-mh whois <####>` will try to look up a Discord user by MH ID. Only works if they set their ID.\n";
-                    usage_str += "  `-mh whois <user>` will try to look up a hunter ID based on a user in the server.\n";
-                    usage_str += "  `-mh whois in <location>` will find up to 5 random hunters in that location.\n";
-                    usage_str += "  `-mh whois rank <rank>` will find up to 5 random hunters with that rank.\n";
-                    usage_str += "Setting your location and rank means that when people search for those things you can be randomly added to the results.";
-                }
-                else {
-                    //TODO: Update this with schedule
-                    usage_str = "I don't know that one but I know `iam`, `whois`, `remind`, `next`, `find`, `ifind`, and `schedule`";
-                }
-            } else {
-                //TODO: Update this with schedule
-                usage_str = "I know the keywords `find`, `ifind`, `next`, `remind`, and `schedule`. \nYou can use `-mh help [find|ifind|next|remind|schedule]` to get specific information about these commands.\n";
-                usage_str += "Example: `-mh help next` provides help about the 'next' keyword, `-mh help remind` provides help about the 'remind' keyword.\n";
-                usage_str += "Pro Tip: **All commands work in PM!**";
-            }
-            message.channel.send(usage_str);
+            let usage_str = getHelpMessage(tokens);
+            // TODO: Send help to PM?
+            message.channel.send(usage_str ? usage_str : "Whoops! That's a bug.");
     }
 }
 
@@ -1379,6 +1324,94 @@ function buildSchedule(timer_request) {
 }
 
 /**
+ * Get the help text.
+ * TODO: Should this be a RichEmbed?
+ * TODO: Dynamically generate this information based on timers, etc.
+ *
+ * @param {string[]} [tokens] An array of user text, the first of which is the specific command to get help for.
+ * @returns {string} The desired help text.
+ */
+function getHelpMessage(tokens) {
+    // TODO: dynamic help text - iterate known keyword commands and their arguments.
+    const keywords = "`iam`, `whois`, `remind`, `next`, `find`, `ifind`, and`schedule`";
+    if (!tokens || !tokens.length) {
+        let genericHelp = [
+            `I know the keywords ${keywords}.`,
+            "You can use `-mh help <keyword>` to get specific information about how to use it.",
+            "Example: `-mh help next` provides help about the 'next' keyword, `-mh help remind` provides help about the 'remind' keyword.",
+            "Pro Tip: **All commands work in PM!**"
+        ];
+        return genericHelp.join("\n");
+    }
+
+    const areaInfo = "Areas are Seasonal Garden (**sg**), Forbidden Grove (**fg**), Toxic Spill (**ts**), Balack's Cove (**cove**), and the daily **reset**.";
+    const subAreaInfo = "Sub areas are the seasons, open/close, spill ranks, and tide levels";
+    const privacyWarning = "Setting your location and rank means that when people search for those things, you can be randomly added to the results.";
+
+    if (tokens[0] === 'next') {
+        return [
+            "Usage: `-mh next [<area> | <sub-area>]` will provide a message about the next related occurrence.",
+            areaInfo,
+            subAreaInfo,
+            "Example: `-mh next fall` will tell when it is Autumn in the Seasonal Garden."
+        ].join("\n");
+    }
+    else if (tokens[0] === 'remind') {
+        return [
+            "Usage: `-mh remind [<area> | <sub-area>] [<number> | always | stop]` will control my reminder function relating to you specifically.",
+            "Using the word `stop` will turn off a reminder if it exists.",
+            "Using a number means I will remind you that many times for that timer.",
+            "Use the word `always` to have me remind you for every occurrence.",
+            "Just using `-mh remind` will list all your existing reminders and how to turn off each",
+            areaInfo,
+            subAreaInfo,
+            "Example: `-mh remind close always` will always PM you 15 minutes before the Forbidden Grove closes."
+        ].join("\n");
+    }
+    else if (tokens[0].substring(0, 5) === 'sched') {
+        return [
+            "Usage: `-mh schedule [<area>] [<number>]` will tell you the timers scheduled for the next `<number>` of hours. Default is 24, max is 240.",
+            "If you provide an area, I will only report on that area.",
+            areaInfo
+        ].join("\n");
+    }
+    else if (tokens[0] === 'find') {
+        return [
+            "Usage `-mh find <mouse>` will print the top attractions for the mouse, capped at 10.",
+            "All attraction data is from <https://mhhunthelper.agiletravels.com/>.",
+            "Help populate the database for better information!"
+        ].join("\n");
+    }
+    else if (tokens[0] === 'ifind') {
+        return [
+            "Usage `-mh ifind <item>` will print the top drop rates for the item, capped at 10.",
+            "All drop rate data is from <https://mhhunthelper.agiletravels.com/>.",
+            "Help populate the database for better information!"
+        ].join("\n");
+    }
+    else if (tokens[0] === 'iam') {
+        return [
+            "Usage `-mh iam <####>` will set your hunter ID. **This must be done before the other options will work.**",
+            "  `-mh iam in <location>` will set your hunting location. Nicknames are allowed.",
+            "  `-mh iam rank <rank>` will set your rank. Nicknames are allowed.",
+            "  `-mh iam not` will remove you from results.",
+            privacyWarning
+        ].join("\n");
+    }
+    else if (tokens[0] === 'whois') {
+        return [
+            "Usage `-mh whois <####>` will try to look up a Discord user by MH ID. Only works if they set their ID.",
+            "  `-mh whois <user>` will try to look up a hunter ID based on a user in the server.",
+            "  `-mh whois in <location>` will find up to 5 random hunters in that location.",
+            "  `-mh whois rank <rank>` will find up to 5 random hunters with that rank.",
+            privacyWarning
+        ].join("\n");
+    }
+    else
+        return `I don't know that one but I do know ${keywords}.`;
+}
+
+/**
  * Initialize (or refresh) the known mice lists from @devjacksmith's tools.
  * Updates the mouse nicknames as well.
  */
@@ -1543,47 +1576,6 @@ function findMouse(channel, args, command) {
 }
 
 /**
- * Interrogate the local 'hunters' data object to find self-registered hunters that match the requested
- * criteria.
- *
- * @param {Message} message the Discord message that initiated this search
- * @param {string[]} searchValues an array of hids, snuids, or names/mentions to search for.
- * @param {string} type the method to use to find the member
- */
-function findHunter(message, searchValues, type) {
-    const noPM = ["hid", "snuid", "name"];
-    if (!message.guild && noPM.indexOf(type) !== -1) {
-        message.channel.send(`Searching by ${type} isn't allowed via PM.`);
-        return;
-    }
-
-    let discordId;
-    if (type === "name") {
-        // Use message text or mentions to obtain the discord ID.
-        let member = message.mentions.members.first() || message.guild.members
-            .filter(member => member.displayName.toLowerCase() === searchValues[0].toLowerCase()).first();
-        if (member)
-            discordId = member.id;
-    } else {
-        // This is self-volunteered information that is tracked.
-        discordId = getHunterByID(searchValues[0], type);
-    }
-    if (!discordId) {
-        message.channel.send(`I did not find a registered hunter with \`${searchValues[0]}\` as a ${type === "hid" ? "hunter ID" : type}.`);
-        return;
-    }
-    // Require that this Discord user has volunteered their information (i.e. the id appears in the 'hunters' object).
-    const hunterId = getHunterByDiscordID(discordId);
-    client.fetchUser(discordId)
-        .then(user => {
-            message.guild.fetchMember(user)
-                .then(member => message.channel.send(`\`${searchValues[0]}\` is ${member.displayName} <https://mshnt.ca/p/${hunterId}>`))
-                .catch(err => message.channel.send("That person may not be on this server."))
-        })
-        .catch(err => message.channel.send("That person may not have a Discord account any longer."));
-}
-
-/**
  * Initialize (or refresh) the known loot lists from @devjacksmith's tools.
  * Updates the loot nicknames as well.
  */
@@ -1744,6 +1736,47 @@ function findItem(channel, args, command) {
             getMouseList();
         }
     }
+}
+
+/**
+ * Interrogate the local 'hunters' data object to find self-registered hunters that match the requested
+ * criteria.
+ *
+ * @param {Message} message the Discord message that initiated this search
+ * @param {string[]} searchValues an array of hids, snuids, or names/mentions to search for.
+ * @param {string} type the method to use to find the member
+ */
+function findHunter(message, searchValues, type) {
+    const noPM = ["hid", "snuid", "name"];
+    if (!message.guild && noPM.indexOf(type) !== -1) {
+        message.channel.send(`Searching by ${type} isn't allowed via PM.`);
+        return;
+    }
+
+    let discordId;
+    if (type === "name") {
+        // Use message text or mentions to obtain the discord ID.
+        let member = message.mentions.members.first() || message.guild.members
+            .filter(member => member.displayName.toLowerCase() === searchValues[0].toLowerCase()).first();
+        if (member)
+            discordId = member.id;
+    } else {
+        // This is self-volunteered information that is tracked.
+        discordId = getHunterByID(searchValues[0], type);
+    }
+    if (!discordId) {
+        message.channel.send(`I did not find a registered hunter with \`${searchValues[0]}\` as a ${type === "hid" ? "hunter ID" : type}.`);
+        return;
+    }
+    // Require that this Discord user has volunteered their information (i.e. the id appears in the 'hunters' object).
+    const hunterId = getHunterByDiscordID(discordId);
+    client.fetchUser(discordId)
+        .then(user => {
+            message.guild.fetchMember(user)
+                .then(member => message.channel.send(`\`${searchValues[0]}\` is ${member.displayName} <https://mshnt.ca/p/${hunterId}>`))
+                .catch(err => message.channel.send("That person may not be on this server."))
+        })
+        .catch(err => message.channel.send("That person may not have a Discord account any longer."));
 }
 
 /**
