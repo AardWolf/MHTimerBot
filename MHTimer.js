@@ -198,7 +198,7 @@ function createTimersList(resolve, reject) {
         }
 
         var obj = JSON.parse(data);
-        for (var i = 0; i < obj.length; i++ )
+        for (let i = 0; i < obj.length; i++ )
             timers_list.push(new Timer(obj[i]));
     });
 }
@@ -228,7 +228,7 @@ function createTimedAnnouncements(channel) {
             channel);
         timer.storeTimeout(timeout);
     });
-    console.log ("Let's say that " + timers_list.length + " timeouts got created");
+    console.log (`Let's say that ${timers_list.length} timeouts got created`);
 }
 
 /**
@@ -886,21 +886,23 @@ function parseTokenForCount(token, newReminder) {
  * Returns the next occurrence of the class of timers as a RichEmbed, or a string if no
  * Timer matched the input TimerRequest.
  * TODO - this should take an array as an argument and process the words passed in
- * @param {any} timerName
+ * @param {ReminderRequest} timerName
  * @returns {RichEmbed|string}
  */
 function nextTimer(timerName) {
     // Inspect all known timers to determine the one that matches the requested area, and occurs soonest.
     const area = timerName.area,
-        sub = timerName.sub_area;
+        sub = timerName.sub_area,
+        areaTimers = timers_list.filter(timer => { return timer.getArea() === area; });
+
     let nextTimer;
-    for (let timer of timers_list)
-        if (timer.getArea() === area)
-            if (!sub || sub === timer.getSubArea())
-                if (!nextTimer || timer.getNext() < nextTimer.getNext())
-                    nextTimer = timer;
+    for (let timer of areaTimers)
+        if (!sub || sub === timer.getSubArea())
+            if (!nextTimer || timer.getNext() < nextTimer.getNext())
+                nextTimer = timer;
 
     if (!nextTimer) {
+        // Prepare a detailed list of known timers and their sub-areas.
         let details = {};
         timers_list.forEach(timer => {
             let area = `\`${timer.getArea()}\``;
@@ -927,7 +929,7 @@ function nextTimer(timerName) {
             // Putting here makes it look nicer and fit in portrait mode
             + "\nTo schedule this reminder: `" + sched_syntax + "`"
         )
-        .setTimestamp(nextTimer.getNext().toJSDate()))
+        .setTimestamp(nextTimer.getNext().toJSDate())
         .setFooter("at") // There has to be something in here or there is no footer
     );
 }
@@ -958,7 +960,7 @@ function timeLeft(in_date) {
     units.forEach(unit => {
         let val = remaining.get(unit);
         if (val)
-            labels.push(String(val) + ((val !== 1) ? "s" : ""));
+            labels.push(`${val}${(val !== 1) ? "s" : ""}`);
     });
     // `labels` should not be empty at this point.
 
@@ -1934,31 +1936,29 @@ function getNicknames(type) {
 //}
 
 /**
- * Find the Discord account for the user with the given hunter ID
+ * Find the first Discord account for the user with the given input property.
+ * Returns undefined if no registered user has the given property.
  *
- * @param {string} hid The hunter ID to look up
- * @param {string} type (should be 'hid', but could be any property).
- * @returns {any} The discord ID, or undefined if the hunter ID was not registered.
+ * @param {string} input The property value to attempt to match.
+ * @param {string} type Any stored property type (typically fairly-unique ones such as 'snuid' or 'hid').
+ * @returns {string?} The discord ID, or undefined if the hunter ID was not registered.
  */
-function getHunterByID(hid, type) {
+function getHunterByID(input, type) {
     for (let key in hunters)
-        if (hunters[key][type] === hid)
+        if (hunters[key][type] === input)
             return key;
-
-    return "No hunter with that id.";
 }
 
 /**
- * Find the account for the user identified by the author.id. Easiest case
+ * Find the self-registered account for the user identified by the given Discord ID.
+ * Returns undefined if the user has not self-registered.
  * 
- * @param {string} id the Discord ID of a registered hunter.
- * @returns {string} the hunter ID of the registered hunter having that Discord ID.
+ * @param {string} discordId the Discord ID of a registered hunter.
+ * @returns {string?} the hunter ID of the registered hunter having that Discord ID.
  */
-function getHunterByDiscordID(id) {
-    if (hunters[id] && hunters[id]["hid"])
-        return hunters[id]["hid"]
-
-    return 0;
+function getHunterByDiscordID(discordId) {
+    if (hunters[discordId])
+        return hunters[discordId]["hid"]
 }
 
 /**
@@ -1969,13 +1969,11 @@ function getHunterByDiscordID(id) {
  * @returns {string[]} an array of up to 5 hunter ids where the property value matched the user's criterion
  */
 function getHunterByProp(property, criterion) {
-    const valid = [];
-    Object.keys(hunters).forEach(key => {
-        if (hunters[key][property] === criterion)
-            valid.push(hunters[key].hid);
-    });
+    const valid = Object.keys(hunters)
+        .filter(key => (hunters[key][property] === criterion))
+        .map(key => (hunters[key].hid));
 
-    return valid.sort(() => { return 0.5 - Math.random() }).slice(0, 5);
+    return valid.sort(() => { return 0.5 - Math.random(); }).slice(0, 5);
 }
 
 /**
