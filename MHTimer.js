@@ -134,9 +134,9 @@ function Main() {
                     break;
                 default:
                     if (message.channel.type === 'dm') {
-                        messageParse(message);
+                        parseUserMessage(message);
                     } else if (message.content.startsWith('-mh ')) {
-                        messageParse(message);
+                        parseUserMessage(message);
                     }
                     break;
             }
@@ -237,238 +237,195 @@ function createTimedAnnouncements(channel) {
  *
  * @param {Message} message a Discord message to parse
  */
-function messageParse(message) {
-    var tokens = [];
-    tokens = splitString(message.content);
+function parseUserMessage(message) {
+    const tokens = splitString(message.content);
+    if (!tokens.length) {
+        message.channel.send("What is happening???");
+        return;
+    }
 
-    if (tokens[0] === '-mh') // coming from chat channel '-mh command...'
+    // Messages that come in from public chat channels will be prefixed with '-mh'.
+    if (tokens[0] === '-mh')
         tokens.shift();
 
-    var command = tokens.shift();
-    var timerName; // This has area and sub_area possibly defined
-    if (typeof command === 'undefined') {
-        message.channel.send("I didn't understand but you can ask me for help");
+    const command = tokens.shift();
+    if (!command) {
+        message.channel.send("I didn't understand, but you can ask me for help.");
         return;
-    } else {
-        if (tokens.length >= 1) {
-            timerName = timerAliases(tokens);
-        } else {
-            timerName = {};
-        }
     }
-    var usage_string;
+
+    // Parse the message to see if it matches any known timer areas, sub-areas, or has count information.
+    const reminderRequest = tokens.length ? timerAliases(tokens) : {};
+
     switch (command.toLowerCase()) {
+        // Display information about the next instance of a timer.
         case 'next':
-            //TODO - This should be a PM, probably?
-            if ((tokens.length === 0) || (typeof timerName.area === 'undefined')) {
-                if (typeof(tokens[0]) !== 'undefined') {
-                    switch (tokens[0]) {
-                        case 'ronza':
-                            message.channel.send("Don't let aardwolf see you ask or you'll get muted"); //maybe add random things here
-                            break;
-                        default:
-                            message.channel.send("Did you want to know about sg, fg, reset, spill, or cove?");
-                    }
+            let aboutTimers = "Did you want to know about `sg`, `fg`, `reset`, `spill`, or `cove`?";
+            if (!tokens.length) {
+                // received "-mh next" -> display the help string.
+                // TODO: pretty-print known timer info
+                message.channel.send(aboutTimers);
+            } else if (!reminderRequest.area) {
+                // received "-mh next <words>", but the words didn't match any known timer information.
+                // Currently, the only other information we handle is RONZA.
+                switch (tokens[0].toLowerCase()) {
+                    case 'ronza':
+                        message.channel.send("Don't let aardwolf see you ask or you'll get muted");
+                        // TODO: increment hunters[id] info? "X has delayed ronza by N years for asking M times"
+                        break;
+                    default:
+                        message.channel.send(aboutTimers);
                 }
             } else {
-                var retStr = nextTimer(timerName);
-                if (typeof retStr === "string") {
-                    message.channel.send(retStr);
-                } else {
-                    message.channel.send("", {embed: retStr} );
-                }
+                // Display information about this known timer.
+                let timerInfo = nextTimer(reminderRequest);
+                if (typeof timerInfo === "string")
+                    message.channel.send(timerInfo);
+                else
+                    message.channel.send("", { embed: timerInfo });
             }
-            // console.log(typeof retStr);
             break;
+
+        // Display or update the user's reminders.
         case 'remind':
-            usage_string = "Usage: `-mh remind <sg|fg|reset|spill|cove> [once|stop|always|<num>]` where once/stop/num/always are optional"; // save this for a help
-            if ((tokens.length === 0) || (typeof timerName.area === 'undefined')) {
+            // TODO: redirect responses to PM.
+            if (!tokens.length || !reminderRequest.area)
                 listRemind(message);
-                // message.channel.send("Did you want me to remind you for sg, fg, reset, spill, or cove?\n" + usage_string);
-            } else {
-                addRemind(timerName, message);
-            }
+            else
+                addRemind(reminderRequest, message);
             break;
+
+        // Display information about upcoming timers.
         case 'sched':
         case 'itin':
         case 'agenda':
         case 'itinerary':
         case 'schedule':
-            usage_str = "Not implemented yet";
-            var hours = 24;
-            if ((tokens.length === 0) || (typeof timerName.count === 'undefined')) {
-                timerName.count = 24;
-            }
-            usage_str = buildSchedule(timerName);
-            var part_str;
-            var curr_count = 0;
+            // Default the searched time period to 24 hours if it was not specified.
+            reminderRequest.count = reminderRequest.count || 24;
+
+            let usage_str = buildSchedule(reminderRequest);
+            // Discord limits messages to 2000 characters, so use multiple messages if necessary.
             while (usage_str.length > 2000) {
-                part_str = usage_str.substr(0,usage_str.lastIndexOf('\n',2000));
+                let part_str = usage_str.substr(0, usage_str.lastIndexOf('\n', 2000));
                 message.channel.send(part_str);
                 usage_str = usage_str.substr(part_str.length);
             }
-            //Issue 39, use the channel the request came in on
-            //message.author.send(usage_str);
             message.channel.send(usage_str);
             break;
+
+        // Display information about the desired mouse.
         case 'find':
         case 'mfind':
-            if (tokens.length == 0) {
-                message.channel.send("You have to supply mice to find");
-            }
+            if (!tokens.length)
+                message.channel.send("You have to supply mice to find.");
             else {
-                var searchStr = tokens.join(" ").trim().toLowerCase().replace(/ mouse$/,'');
-                if (searchStr.length < 3) {
-                    message.channel.send("Your search string was too short, try again");
-                } else {
-                    findMouse(message.channel, searchStr, 'find');
-                }
+                let criteria = tokens.join(" ").trim().toLowerCase().replace(/ mouse$/,'');
+                if (criteria.length < 3)
+                    message.channel.send("Your search string was too short, try again.");
+                else
+                    findMouse(message.channel, criteria, 'find');
             }
             break;
+
+        // Display information about the desired item.
         case 'ifind':
-            if (tokens.length == 0) {
+            if (!tokens.length)
                 message.channel.send("You have to supply an item to find");
-            }
             else {
-                var searchStr = tokens.join(" ").trim().toLowerCase();
-                if (searchStr.length < 3) {
-                    message.channel.send("Your search string was too short, try again");
-                } else {
-                    findItem(message.channel, searchStr, 'ifind');
-                }
+                let criteria = tokens.join(" ").trim().toLowerCase();
+                if (criteria.length < 3)
+                    message.channel.send("Your search string was too short, try again.");
+                else
+                    findItem(message.channel, criteria, 'ifind');
             }
             break;
+
+        // Update information about the user volunteered by the user.
         case 'iam':
-            if (tokens.length == 0) {
-                message.channel.send("Yes, you are. Provide a hunter ID to set that.");
-            }
-            else if ((tokens.length == 1) && !isNaN(tokens[0])) {
+            if (!tokens.length)
+                message.channel.send("Yes, you are. Provide a hunter ID number to set that.");
+            else if (tokens.length === 1 && !isNaN(tokens[0]))
                 setHunterID(message, tokens[0]);
-            }
-            else if ((tokens.length == 1) && (tokens[0].toLowerCase() === "not")) {
+            else if (tokens.length === 1 && tokens[0].toLowerCase() === "not")
                 unsetHunterID(message);
-            }
             else {
-                if ((tokens[0].toLowerCase() === "in") && (tokens[1])) {
-                    tokens.shift();
-                    var loc = tokens.join(" ").toLowerCase();
-                    if (nicknames["locations"][loc]) {
-                        loc = nicknames["locations"][loc];
-                    }
-                    setHunterProp(message, "location", loc);
+                // received -mh iam <words>. The user can specify where they are hunting, their rank/title, or their in-game id.
+                // Nobody should need this many tokens to specify their input, but someone is gonna try for more.
+                let userText = tokens.slice(1, 10).join(" ").trim().toLowerCase();
+                if (tokens[0].toLowerCase() === "in") {
+                    if (nicknames["locations"][userText])
+                        userText = nicknames["locations"][userText];
+                    setHunterProperty(message, "location", userText);
                 }
-                else if (((tokens[0].toLowerCase() === "rank") || (tokens[0].toLowerCase() === "title")
-                                || (tokens[0].toLowerCase() === "a"))
-                            && (tokens[1])) {
-                    tokens.shift();
-                    var rank = tokens.join(" ").toLowerCase();
-                    if (nicknames["ranks"][rank]) {
-                        rank = nicknames["ranks"][rank];
-                    }
-                    setHunterProp(message, "rank", rank);
+                else if (["rank", "title", "a"].indexOf(tokens[0].toLowerCase()) !== -1) {
+                    if (nicknames["ranks"][userText])
+                        userText = nicknames["ranks"][userText];
+                    setHunterProperty(message, "rank", userText);
                 }
-                else if ((tokens[0].toLowerCase().substring(0,3) === "snu") && (tokens[1])) {
-                    tokens.shift();
-                    var snuid = tokens.join(" ").toLowerCase();
-                    setHunterProp(message, "snuid", snuid);
-                }
-                else {
+                else if (tokens[0].toLowerCase().substring(0, 3) === "snu" && tokens[1])
+                    setHunterProperty(message, "snuid", userText);
+                else
                     message.channel.send("I'm not sure what to do with that:\n  `-mh iam ###` to set a hunter ID.\n  `-mh iam rank <rank>` to set a rank.\n  `-mh iam in <location>` to set a location");
-                }
             }
             break;
+
+        // Display volunteered information about known users. Handled inputs:
+        /**
+         * -mh whois ####                   -> hid lookup (No PM)
+         * -mh whois snuid ####             -> snuid lookup (No PM)
+         * -mh whois <word/@mention>        -> name lookup (No PM)
+         * -mh whois in <words>             -> area lookup
+         * -mh whois [rank|title|a] <words> -> random query lookup
+         */
         case 'whois':
-            if (tokens.length == 0) {
+            if (!tokens.length) {
                 message.channel.send("Who's who? Who's on first?");
+                return;
             }
-            else if (((tokens.length == 1) && !isNaN(tokens[0])) ||
-                     ((tokens[0].toLowerCase().substring(0, 3) === "snu") &&
-                      (tokens.length == 2)))
-            {
-                var type = "hid";
-                if (tokens.length == 2) {
-                    // snuid lookup
-                    type = "snuid";
-                    tokens.shift();
-                }
-                if (!message.guild) {
-                    message.channel.send("I cannot do this in PM");
-                    return;
-                }
-                var discord_id = getHunterByID(tokens[0], type);
-                if (!discord_id) {
-                    message.channel.send("I did not find a hunter with `" + tokens[0] + "` as a hunter ID");
-                    return;
-                }
-                var hid = getHunterByDiscordID(discord_id);
-                client.fetchUser(discord_id)
-                    .then(user => {
-                        message.guild.fetchMember(user)
-                            .then(member => {
-                                message.channel.send("`" + tokens[0] + "` is " + member.displayName + " <https://mshnt.ca/p/" +
-                                     hid + ">");
-                            })
-                            .catch(err => {message.channel.send("That person may not be on this server")} );
-                    })
-                    .catch(err => {message.channel.send("That person may not have a Discord account any more")} );
+
+            let searchType = tokens.shift().toLowerCase();
+            if (!isNan(parseInt(searchType, 10))) {
+                // hid lookup of 1 or more IDs.
+                tokens.unshift(parseInt(searchType, 10));
+                findHunter(message, tokens, "hid");
+                return;
             }
-            else if (tokens.length == 1) {
-                var member;
-                if (message.guild) {
-                    let member = message.mentions.members.first() || message.guild.members
-                        .filter(mem => (mem.displayName.toLowerCase() === tokens[0].toLowerCase()))
-                        .first();
-                    if (!member) {
-                        message.channel.send("Sorry, I couldn't figure out who you're looking for.");
-                    } else {
-                        var hunter_id = getHunterByDiscordID(message, member.id);
-                        if (hunter_id) {
-                            message.channel.send(member.displayName + " is `" + hunter_id + "` <https://mshnt.ca/p/" + hunter_id + ">");
-                        } else {
-                            message.channel.send("It looks like " + tokens[0] + " didn't set their hunter ID ");
-                        }
-                    }
-                }
-                else {
-                    message.channel.send("I cannot look up users by name in a PM");
-                    return;
-                }
+            else if (searchType.substring(0, 3) === "snu") {
+                // snuid lookup of 1 or more IDs.
+                findHunter(message, tokens, "snuid");
+                return;
+            }
+            else if (!tokens.length) {
+                // Display name or user mention lookup.
+                tokens.unshift(searchType);
+                findHunter(message, tokens, "name");
+                return;
             }
             else {
-                var hunters = [];
-                var property = tokens[0];
-                var search = tokens.join(" ");
-                if ((tokens[0].toLowerCase() === "in") && (tokens[1])) {
-                    tokens.shift();
-                    var loc = tokens.join(" ").toLowerCase();
-                    if (nicknames["locations"][loc]) {
-                        loc = nicknames["locations"][loc];
+                // Rank or location lookup. tokens[] contains the terms to search
+                let search = tokens.join(" ").toLowerCase();
+                if (searchType === "in") {
+                    if (nicknames["locations"][search]) {
+                        search = nicknames["locations"][search];
                     }
-                    property = "location";
-                    search = loc;
-                    hunters = getHunterByProp("location", loc);
+                    searchType = "location";
                 }
-                else if (((tokens[0].toLowerCase() === "rank") || (tokens[0].toLowerCase() === "title")
-                            || (tokens[0].toLowerCase() === "a"))
-                            && (tokens[1])) {
-                    tokens.shift();
-                    var rank = tokens.join(" ").toLowerCase();
-                    if (nicknames["ranks"][rank]) {
-                        rank = nicknames["ranks"][rank];
+                else if (["rank", "title", "a"].indexOf(searchType) !== -1) {
+                    if (nicknames["ranks"][search]) {
+                        search = nicknames["ranks"][search];
                     }
-                    property = "rank";
-                    search = rank;
-                    hunters = getHunterByProp("rank", rank);
+                    searchType = "rank";
                 }
                 else {
                     message.channel.send("I'm not sure what to do with that:\n  `-mh whois [###|<mention>]` to look up specific hunters.\n  `-mh whois [in|a] [<location>|<rank>]` to find up to 5 random new friends.");
+                    return;
                 }
-                if (hunters.length) {
-//                    console.log(hunters);
-                    message.channel.send(hunters.length + " random hunters: `" + hunters.join("`, `") + "`");
-                } else {
-                    message.channel.send("I couldn't find any hunters with `" + property + "` matching `" + (search) + "`");
-                }
+                const hunters = getHuntersByProperty(searchType, search);
+                message.channel.send(hunters.length
+                    ? `${hunters.length} random hunters: \`${hunters.join("\`, \`")}\``
+                    : `I couldn't find any hunters with \`${searchType}\` matching \`${search}\``
+                );
             }
             break;
 
@@ -1586,6 +1543,47 @@ function findMouse(channel, args, command) {
 }
 
 /**
+ * Interrogate the local 'hunters' data object to find self-registered hunters that match the requested
+ * criteria.
+ *
+ * @param {Message} message the Discord message that initiated this search
+ * @param {string[]} searchValues an array of hids, snuids, or names/mentions to search for.
+ * @param {string} type the method to use to find the member
+ */
+function findHunter(message, searchValues, type) {
+    const noPM = ["hid", "snuid", "name"];
+    if (!message.guild && noPM.indexOf(type) !== -1) {
+        message.channel.send(`Searching by ${type} isn't allowed via PM.`);
+        return;
+    }
+
+    let discordId;
+    if (type === "name") {
+        // Use message text or mentions to obtain the discord ID.
+        let member = message.mentions.members.first() || message.guild.members
+            .filter(member => member.displayName.toLowerCase() === searchValues[0].toLowerCase()).first();
+        if (member)
+            discordId = member.id;
+    } else {
+        // This is self-volunteered information that is tracked.
+        discordId = getHunterByID(searchValues[0], type);
+    }
+    if (!discordId) {
+        message.channel.send(`I did not find a registered hunter with \`${searchValues[0]}\` as a ${type === "hid" ? "hunter ID" : type}.`);
+        return;
+    }
+    // Require that this Discord user has volunteered their information (i.e. the id appears in the 'hunters' object).
+    const hunterId = getHunterByDiscordID(discordId);
+    client.fetchUser(discordId)
+        .then(user => {
+            message.guild.fetchMember(user)
+                .then(member => message.channel.send(`\`${searchValues[0]}\` is ${member.displayName} <https://mshnt.ca/p/${hunterId}>`))
+                .catch(err => message.channel.send("That person may not be on this server."))
+        })
+        .catch(err => message.channel.send("That person may not have a Discord account any longer."));
+}
+
+/**
  * Initialize (or refresh) the known loot lists from @devjacksmith's tools.
  * Updates the loot nicknames as well.
  */
@@ -1807,7 +1805,7 @@ function setHunterID(message, hid) {
  * @param {string} property the property key for the given user, e.g. 'hid', 'rank', 'location'
  * @param {any} value the property's new value.
  */
-function setHunterProp(message, property, value) {
+function setHunterProperty(message, property, value) {
     let hunter = message.author.id;
     if ((!hunters[hunter]) || (!hunters[hunter]['hid'])) {
         message.channel.send("I don't know who you are so you can't set that now; set your hunter ID first.");
@@ -1946,7 +1944,7 @@ function getHunterByDiscordID(discordId) {
  * @param {string} criterion user-entered input.
  * @returns {string[]} an array of up to 5 hunter ids where the property value matched the user's criterion
  */
-function getHunterByProp(property, criterion) {
+function getHuntersByProperty(property, criterion) {
     const valid = Object.keys(hunters)
         .filter(key => (hunters[key][property] === criterion))
         .map(key => (hunters[key].hid));
