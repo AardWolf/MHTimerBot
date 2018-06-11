@@ -1446,133 +1446,115 @@ function getMouseList() {
     getNicknames("mice");
 }
 
+/**
+ * Query @devjacksmith's database for information about the desired mouse.
+ *
+ * @param {TextChannel} channel the channel on which to respond.
+ * @param {string} args a lowercased string of search criteria.
+ * @param {string} command the command switch used to arrive in this function. For a mouse lookup, this will be 'find'. If searching for a mouse with items, will be 'ifind'.
+ */
 function findMouse(channel, args, command) {
     //NOTE: RH location is https://mhhunthelper.agiletravels.com/tracker.json
-    var url = 'https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=mouse';
-    var retStr = "'" + args + "' not found";
-    var found = 0;
-    var orig_args = args;
+    let url = 'https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=mouse';
+    let retStr = "'" + args + "' not found";
 
-    //Process args for flags
-    event = "";
-    argArray = args.split(/\s+/);
-    if (argArray.length > 2) {
-        if (argArray[0] == "-e") {
-            event = argArray[1];
-            url += "&timefilter=" + event;
-            argArray.splice(0, 2);
+    // Deep copy the input args, in case we modify them.
+    const orig_args = JSON.parse(JSON.stringify(args));
+
+    //Process args for flags, like the -e event filter.
+    let tokens = args.split(/\s+/);
+    if (tokens.length > 2) {
+        if (tokens[0] === "-e") {
+            url += "&timefilter=" + tokens[1];
+            tokens.splice(0, 2);
         }
-        args = argArray.join(" ");
+        args = tokens.join(" ");
     }
-    //Check if it's a nickname
-    if (nicknames["mice"][args]) {
+    // If the input was a nickname, convert it to the queryable value.
+    if (nicknames["mice"][args])
         args = nicknames["mice"][args];
-    }
 
 
-
-    var len = args.length;
-    var mouseID = 0;
-    var mouseName;
-    var attractions = [];
-    var stage_used = 0;
-//    console.log("Check for a string length of " + len)
-    for (let i = 0; (i < mice.length && !found); i++) {
-        if (mice[i].lowerValue.substring(0,len) === args) {
-//            retStr = "'" + args + "' is '" + mice[i].value + "' AKA " + mice[i].id;
-            mouseID = mice[i].id;
-            mouseName = mice[i].value;
+    const MATCH_LENGTH = args.length;
+    for (let i = 0; i < mice.length; i++)
+        if (mice[i].lowerValue.substring(0, MATCH_LENGTH) === args) {
+            let mouseID = mice[i].id;
+            let mouseName = mice[i].value;
             url += "&item_id=" + mouseID;
-//            console.log("Lookup: " + url);
-            request( {
+            request({
                 url: url,
                 json: true
-            }, function (error, response, body) {
-//                console.log("Doing a lookup");
-                if (!error && response.statusCode == 200 && Array.isArray(body)) {
-                    //body is an array of objects with: location, stage, total_hunts, rate, cheese
-                    // sort by "rate" but only if hunts > 100
-                    var attractions = [];
-                    var collengths = { location: 0, stage: 0, total_hunts: 0, cheese: 0};
-                    for (let j = 0; j < body.length; j++) {
-                        if (body[j].total_hunts >= 100) {
-                            attractions.push(
-                                {   location: body[j].location,
-                                    stage: (body[j].stage === null) ? " N/A " : body[j].stage,
-                                    total_hunts: body[j].total_hunts,
-                                    rate: body[j].rate,
-                                    cheese: body[j].cheese
-                                } );
-                        }
-                    }
+            }, (error, response, body) => {
+                const attractions = [];
+                if (!error && response.statusCode === 200 && Array.isArray(body)) {
+                    // body is an array of objects with: location, stage, total_hunts, rate, cheese
+                    // Sort it by "rate" but only if hunts > 100
+                    body.filter(setup => (setup.total_hunts > 99)).forEach(setup => {
+                        attractions.push(
+                            {
+                                location: setup.location,
+                                stage: setup.stage ? setup.stage : " N/A ",
+                                total_hunts: integerComma(setup.total_hunts),
+                                rate: setup.rate * 1.0 / 100,
+                                cheese: setup.cheese
+                            });
+                    });
                 } else {
-                    console.log("Lookup failed for some reason", error, response, body);
-                    retStr = "Could not process results for '" + args + "', AKA " + mouseName;
-                    channel.send(retStr);
+                    console.log("Lookup failed for some reason:", error, response, body);
+                    channel.send(`Could not process results for '${args}', AKA ${mouseName}`);
+                    return;
                 }
-                //now to sort that by AR, descending
-                attractions.sort( function (a,b) {
-                    return b.rate - a.rate;
-                });
-                //And then to make a nice output. Or an output
-                retStr = "";
-                if (attractions.length > 0) {
-                    attractions.unshift({ location: "Location", stage: "Stage", total_hunts: "Hunts", rate: "AR", cheese: "Cheese"});
-                    attractions.splice(11);
-                    for (var j = 0; j < attractions.length; j++) {
-                        if (j > 0) {
-                            attractions[j].total_hunts = integerComma(attractions[j].total_hunts);
-                        }
-                        for (var field in collengths) {
-                            if ( attractions[j].hasOwnProperty(field) &&
-                                (attractions[j][field].length > collengths[field])) {
-                                collengths[field] = attractions[j][field].length;
-                            }
-                        }
-                        if (j > 0 && attractions[j].stage != " N/A ") {
-                          stage_used = 1;
-                        }
-                    }
-                    retStr += attractions[0].location.padEnd(collengths.location) + ' |';
-                    if (stage_used === 1) {
-                        retStr += attractions[0].stage.padEnd(collengths.stage) + ' |' ;
-                    } else {
-                        collengths.stage = 0;
-                    }
-                    retStr += attractions[0].cheese.padEnd(collengths.cheese) + ' |' ;
-                    retStr += attractions[0].rate.padEnd(7) + ' |';
-                    retStr += attractions[0].total_hunts.padEnd(collengths.total_hunts);
-                    retStr += "\n";
-                    retStr += '='.padEnd(collengths.location + collengths.stage + collengths.cheese + 15 + collengths.total_hunts,'=') + "\n";
-                    for (var j = 1; j < attractions.length ; j++) {
-                        retStr += attractions[j].location.padEnd(collengths.location) + ' |';
-                        if (stage_used === 1) {
-                            retStr += attractions[j].stage.padEnd(collengths.stage) + ' |' ;
-                        }
-                        retStr += attractions[j].cheese.padEnd(collengths.cheese) + ' |' ;
-                        retStr += String((attractions[j].rate * 1.0 / 100)).padStart(6) + '% |';
-                        retStr += attractions[j].total_hunts.padStart(collengths.total_hunts);
-                        retStr += "\n";
-                    }
-                    retStr = mouseName + " (mouse) can be found the following ways:\n```\n" + retStr + "\n```\n";
-                    retStr += "HTML version at: <https://mhhunthelper.agiletravels.com/?mouse=" + mouseID + ">";
-                } else {
-                    retStr = mouseName + " either hasn't been seen enough or something broke";
+                
+                // If there was a result, create a nice-looking table from the data.
+                let retStr = "";
+                if (attractions.length) {
+                    // Sort that by Attraction Rate, descending.
+                    attractions.sort((a, b) => { return b.rate - a.rate; });
+                    // Keep only the top 10 results.
+                    attractions.splice(10);
+
+                    // Column Formatting specification.
+                    /** @type {Object <string, ColumnFormatOptions>} */
+                    const columnFormatting = {};
+
+                    // Specify the column order.
+                    const order = ["location", "stage", "cheese", "rate", "total_hunts"];
+                    // Inspect the attractions array to determine if we need to include the stage column.
+                    if (attractions.every(row => (row.stage === " N/A ")))
+                        order.splice(order.indexOf("stage"), 1);
+
+                    // Build the header row.
+                    const labels = { location: "Location", stage: "Stage", total_hunts: "Hunts", rate: "AR", cheese: "Cheese" }
+                    const headers = order.map(key => {
+                        columnFormatting[key] = {columnWidth: labels[key].length};
+                        return { 'key': key, 'label': labels[key] };
+                    })
+
+                    // Give the numeric column proper formatting.
+                    columnFormatting['rate'] = {
+                        alignRight: true,
+                        isFixedWidth: true,
+                        columnWidth: 7,
+                        suffix = "%"
+                    };
+
+                    let table = prettyPrintArrayAsString(attractions, columnFormatting, headers, "=");
+                    retStr = `${mouseName} (mouse) can be found the following ways:\n\`\`\`\n${table}\n\`\`\`\n`;
+                    retStr += `HTML version at: <https://mhhunthelper.agiletravels.com/?mouse=${mouseID}>`;
                 }
+                else
+                    retStr = `${mouseName} either hasn't been seen enough, or something broke.`;
                 channel.send(retStr);
             });
-            found = 1;
+            return;
         }
-    }
-    if (!found) {
-        //If this was an item find try finding a mouse
-        if (command === 'find') {
-            findItem(channel, orig_args, command);
-        } else {
-//        console.log("Nothing found for '", args, "'");
-            channel.send(retStr);
-            getItemList();
-        }
+
+    // No matching mouse was found. If this was an item, find try finding a mouse.
+    if (command === 'find') {
+        findItem(channel, orig_args, command);
+    } else {
+        channel.send(retStr);
+        getItemList();
     }
 }
 
