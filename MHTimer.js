@@ -1995,6 +1995,131 @@ function integerComma(number) {
     return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
+/**
+ * @typedef {Object} ColumnFormatOptions
+ * @property {number} [columnWidth] The total width of the largest value in the column
+ * @property {boolean} [isFixedWidth] If true, the input width will not be dynamically computed based on the values in the given column
+ * @property {string} [prefix] a string or character which should appear in the column before the column's value. e.g. $
+ * @property {string} [suffix] a string or character which should appear in the column after the column's value. e.g. %
+ * @property {boolean} [alignRight] Whether the column should be right-aligned (default: left-aligned)
+ * @property {boolean} [convertToPercent] Whether the value is a raw float that should be converted to a percentage value by multiplying by 100. (Does not add a % to the end)
+ * @property {number} [numDecimals] For right-aligned values that are converted to percent, the number of decimals kept.
+ */
+
+/**
+ * Given the input array and headers, computes a ready-to-print string that lines up the values in each column.
+ * 
+ * @param {Object <string, any>[]} body an array of object data to be printed.
+ * @param {Object <string, ColumnFormatOptions>} columnFormat An array of objects that describe the formatting to apply to the given column in the output table.
+ * @param {{key: string, label: string}[]} headers The headers which will label the columns in the output table, in the order to be arranged. The key property should
+ *                                                 match a key in the body and columnFormat objects, and the label should be the desired column header text.
+ * @param {string} [headerUnderline] a character to use to draw an "underline", separating the printed header row from the rows of the body.
+ */
+function prettyPrintArrayAsString(body, columnFormat, headers, headerUnderline) {
+    // The body should be an array of objects.
+    if (!body || !Array.isArray(body) || !Object.keys(body[0]).length)
+        throw new TypeError(`Input body was of type ${typeof body}. Expected an array of objects.`);
+    // The column formatter should be an object.
+    if (!columnFormat || !Object.keys(columnFormat).length)
+        throw new TypeError(`Input column formatter was of wrong type (or had no keys).`);
+    // The headers should be an array of objects with at minimum 'key' and 'label' properties, of which 'key' must have a non-falsy value.
+    if (!headers || !Array.isArray(headers) || !headers.every(col => (col.hasOwnProperty("key") && col.hasOwnProperty("label") && col.key)))
+        throw new TypeError(`Input headers of incorrect type. Expected array of objects with properties 'key' and 'label'.`);
+    // All object keys in the headers array must be found in both the body and columnFormat objects.
+    let bodyKeys = body.reduce((acc, row) => { Object.keys(row).forEach(key => acc.add(key)); return acc; }, new Set());
+    if (!headers.every(col => (bodyKeys.has(col.key) && columnFormat.hasOwnProperty(col.key))))
+        throw new TypeError(`Input header array specifies non-existent columns.`);
+
+    // Ensure that the column format prefix/suffix strings are initialized.
+    for (let col in columnFormat) {
+        ["prefix", "suffix"].forEach(key => {
+            columnFormat[col][key] = columnFormat[col][key] || (columnFormat[col][key] === 0 ? "0" : "")
+        });
+    }
+
+    // To pad the columns properly, we must determine the widest column value of each column.
+    // Initialize with the width of the column's header text.
+    for (let col of headers)
+        if (!columnFormat[col.key].isFixedWidth)
+            columnFormat[col.key].columnWidth = Math.max(col.label.length, columnFormat[col.key].columnWidth);
+
+    // Then parse every row in the body. The column width will be set such that any desired prefix or suffix can be included.
+    // If a column is specified as fixed width, it is assumed that the width was properly set.
+    for (let row of body)
+        for (let col in columnFormat)
+            if (!columnFormat[col].isFixedWidth)
+                columnFormat[col].columnWidth = Math.max(
+                    columnFormat[col].columnWidth,
+                    row[col].length + columnFormat[col].prefix.length + columnFormat[col].suffix.length
+                );
+
+    // Stringify the header information. Headers are center-padded if they are not the widest element in the column.
+    const output = [];
+    output.push(
+        headers.reduce((row, col) => {
+            let text = col.label;
+            let diff = columnFormat[col.key].columnWidth - text.length;
+            if (diff < 0)
+                // This was a fixed-width column that needs to be expanded.
+                columnFormat[col.key].columnWidth = text.length;
+            else if (diff > 0)
+                // Use padStart and padEnd to center-align this not-the-widest element.
+                text = text.padStart(Math.floor(diff / 2)).padEnd(Math.ceil(diff / 2));
+
+            row.push(text);
+            return row;
+        }, []).join(" | ")
+    );
+
+    // If there is a underline string, add it.
+    if (headerUnderline || headerUnderline === 0) {
+        let text = String(headerUnderline).repeat(output[0].length / headerUnderline.length);
+        text = text.substr(0, output[0].length);
+        output.push(text);
+    }
+
+    // Add rows to the output.
+    for (let row of body) {
+        let rowText = [];
+        // Fill the row's text based on the specified header order.
+        for (let i = 0, len = headers.length; i < len; ++i) {
+            let key = headers[i].key;
+            let text = row[key].toString();
+            let options = columnFormat[key];
+
+            // If the convertToPercent flag is set, multiply the value by 100, and then drop required digits.
+            // e.x. 0.123456 -> 12.3456
+            // TODO: use Number.toLocaleString instead, with max fraction digits.
+            if (options.convertToPercent) {
+                text = parseFloat(text);
+                if (!isNaN(text)) {
+                    text = text * 100;
+                    if (options.numDecimals === 0)
+                        text = Math.round(text);
+                    else if (!isNaN(parseInt(options.numDecimals, 10))) {
+                        let factor = Math.pow(10, Math.abs(parseInt(options.numDecimals, 10)));
+                        if (factor !== Infinity)
+                            text = Math.round(text * factor) / factor;
+                    }
+                    // The float may have any number of decimals, so we should ensure that there is room for the prefix and suffix.
+                    text = String(text).substr(0, options.columnWidth - options.suffix.length - options.prefix.length);
+                }
+                text = String(text);
+            }
+
+            // Add the desired prefix and suffix for this column, and then pad as desired.
+            text = `${options.prefix}${text}${options.suffix}`;
+            if (options.alignRight)
+                text = text.padStart(options.columnWidth);
+            else
+                text = text.padEnd(options.columnWidth);
+            rowText.push(text);
+        }
+        output.push(rowText.join(" | "));
+    }
+    return output.join("\n");
+}
+
 //Resources:
 //Timezones in Discord: https://www.reddit.com/r/discordapp/comments/68zkfs/timezone_tag_bot/
 //Location nicknames as csv: https://docs.google.com/spreadsheets/d/e/2PACX-1vQRxGO1iLgX6N2P2iUT57ftCbh5lv_cmnatC6F8NevrdYDtumjcIJw-ooAqm1vIjSu6b0HfP4v2DYil/pub?gid=0&single=true&output=csv
