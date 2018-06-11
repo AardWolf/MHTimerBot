@@ -126,10 +126,9 @@ function Main() {
                 return;
             }
             switch (message.channel.name){
-                case 'larrys-freebies':
+                case settings.linkConversionChannel:
                     if(/^(http[s]?:\/\/htgb\.co\/).*/g.test(message.content.toLowerCase())){
                         convertRewardLink(message);
-
                     }
                     break;
                 default:
@@ -180,6 +179,8 @@ function loadSettings(resolve, reject) {
             return;
         }
         settings = JSON.parse(data);
+        if (!settings.linkConversionChannel)
+            settings.linkConversionChannel = 'larrys-freebies';
         resolve();
     });
 }
@@ -1643,10 +1644,10 @@ function findItem(channel, args, command) {
             itemName = items[i].value;
             url += "&item_id=" + itemID;
 //            console.log("Lookup: " + url);
-            request( {
+            request({
                 url: url,
                 json: true
-            }, function (error, response, body) {
+            }, (error, response, body) => {
 //                console.log("Doing a lookup");
                 if (!error && response.statusCode == 200 && Array.isArray(body)) {
                     //body is an array of objects with: location, stage, total_hunts, rate, cheese
