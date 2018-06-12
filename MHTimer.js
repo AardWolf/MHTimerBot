@@ -228,7 +228,7 @@ function createTimedAnnouncements(channel) {
                 // Schedule the announcement on a repeated interval.
                 let interval = setInterval(
                     (timer, channel) => { doAnnounce(timer, channel); },
-                    timer.getRepeatInterval(), timer, channel);
+                    timer.getRepeatInterval().as('milliseconds'), timer, channel);
                 timer.storeInterval(interval);
             },
             timer.getNext().diffNow().minus(timer.getAdvanceNotice()).as('milliseconds'),
@@ -972,7 +972,6 @@ function saveReminders() {
  * @param {TextChannel} channel The Discord channel that will receive the message.
  */
 function doAnnounce(timer, channel) {
-    timer.advance();
     channel.send(timer.getAnnouncement())
       .catch(error => {
           console.log(error);

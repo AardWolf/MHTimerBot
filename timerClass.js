@@ -6,11 +6,12 @@ const { DateTime, Duration, Interval } = require('luxon');
  *
  * @property {string} area The area shorthand (e.g. fg) that this timer is for
  * @property {string} sub_area Areas may have multiple things to care about, such as "close" or "open"
- * @property {string} seed_time A reference RFC3339 timestamp string, e.g. "2017-07-24T12:00:00.000Z" that indicates when this timer turned on.
- * @property {number} repeat_time The duration of the timer interval, in milliseconds. e.g. 72 000 000
+ * @property {string} seed_time A reference timestamp string that indicates when this timer turned on. Assumed ISO format.
+ * @property {number | {}} repeat_time The duration of the timer interval, in milliseconds or a luxon Duration object format. e.g. 72 000 000, {seconds: 72000}, {seconds: 71000, milliseconds: 1000000}
  * @property {string} announce_string The message printed when this timer activates, i.e. "X is happening right now"
  * @property {string} demand_string The message printed when this timer is upcoming, i.e. "do this before X happens"
- */
+ * @property {number | {}} announce_offset How far in advance of the actual "activation time" the timer should be activated to send reminders, in milliseconds or luxon Duration object format.
+*/
 
 /**
  * Timers track various events within MouseHunt, generally things that would otherwise not be visible without travel. For example,
@@ -35,9 +36,8 @@ class Timer {
         // If the input Timer seed is a primitive (e.g. 1), or is missing required properties, bail. 
         const keys = Object.keys(seed);
         const required = ['area', 'seed_time', 'repeat_time'];
-        if (!keys.length ||
-                // If the required key is missing, or has a falsy value, then the seed is invalid.
-                !required.every(rq => { return (keys.indexOf(rq) !== -1 && seed[rq]); }))
+        // If a required key is missing, or has a falsy value, then the seed is invalid.
+        if (!keys.length || !required.every(rq => (keys.indexOf(rq) !== -1 && seed[rq])))
             throw new TypeError(`Input timer seed is missing required keys. Found only: ${keys.toString()}`);
 
         // Assign area and sub_area.
@@ -51,16 +51,13 @@ class Timer {
             throw new TypeError(`(${this.name}): Input seed time ${seed.seed_time} failed to parse into a valid DateTime.`);
 
         // Create the Duration that represents the time period between activations.
-        // Could switch from milliseconds serialization to an object, e.g.
-        // { hours: 80 } and {days: 3, hours: 8} both mean the same thing.
-        // this._repeatDuration = Duration.fromObject(seed.repeat_time);
-        this._repeatDuration = Duration.fromMillis(Math.abs(seed.repeat_time));
-        if (!this._repeatDuration.isValid || this._repeatDuration.as('minutes') < 1)
-            throw new RangeError(`(${this.name}): Input seed repeat duration was ${seed.repeat_time}, which is invalid or too short.`);
+        this._repeatDuration = getAsDuration(seed.repeat_time || 0, true);
+        if (this._repeatDuration.as('minutes') < 1)
+            throw new RangeError(`(${this.name}): Input repeat duration is ${seed.repeat_time} (invalid or too short).`);
 
         // Require the stored seed time to be in the past.
         while (DateTime.utc() < this._seedTime) {
-            console.log(`(${this.name}): seed time ('${this._seedTime}') is in the future, decrementing by Duration ${this._repeatDuration}`);
+            console.log(`(${this.name}): seed time ('${this._seedTime}') in future: decrementing ${this._repeatDuration.as('minutes')} minutes.`);
             this._seedTime = this._seedTime.minus(this._repeatDuration);
         }
 
@@ -79,7 +76,7 @@ class Timer {
         }
 
         // If no advance warning is specified, the timer will send reminders only when it activates.
-        this._advanceNotice = Duration.fromMillis(seed.announce_offset || 0);
+        this._advanceNotice = getAsDuration(seed.announce_offset || 0, true);
 
         /** @type {NodeJS.Timer} the NodeJS.Timer object created by NodeJS.setTimeout() */
         this._timeout = null;
@@ -90,21 +87,25 @@ class Timer {
     /**
      * A loggable/printable name for this timer, based on the area and sub-area.
      *
+     * @instance
      * @returns {string} e.g. "fg: close"
      */
     get name() {
-        let name = this._area;
-        if (this._subArea)
-            name += ": " + this._subArea;
-        return name;
+        return `${this._area}${this._subArea ? `: ${this._subArea}` : ""}`;
     }
 
     /**
-     * Called when the timer activates.
+     * Advances the known last activation time by the repeat duration.
+     * @instance
      */
     advance() {
-        if (this._lastActivation)
-            this._lastActivation = this._lastActivation.plus(this._repeatDuration);
+        if (this._lastActivation) {
+            let next = this._lastActivation.plus(this._repeatDuration);
+            if (next > DateTime.utc())
+                console.log(`(${this.name}): Skipped requested advancement into the future.`);
+            else
+                this._lastActivation = next;
+        }
     }
 
     /**
@@ -121,18 +122,21 @@ class Timer {
         if (!this._lastActivation || !this._lastActivation instanceof DateTime || !this._lastActivation.isValid) {
             // Seed time is guaranteed to be in the past by the Timer constructor, so this is a
             // well - formed Interval with at least one value.
-            let activations = Interval.fromDateTimes(this._seedTime, now).splitBy(this._repeatDuration).map(i => { return i.start });
+            if (now < this._seedTime)
+                console.log(`Assertion of seed time in the past failed.`);
+            let activations = Interval.fromDateTimes(this._seedTime, now).splitBy(this._repeatDuration).map(i => i.start);
             this._lastActivation = activations.pop();
 
             console.log(`(${this.name}): rebuilt last activation cache.`);
         }
 
         // Ensure the cache is correct.
-        while (!Interval.after(this._lastActivation, this._repeatDuration).contains(now)) {
+        let window = Interval.before(now, this._repeatDuration),
+            advances = 0;
+        while (this._lastActivation < now && !window.contains(this._lastActivation))
             this.advance();
-
-            console.log(`(${this.name}): had to update incorrect cached activation time.`);
-        }
+        if (advances)
+            console.log(`(${this.name}): cached activation time advanced x${advances}.`);
 
         return this._lastActivation;
     }
@@ -141,7 +145,7 @@ class Timer {
      * Determine the next time this particular Timer activates.
      *
      * @instance
-     * @returns {DateTime} a Date object that indicates the next time this Timer will activate.
+     * @returns {DateTime} a new Date object that indicates the next time this Timer will activate.
      */
     getNext() {
         return this.getLastActivation().plus(this._repeatDuration);
@@ -280,5 +284,37 @@ class Timer {
     }
 }
 
+/**
+ * Convert the given input into a Duration object
+ * @param {{} | number} value a value from a user/file to be cast to a duration.
+ *  e.g 36000000, {milliseconds: 36000000}, {hours: 10}, {hours: 9, minutes: 60}
+ * @param {boolean} normalize If true, the Duration is converted to "human" units (default false)
+ * @returns {Duration}
+ */
+function getAsDuration(value, normalize = false) {
+    let dur = _isLuxonObject(value) ? Duration.fromObject(value) : Duration.fromMillis(value || 0);
+    if (!dur.isValid) {
+        console.log(`Received invalid input ${value} to convert to a Duration.`);
+        dur = Duration.fromMillis(0);
+        // throw new TypeError(`Invalid argument to Duration constructor: ${value}`);
+    }
+    return (normalize ? dur.shiftTo('days', 'hours', 'minutes', 'seconds', 'milliseconds') : dur);
+}
+function _isLuxonObject(value) {
+    // It's probably milliseconds, but if not, it needs to be an object.
+    if (!value || !isNaN(parseInt(value, 10)) || value !== Object(value))
+        return false;
+    // It wasn't a valid number.
+    let keys = Object.keys(value);
+    if (!keys || !keys.length)
+        return false;
+    const dateTimeUnits = ['year', 'month', 'day', 'ordinal', 'weekYear', 'weekNumber', 'weekday', 'hour', 'minute', 'second', 'millisecond', 'zone', 'locale', 'outputCalendar', 'numberingSystem'];
+    if (keys.every(key => dateTimeUnits.indexOf(key) !== -1))
+        return true;
+    const durationUnits = ['years', 'quarters', 'months', 'weeks', 'days', 'hours', 'minutes', 'seconds', 'milliseconds', 'locale', 'numberingSystem', 'conversionAccuracy'];
+    if (keys.every(key => durationUnits.indexOf(key) !== -1))
+        return true;
+    return false;
+}
 
 module.exports = Timer;
