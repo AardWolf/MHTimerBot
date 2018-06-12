@@ -2,7 +2,7 @@
   MHTimer Bot
 */
 // Import required modules
-const { Discord, ClientUser, TextChannel, Message, RichEmbed } = require('discord.js');
+const Discord = require('discord.js');
 const { DateTime, Duration, Interval } = require('luxon');
 
 const Timer = require('./timerClass.js');
@@ -221,10 +221,10 @@ function createTimedAnnouncements(channel) {
                 // Schedule the announcement on a repeated interval.
                 let interval = setInterval(
                     (timer, channel) => { doAnnounce(timer, channel); },
-                    timer.getRepeat(), timer, channel);
+                    timer.getRepeatInterval(), timer, channel);
                 timer.storeInterval(interval);
             },
-            timer.getNext().diffNow().minus(timer.getAdvanceNotice()).as('millis'),
+            timer.getNext().diffNow().minus(timer.getAdvanceNotice()).as('milliseconds'),
             timer,
             channel);
         timer.storeTimeout(timeout);
@@ -434,9 +434,9 @@ function parseUserMessage(message) {
         case 'arrg':
         case 'aarg':
         default:
-            let usage_str = getHelpMessage(tokens);
+            let helpMessage = getHelpMessage(tokens);
             // TODO: Send help to PM?
-            message.channel.send(usage_str ? usage_str : "Whoops! That's a bug.");
+            message.channel.send(helpMessage ? helpMessage : "Whoops! That's a bug.");
     }
 }
 
@@ -487,8 +487,9 @@ function splitString(input) {
     const tokens = [];
     const splitRegexp = /[^\s"]+|"([^"]*)"/gi;
 
+    let match = "";
     do {
-        let match = splitRegexp.exec(input);
+        match = splitRegexp.exec(input);
         if (match) {
             // If we captured a group (i.e. a quoted phrase), push that, otherwise push the match (i.e. a single word).
             tokens.push(match[1] ? match[1] : match[0]);
@@ -860,12 +861,12 @@ function timeLeft(in_date) {
     // return remaining.toFormat("'in' dd 'days,' HH 'hours, and ' mm 'minutes");
     // return remaining.toFormat("'in' dd':'HH':'mm");
 
-    // Push any nonzero units into an array, adding "s" as appropriate.
+    // Push any nonzero units into an array, removing "s" if appropriate (since unit is plural).
     const labels = [];
     units.forEach(unit => {
         let val = remaining.get(unit);
         if (val)
-            labels.push(`${val}${(val !== 1) ? "s" : ""}`);
+            labels.push(`${val.toLocaleString('en-US', { maximumFractionDigits: 2 })} ${(val !== 1) ? unit : unit.slice(0, -1)}`);
     });
     // `labels` should not be empty at this point.
 
@@ -956,7 +957,7 @@ function saveReminders() {
  */
 function doAnnounce(timer, channel) {
     timer.advance();
-    channel.send(timer.getAnnounce())
+    channel.send(timer.getAnnouncement())
       .catch(error => {
           console.log(error);
           console.log(channel.client.status)
@@ -1042,7 +1043,7 @@ function sendRemind(user, remind, timer) {
         }
     }
     // console.log("Processed reminder", remind);
-    user.send(timer.getAnnounce() + "\n" + usage_str )
+    user.send(timer.getAnnouncement() + "\n" + usage_str )
         .then(() => { remind.fail = 0; }, //worked
             () => { remind.fail = (remind.fail || 0) + 1; });
 }
@@ -1317,7 +1318,7 @@ function buildSchedule(timer_request) {
     }
     return_str += upcoming_timers.length ? ":\n" : ".";
 
-    upcoming_timers.reduce((str, val) => {
+    return_str = upcoming_timers.reduce((str, val) => {
         return str + val.message + timeLeft(val.time) + "\n";
     }, return_str);
 
@@ -1436,9 +1437,8 @@ function getMouseList() {
         if (!error && response.statusCode == 200) {
             console.log("Got a mouse list");
             mice = body;
-            for (let i of mice) {
+            for (let i = 0, len = mice.length; i < len; ++i)
                 mice[i].lowerValue = mice[i].value.toLowerCase();
-            }
         }
     });
 
@@ -1476,7 +1476,7 @@ function findMouse(channel, args, command) {
 
 
     const MATCH_LENGTH = args.length;
-    for (let i = 0; i < mice.length; i++)
+    for (let i = 0, len = mice.length; i < len; ++i)
         if (mice[i].lowerValue.substring(0, MATCH_LENGTH) === args) {
             let mouseID = mice[i].id;
             let mouseName = mice[i].value;
@@ -1504,7 +1504,7 @@ function findMouse(channel, args, command) {
                     channel.send(`Could not process results for '${args}', AKA ${mouseName}`);
                     return;
                 }
-                
+
                 // If there was a result, create a nice-looking table from the data.
                 let retStr = "";
                 if (attractions.length) {
@@ -1526,7 +1526,7 @@ function findMouse(channel, args, command) {
                     // Build the header row.
                     const labels = { location: "Location", stage: "Stage", total_hunts: "Hunts", rate: "AR", cheese: "Cheese" }
                     const headers = order.map(key => {
-                        columnFormatting[key] = {columnWidth: labels[key].length};
+                        columnFormatting[key] = { columnWidth: labels[key].length };
                         return { 'key': key, 'label': labels[key] };
                     })
 
@@ -1535,7 +1535,7 @@ function findMouse(channel, args, command) {
                         alignRight: true,
                         isFixedWidth: true,
                         columnWidth: 7,
-                        suffix = "%"
+                        suffix: "%"
                     };
 
                     let table = prettyPrintArrayAsString(attractions, columnFormatting, headers, "=");
@@ -1548,6 +1548,7 @@ function findMouse(channel, args, command) {
             });
             return;
         }
+
 
     // No matching mouse was found. If this was a mouse search, find try finding an item.
     if (command === 'find')
@@ -1580,7 +1581,7 @@ function getItemList() {
         if (!error && response.statusCode == 200) {
             console.log("Got a loot list");
             items = body;
-            for (let i of items)
+            for (let i = 0, len = items.length; i < len; ++i)
                 items[i].lowerValue = items[i].value.toLowerCase();
         }
     });
@@ -1611,7 +1612,7 @@ function findItem(channel, args, command) {
         args = nicknames["loot"][args];
 
     const MATCH_LENGTH = args.length;
-    for (var i = 0; i < items.length; i++)
+    for (let i = 0, len = items.length; i < len; ++i)
         if (items[i].lowerValue.substring(0, MATCH_LENGTH) === args) {
             let itemID = items[i].id;
             let itemName = items[i].value;
@@ -1669,7 +1670,7 @@ function findItem(channel, args, command) {
                         isFixedWidth: true,
                         numDecimals: 3,
                         columnWidth: 7,
-                        suffix = "%"
+                        suffix: "%"
                     };
 
                     let table = prettyPrintArrayAsString(attractions, columnFormatting, headers, "=");
@@ -1876,7 +1877,7 @@ function getNicknames() {
  */
 function getNicknames(type) {
     if (!nickname_urls[type]) {
-        console.log(`Received ${type} but I don't know that URL.`);
+        console.log(`Received '${type}' but I don't know that URL.`);
         return false;
     }
     nicknames[type] = {};
@@ -1893,7 +1894,7 @@ function getNicknames(type) {
                     nicknames[type][cols[0]] = cols[1];
             }
         }
-        console.log(`Loaded ${Object.keys(nicknames[type]).length} nicknames of type '${type}.`);
+        console.log(`Loaded ${Object.keys(nicknames[type]).length} nicknames of type '${type}'.`);
     });
 }
 
