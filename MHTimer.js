@@ -2,8 +2,11 @@
   MHTimer Bot
 */
 // Import required modules
-const Discord = require('discord.js');
 const { DateTime, Duration, Interval } = require('luxon');
+const Discord = require('discord.js');
+
+// Import type-hinting definitions
+const { Client, ClientUser, Guild, Message, RichEmbed, TextChannel, User } = require('discord.js');
 
 const Timer = require('./timerClass.js');
 // Access local URIs, like files.
@@ -23,18 +26,21 @@ const main_settings_filename = 'settings.json',
 /** @type Timer[] */
 const timers_list = [];
 /** @type {TimerReminder[]} */
-var reminders = [];
+const reminders = [];
 const file_encoding = 'utf8';
 var settings = {};
-var mice = [];
-var items = [];
+const mice = [];
+const items = [];
 var hunters = {};
 var nicknames = {};
 var nickname_urls = {};
 /** @type {Object <string, DateTime>} */
 const last_timestamps = {
-    reminder_save: DateTime.utc()
+    reminder_save: null,
+    hunter_save: null
 }
+/** @type {Object <string, NodeJS.Timer>} */
+const dataTimers = {};
 const refresh_rate = Duration.fromObject({ minutes: 5 });
 
 //Only support announcing in 1 channel
@@ -96,9 +102,6 @@ function Main() {
     // Load any saved hunters
     a.then( loadHunters );
 
-    // Load nickname urls
-    a.then( loadNicknameURLs );
-
     // Bot start up tasks
     a.then(() => {
         client.on('ready', () => {
@@ -108,13 +111,13 @@ function Main() {
             for (var [guildkey, guildvalue] of client.guilds) {
                 let canAnnounce = false;
                 for (var [chankey, chanvalue] of guildvalue.channels)
-                    if (chanvalue.name === "timers") {
+                    if (chanvalue.name === settings.timedAnnouncementChannel) {
                         createTimedAnnouncements(chanvalue);
                         canAnnounce = true;
                     }
 
                 if (!canAnnounce)
-                    console.log(`No #timers channel in guild '${guildvalue.name}'.`);
+                    console.log(`No channel for announcements in guild '${guildvalue.name}'.`);
             }
         });
     });
@@ -154,8 +157,10 @@ function Main() {
         });
     });
 
-    a.then( getMouseList );
-    a.then( getItemList );
+    // Load nickname urls and only afterwards query the mouse & item lists.
+    a.then( loadNicknameURLs )
+        .then( getMouseList )
+        .then( getItemList );
 
 }
 try {
@@ -180,7 +185,9 @@ function loadSettings(resolve, reject) {
         }
         settings = JSON.parse(data);
         if (!settings.linkConversionChannel)
-            settings.linkConversionChannel = 'larrys-freebies';
+            settings.linkConversionChannel = "larrys-freebies";
+        if (!settings.timedAnnouncementChannel)
+            settings.timedAnnouncementChannel = "timers";
         resolve();
     });
 }
@@ -198,7 +205,7 @@ function createTimersList(resolve, reject) {
             return console.log(err);
         }
 
-        var obj = JSON.parse(data);
+        let obj = JSON.parse(data);
         for (let i = 0; i < obj.length; i++ )
             timers_list.push(new Timer(obj[i]));
     });
@@ -386,7 +393,7 @@ function parseUserMessage(message) {
             }
 
             let searchType = tokens.shift().toLowerCase();
-            if (!isNan(parseInt(searchType, 10))) {
+            if (!isNaN(parseInt(searchType, 10))) {
                 // hid lookup of 1 or more IDs.
                 tokens.unshift(parseInt(searchType, 10));
                 findHunter(message, tokens, "hid");
@@ -897,14 +904,21 @@ function timeLeft(in_date) {
  * Read the reminders JSON file, and populate the array for use
  */
 function loadReminders() {
+    console.log(`Scheduling save for reminders every ~${refresh_rate.as('minutes')} minutes.`);
+    // Do we need to do anything if saveReminders calls its reject()?
+    dataTimers['reminders'] = setInterval(saveReminders,
+        refresh_rate.as('milliseconds') * (Math.random() + 1));
+
     console.log("loading reminders");
     fs.readFile(reminder_filename, file_encoding, (err, data) => {
         if (err) {
-            console.log(err);
+            // ENOENT -> File did not exist in the given location.
+            if (err.code !== "ENOENT")
+                console.log(err);
             return;
         }
 
-        reminders = JSON.parse(data);
+        Array.prototype.push.apply(reminders, JSON.parse(data));
         console.log (reminders.length + " reminders loaded");
     });
 }
@@ -929,7 +943,7 @@ function saveReminders() {
                 break;
         }
         if (numExpired === reminders.length)
-            reminders = [];
+            reminders.length = 0;
         else if (numExpired) {
             // Advance to the next record (which should be expired and a valid index).
             ++i;
@@ -940,18 +954,20 @@ function saveReminders() {
             }
         }
     }
-    fs.writeFile(reminder_filename, JSON.stringify(reminders, null, 1), file_encoding, (err) => {
+    fs.writeFile(reminder_filename, JSON.stringify(reminders, null, 1), file_encoding, err => {
         if (err) {
             reject();
             return console.log(err);
         }
+        last_timestamps.reminder_save = DateTime.utc();
+        console.log(`Reminders saved successfully at ${last_timestamps.reminder_save}.`);
     });
 }
 
 /**
  * Send the given timer's announcement to the given channel, and then process
  * any reminders that chatters may have set up.
- * 
+ *
  * @param {Timer} timer The timer being announced.
  * @param {TextChannel} channel The Discord channel that will receive the message.
  */
@@ -969,7 +985,7 @@ function doAnnounce(timer, channel) {
 /**
  * Locate any known reminders that reference this timer, and send a PM to
  * the chatter who requested it.
- * 
+ *
  * @param {Timer} timer The activated timer.
  */
 function doRemind(timer) {
@@ -1049,183 +1065,106 @@ function sendRemind(user, remind, timer) {
 }
 
 /**
- * Add (or remove) a reminder
+ * Add (or remove) a reminder.
  * 
- * @param {any} timerRequest
+ * @param {ReminderRequest} timerRequest a timer request which has already passed through token
+ *                                       validation to set 'area' and 'sub_area' as possible.
  * @param {Message} message the Discord message that initiated this request.
  */
 function addRemind(timerRequest, message) {
-    //Add (or remove) a reminder
-    var area = timerRequest.area;
-    var response_str = "Tell aardwolf what you did. This used to break the bot";
-    var sub_area = timerRequest.sub_area;
-    var num = timerRequest.count;
-    var timer_found = -1;
-    var has_sub_area = 0;
-    var turned_off = 0;
-
-    if (typeof num === 'undefined') {
-        num = 1; //new default is once
+    // If there were no area, the reminders would have been
+    // listed instead of 'addRemind' being called.
+    const area = timerRequest.area;
+    const subArea = timerRequest.sub_area;
+    if (!area) {
+        message.channel.send("I do not know the area you asked for");
+        return;
     }
 
-    if (typeof area === 'undefined') {
-        return "I do not know the area you asked for";
-    }
+    // Default to reminding the user once.
+    const count = timerRequest.count || (timerRequest.count === 0 ? 0 : 1);
+    const name = `${area}${subArea ? `: ${subArea}` : ""}`;
 
-    for (var i = 0; i < timers_list.length; i++) {
-        if (timers_list[i].getArea() === area) {
-            if (typeof sub_area === 'undefined') {
-                timer_found = i;
-                has_sub_area = 0;
-                break;
-            }
-            else if (sub_area === timers_list[i].getSubArea()) {
-                timer_found = i;
-                has_sub_area = 1;
-                break;
-            }
-        }
-    }
-
-    //confirm it is a valid area
-    if (timer_found < 0) {
-        for (var i = 0; i < timers_list.length; i++) {
-            if (timers_list[i].getArea() === area) {
-                timer_found = i;
-                has_sub_area = 0;
-                console.log ("Apparently this is still needed for '" + area + "'");
-                console.log(timerRequest);
-                break;
-            }
-        }
-    }
-    if (timer_found < 0) {
-        return "I do not know the area requested, only sg, fg, reset, spill, or cove";
-    }
-
-    if (has_sub_area == 0) {
-        sub_area = undefined;
-    }
-
-    if (num === 0) {
-        //This is the stop case
-        var i = reminders.length;
-        while (i--) {
-//        for (var i = 0; i < reminders.length; i++) {
-            if ((reminders[i].user === message.author.id) &&
-                (reminders[i].area === area))
-            {
-                if (has_sub_area &&
-                    (typeof reminders[i].sub_area !== 'undefined') &&
-                    (reminders[i].sub_area === sub_area))
-                {
-                    reminders[i].count = 0;
-                    response_str = "Reminder for " + reminders[i].area + " (" + reminders[i].sub_area + ") turned off ";
-                    reminders.splice(i,1);
-                    turned_off++;
+    // Delete the reminder, if that is being requested.
+    // (Rather than try to modify the positions and number of elements in
+    // reminders e.g. thread race saveReminders, simply set the count to 0.)
+    if (!count) {
+        let responses = [];
+        for (let reminder of reminders)
+            if (reminder.user === message.author.id && reminder.area === area) {
+                if (subArea && subArea === reminder.sub_area) {
+                    reminder.count = 0;
+                    responses.push(`Reminder for '${name}' turned off.`);
                 }
-                else if ((!has_sub_area) && (typeof reminders[i].sub_area === 'undefined')) {
-                    reminders[i].count = 0;
-                    response_str = "Reminder for " + reminders[i].area + " turned off ";
-                    reminders.splice(i,1);
-                    turned_off++;
+                else if (!subArea && !reminder.sub_area) {
+                    reminder.count = 0;
+                    responses.push(`Reminder for '${name}' turned off.`);
                 }
             }
-        }
-        if (turned_off === 0) {
-            response_str = "I couldn't find a reminder for you in " + area;
-            if (typeof sub_area !== 'undefined') {
-                response_str += " (" + sub_area + ")";
-            }
-            console.log(timerRequest);
-            console.log(has_sub_area);
-        } else {
-            saveReminders();
-        }
-        if (typeof response_str === 'undefined') {
-            console.log("response_str got undefined");
-            console.log(tokens);
-            response_str = "That was a close one, I almost crashed!";
-        }
-        return response_str;
-    }// end stop case
 
-    response_str = "";
-    var remind = {  "count" : num,
-                    "area" : area,
-                    "user" : message.author.id
+        message.author.send(responses.length
+            ? `\`\`\`${responses.join("\n")}\`\`\``
+            : `I couldn't find a reminder for you in '${name}'.`
+        );
+        return;
     }
-    if (has_sub_area === 1) {
-        remind.sub_area = sub_area;
+
+    // User asked to be reminded - find a timer that meets the request.
+    const choices = timers_list.filter(choice => {
+        return (area === choice.getArea() && (!subArea || subArea === choice.getSubArea()));
+    }).sort((a, b) => (a.getNext() - b.getNext()));
+    console.log(`Found ${choices.length} matching timer request:`, timerRequest, choices);
+
+    // Assume the desired timer is the soonest one that matched the given criteria.
+    let timer = choices.pop();
+    if (!timer) {
+        // TODO: dynamic area response.
+        message.author.send("I'm sorry, there weren't any timers I know of that match your request.");
+        return;
     }
-    //Make sure the reminder doesn't already exist
-    found = 0;
-    for (var i = 0; i < reminders.length; i++) {
-        if ((reminders[i].user === message.author.id) &&
-            (reminders[i].area === area))
-        {
-            if ((typeof remind.sub_area === 'undefined') &&
-                (typeof reminders[i].sub_area === 'undefined'))
-            {
-                response_str = "I already have a reminder for " + area + " for you";
-                found = 1;
-                break;
+
+    const newReminder = {
+        "count": count,
+        "area": area,
+        "user": message.author.id
+    };
+    if (timer.getSubArea())
+        newReminder.sub_area = subArea;
+
+    // If the reminder already exists, set its new count to the requested count.
+    let responses = [];
+    for (let reminder of reminders)
+        if (reminder.user === message.author.id && reminder.area === area) {
+            if (subArea && reminder.sub_area === subArea) {
+                responses.push(`Updated reminder count for '${name}' from ${reminder.count} to ${count}.`);
+                reminder.count = count;
             }
-            else if ((typeof remind.sub_area !== 'undefined') &&
-                     (typeof reminders[i].sub_area !== 'undefined') &&
-                     (reminders[i].sub_area === remind.sub_area))
-            {
-                response_str = "I already have a remind for " + area + " (" + remind.sub_area + ") for you";
-                found = 1;
-                break;
+            else if (!subArea && !reminder.sub_area) {
+                responses.push(`Updated reminder count for '${name}' from ${reminder.count} to ${count}.`);
+                reminder.count = count;
             }
         }
+
+    if (responses.length) {
+        console.log(`Updated ${responses.length} reminders for ${message.author.username} to a count of ${count}.`, timerRequest);
+        message.author.send(`\`\`\`${responses.join("\n")}\`\`\``);
+        return;
     }
-    var save_ok;
-    if (found === 0) {
-        reminders.push(remind);
-        response_str = "Reminder for " + area
-        if (typeof remind.sub_area !== 'undefined') {
-            response_str += " (" + remind.sub_area + ")";
-        }
-        response_str += " set to PM you ";
-        if (remind.count === 1) {
-            response_str += "once (stop this one and use the word 'always' if you wanted a repeating reminder) ";
-        }
-        else if (remind.count === -1) {
-            response_str += "until you stop it";
-        }
-        else {
-            response_str += remind.count + " times";
-        }
-        if (message.channel.type == "dm") {
-            save_ok = 1;
-        } else {
-            message.author.send("Hi there! Reminders will be in PM and I'm just making sure I can PM you.\n" + response_str)
-                .then(function()
-                    {
-                        save_ok = 1;
-                        saveReminders();
-                    }, //worked
-                    function()
-                    {
-                        save_ok = 0;
-                    });
-        }
-//        if (save_ok == 0) {
-//            response_str = "I am not allowed to PM you so I will not set that timer. Check your Discord permissions.";
-//        }
-    }
-    if (typeof response_str === 'undefined') {
-        console.log("response_str got undefined");
-        console.log(tokens);
-        response_str = "That was a close one, I almost crashed!";
-    }
-    // Turns out if people block the bot from chatting with them reminders will fail anyway
-//    if ((found + save_ok) >= 1) {
-//        saveReminders();
-//    }
-//    return response_str;
+
+    // No updates were made - free to add a new reminder.
+    reminders.push(newReminder);
+    responses.push(`Reminder for ${name} set to PM you`);
+    responses.push((count === 1) ? "once" : (count < 0) ? "until you stop it" : `${count} times.`);
+
+    // Inform the user of the new reminder, in PM only.
+    if (message.channel.type !== "dm")
+        responses.unshift(`Hi there! Reminders are only sent via PM, and I'm just making sure I can PM you.`);
+
+    // Send notice of the update via PM.
+    message.author.send(responses.join(" ")).then(
+        () => console.log(`Added ${newReminder} for ${message.author.id} successfully.`),
+        () => console.log(`Reminder notification failure for ${message.author.id}. Still created and activated reminder ${newReminder}.`)
+    );
 }
 
 /**
@@ -1236,17 +1175,17 @@ function addRemind(timerRequest, message) {
 function listRemind(message) {
     const user = message.author.id,
         pm_channel = message.author;
-    var timer_str = "";
-    var usage_str;
-    var found = 0;
+    let timer_str = "Your reminders:";
+    let usage_str;
 
-    const userReminders = reminders.filter(reminder => { return reminder.user === user; });
+    const userReminders = reminders.filter(reminder => (reminder.user === user));
     userReminders.forEach(reminder => {
-        timer_str += "\nTimer:\t" + reminder.area;
-        usage_str = "`-mh remind " + reminder.area;
+        // TODO: prettyPrint this info.
+        timer_str += `\nTimer:\t\`${reminder.area}\``;
+        usage_str = `\`-mh remind ${reminder.area}`;
         if (reminder.sub_area) {
-            timer_str += " (" + reminder.sub_area + ")";
-            usage_str += " " + reminder.sub_area;
+            timer_str += ` (${reminder.sub_area})`;
+            usage_str += ` ${reminder.sub_area}`;
         }
 
         if (reminder.count === 1)
@@ -1254,21 +1193,16 @@ function listRemind(message) {
         else if (reminder.count === -1)
             timer_str += " until you stop it";
         else
-            timer_str += " " + reminder.count + " times";
+            timer_str += ` ${reminder.count} times`;
 
-        timer_str += ".\n\t" + usage_str + " stop` to turn off\n";
+        timer_str += `.\n\t${usage_str} stop\` to turn off\n`;
 
         if (reminder.fail)
-            timer_str += "There have been " + reminder.fail + " failed attempts to activate this reminder.\n";
+            timer_str += `There have been ${reminder.fail} failed attempts to activate this reminder.\n`;
     });
 
-    let err = 0;
     pm_channel.send(userReminders.length ? timer_str : "I found no reminders for you, sorry.")
-        .then(
-            () => { err = 0; }, // Successful callback
-            () => { err = 1; }  // Error callback
-        );
-    //TODO: If err=1 then the user has blocked the bot, disable timers?
+        .catch(() => console.log(`PM Notification failure for ${pm_channel.username}. Possibly blocked.`));
 }
 
 /**
@@ -1280,10 +1214,7 @@ function listRemind(message) {
  * @returns {string} a ready-to-print string containing the timer's demand, and how soon it will occur.
  */
 function buildSchedule(timer_request) {
-    // All timers and requests have areas.
     const area = timer_request.area;
-    if (!area)
-        return "Invalid area given - where did you want to look for upcoming timers?";
 
     // Search from 1 hour to 10 days out.
     let req_hours = Duration.fromObject({ hours: timer_request.count });
@@ -1300,7 +1231,7 @@ function buildSchedule(timer_request) {
     /** @type {{time: DateTime, message: string}[]} */
     const upcoming_timers = [];
     const max_timers = 24;
-    timers_list.filter(timer => { return timer.getArea() === area; })
+    (!area ? timers_list : timers_list.filter(timer => (timer.getArea() === area)))
         .forEach(timer => {
             let message = timer.getDemand();
             for (let time of timer.upcoming(until))
@@ -1311,15 +1242,15 @@ function buildSchedule(timer_request) {
     upcoming_timers.sort((a, b) => { return a.time - b.time; });
 
     // Make a nice message to display.
-    let return_str = "I have " + (upcoming_timers.length) + " timers coming up in the next " + req_hours.as('hours') + " hours";
+    let return_str = `I have ${upcoming_timers.length} timers coming up in the next ${req_hours.as('hours')} hours`;
     if (upcoming_timers.length > max_timers) {
-        return_str += ". Here are the next " + max_timers + " of them";
+        return_str += `. Here are the next ${max_timers} of them`;
         upcoming_timers.splice(max_timers, upcoming_timers.length)
     }
     return_str += upcoming_timers.length ? ":\n" : ".";
 
     return_str = upcoming_timers.reduce((str, val) => {
-        return str + val.message + timeLeft(val.time) + "\n";
+        return `${str}${val.message} ${timeLeft(val.time)}\n`;
     }, return_str);
 
     return return_str;
@@ -1337,13 +1268,12 @@ function getHelpMessage(tokens) {
     // TODO: dynamic help text - iterate known keyword commands and their arguments.
     const keywords = "`iam`, `whois`, `remind`, `next`, `find`, `ifind`, and`schedule`";
     if (!tokens || !tokens.length) {
-        let genericHelp = [
+        return [
             `I know the keywords ${keywords}.`,
             "You can use `-mh help <keyword>` to get specific information about how to use it.",
             "Example: `-mh help next` provides help about the 'next' keyword, `-mh help remind` provides help about the 'remind' keyword.",
             "Pro Tip: **All commands work in PM!**"
-        ];
-        return genericHelp.join("\n");
+        ].join("\n");
     }
 
     const areaInfo = "Areas are Seasonal Garden (**sg**), Forbidden Grove (**fg**), Toxic Spill (**ts**), Balack's Cove (**cove**), and the daily **reset**.";
@@ -1436,14 +1366,15 @@ function getMouseList() {
     }, (error, response, body) => {
         if (!error && response.statusCode == 200) {
             console.log("Got a mouse list");
-            mice = body;
+            mice.length = 0;
+            Array.prototype.push.apply(mice, body);
             for (let i = 0, len = mice.length; i < len; ++i)
                 mice[i].lowerValue = mice[i].value.toLowerCase();
         }
-    });
 
-    // Populate the nickname values for mice.
-    getNicknames("mice");
+        // Populate the nickname values for mice.
+        getNicknames("mice");
+    });
 }
 
 /**
@@ -1456,7 +1387,7 @@ function getMouseList() {
 function findMouse(channel, args, command) {
     //NOTE: RH location is https://mhhunthelper.agiletravels.com/tracker.json
     let url = 'https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=mouse';
-    let retStr = "'" + args + "' not found";
+    let retStr = `'${args}' not found`;
 
     // Deep copy the input args, in case we modify them.
     const orig_args = JSON.parse(JSON.stringify(args));
@@ -1465,7 +1396,7 @@ function findMouse(channel, args, command) {
     let tokens = args.split(/\s+/);
     if (tokens.length > 2) {
         if (tokens[0] === "-e") {
-            url += "&timefilter=" + tokens[1];
+            url += `&timefilter=${tokens[1]}`;
             tokens.splice(0, 2);
         }
         args = tokens.join(" ");
@@ -1480,7 +1411,7 @@ function findMouse(channel, args, command) {
         if (mice[i].lowerValue.substring(0, MATCH_LENGTH) === args) {
             let mouseID = mice[i].id;
             let mouseName = mice[i].value;
-            url += "&item_id=" + mouseID;
+            url += `&item_id=${mouseID}`;
             request({
                 url: url,
                 json: true
@@ -1526,7 +1457,10 @@ function findMouse(channel, args, command) {
                     // Build the header row.
                     const labels = { location: "Location", stage: "Stage", total_hunts: "Hunts", rate: "AR", cheese: "Cheese" }
                     const headers = order.map(key => {
-                        columnFormatting[key] = { columnWidth: labels[key].length };
+                        columnFormatting[key] = {
+                            columnWidth: labels[key].length,
+                            alignRight: !isNaN(parseInt(attractions[0][key]))
+                        };
                         return { 'key': key, 'label': labels[key] };
                     })
 
@@ -1580,20 +1514,21 @@ function getItemList() {
     }, (error, response, body) => {
         if (!error && response.statusCode == 200) {
             console.log("Got a loot list");
-            items = body;
+            items.length = 0;
+            Array.prototype.push.apply(items, body);
             for (let i = 0, len = items.length; i < len; ++i)
                 items[i].lowerValue = items[i].value.toLowerCase();
         }
-    });
 
-    // Populate the nickname values for loot.
-    getNicknames("loot");
+        // Populate the nickname values for loot.
+        getNicknames("loot");
+    });
 }
 
 function findItem(channel, args, command) {
     //NOTE: RH location is https://mhhunthelper.agiletravels.com/tracker.json
     let url = 'https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=loot';
-    let retStr = "'" + args + "' not found";
+    let retStr = `'${args}' not found`;
 
     // Deep copy the input args, in case we modify them.
     const orig_args = JSON.parse(JSON.stringify(args));
@@ -1602,7 +1537,7 @@ function findItem(channel, args, command) {
     let tokens = args.split(/\s+/);
     if (tokens.length > 2) {
         if (tokens[0] === "-e") {
-            url += "&timefilter=" + tokens[1];
+            url += `&timefilter=${tokens[1]}`;
             tokens.splice(0, 2);
         }
         args = tokens.join(" ");
@@ -1616,7 +1551,7 @@ function findItem(channel, args, command) {
         if (items[i].lowerValue.substring(0, MATCH_LENGTH) === args) {
             let itemID = items[i].id;
             let itemName = items[i].value;
-            url += "&item_id=" + itemID;
+            url += `&item_id=${itemID}`;
             request({
                 url: url,
                 json: true
@@ -1630,7 +1565,7 @@ function findItem(channel, args, command) {
                             {
                                 location: setup.location,
                                 stage: setup.stage === null ? " N/A " : setup.stage,
-                                total_hunts: setup.total_hunts,
+                                total_hunts: integerComma(setup.total_hunts),
                                 rate: setup.rate * 1.0 / 1000, // Divide by 1000? should this be 100?
                                 cheese: setup.cheese
                             });
@@ -1660,7 +1595,10 @@ function findItem(channel, args, command) {
                     // Build the header row.
                     const labels = { location: "Location", stage: "Stage", total_hunts: "Hunts", rate: "DR", cheese: "Cheese" }
                     const headers = order.map(key => {
-                        columnFormatting[key] = { columnWidth: labels[key].length };
+                        columnFormatting[key] = {
+                            columnWidth: labels[key].length,
+                            alignRight: !isNaN(parseInt(attractions[0][key]))
+                        };
                         return { 'key': key, 'label': labels[key] };
                     })
 
@@ -1736,7 +1674,6 @@ function findHunter(message, searchValues, type) {
 /**
  * Unsets the hunter's id (and all other friend-related settings), and messages the user back.
  * Currently all settings are friend-related.
- * If a change was made, the new data object is serialized.
  *
  * @param {Message} message A Discord message object
  */
@@ -1744,8 +1681,7 @@ function unsetHunterID(message) {
     let hunter = message.author.id;
     if (hunters[hunter]) {
         delete hunters[hunter];
-        saveHunters();
-        message.channel.send("OK, you have been deleted from results.");
+        message.channel.send(`*POOF*, you're gone!`);
     } else {
         message.channel.send("I didn't do anything but that's because you didn't do anything either.");
     }
@@ -1753,7 +1689,6 @@ function unsetHunterID(message) {
 
 /**
  * Sets the message author's hunter ID to the passed argument, and messages the user back.
- * If a change was made, the new data object is serialized.
  * 
  * @param {Message} message a Discord message object from a user
  * @param {string} hid a "Hunter ID" string, which should parse to a number.
@@ -1762,7 +1697,7 @@ function setHunterID(message, hid) {
     let hunter = message.author.id;
     let message_str = "";
     if (isNaN(hid)) {
-        message.channel.send("I'm not sure that `" + hid + "` is a number so I am ignoring you.");
+        message.channel.send(`I'm not sure that \`${hid}\` is a number so I am ignoring you.`);
         return;
     }
 
@@ -1774,34 +1709,31 @@ function setHunterID(message, hid) {
 
     // If they already registered a hunter ID, update it.
     if (hunters[hunter]['hid']) {
-        message_str = "You used to be known as `" + hunters[hunter]['hid'] + "`. ";
+        message_str = `You used to be known as \`${hunters[hunter]['hid']}\`. `;
         console.log("Found an old hid");
     }
     hunters[hunter]['hid'] = hid;
-    message_str += "If people look you up they'll see `" + hid + "`."
+    message_str += `If people look you up they'll see \`${hid}\`.`;
 
-    saveHunters(); // TODO: Change this to a scheduled save
     message.channel.send(message_str);
 }
 
 /**
  * Accepts a message object and hunter id, sets the author's hunter ID to the passed argument
- * If a change was made, the new data object is serialized.
- *
+ * 
  * @param {Message} message a Discord message object
  * @param {string} property the property key for the given user, e.g. 'hid', 'rank', 'location'
  * @param {any} value the property's new value.
  */
 function setHunterProperty(message, property, value) {
     let hunter = message.author.id;
-    if ((!hunters[hunter]) || (!hunters[hunter]['hid'])) {
+    if (!hunters[hunter] || !hunters[hunter]['hid']) {
         message.channel.send("I don't know who you are so you can't set that now; set your hunter ID first.");
         return;
     }
 
     let message_str = !hunters[hunter][property] ? "" : `Your ${property} used to be \`${hunters[hunter][property]}\`.`;
     hunters[hunter][property] = value;
-    saveHunters(); // TODO: Change this to a scheduled save
 
     message_str += `Your ${property} is set to \`${value}\``;
     message.channel.send(message_str);
@@ -1811,11 +1743,18 @@ function setHunterProperty(message, property, value) {
  * Read the JSON datafile with hunter data, storing its contents in the 'hunters' global object.
  */
 function loadHunters() {
+    console.log(`Scheduling save for hunters every ~${refresh_rate.as('minutes')} minutes.`);
+    // Do we need to do anything if saveHunters calls its reject()?
+    dataTimers['hunters'] = setInterval(saveHunters,
+        refresh_rate.as('milliseconds') * (Math.random() + 1));
+
     console.log("loading hunters");
     fs.readFile(hunter_ids_filename, file_encoding, (err, data) => {
         if (err) {
-            console.log(err);
-            return undefined;
+            // ENOENT -> File did not exist in the given location.
+            if (err.code !== "ENOENT")
+                console.log(err);
+            return;
         }
 
         hunters = JSON.parse(data);
@@ -1830,16 +1769,18 @@ function loadNicknameURLs() {
     console.log("loading nicknames");
     fs.readFile(nickname_urls_filename, file_encoding, (err, data) => {
         if (err) {
-            console.log(err);
-            return undefined;
+            // ENOENT -> File did not exist in the given location.
+            if (err.code !== "ENOENT")
+                console.log(err);
+            return;
         }
 
         nickname_urls = JSON.parse(data);
-        console.log (Object.keys(nickname_urls).length + " nickname sources loaded");
-        nicknames = {}; //Clear it out
-        for (var key in nickname_urls) {
+        console.log(`${Object.keys(nickname_urls).length} nickname URLs loaded from disk.`);
+        // Load all nicknames from all sources.
+        nicknames = {};
+        for (var key in nickname_urls)
             getNicknames(key);
-        }
     });
 }
 
@@ -1847,23 +1788,14 @@ function loadNicknameURLs() {
  * Serialize the 'hunters' global object into a JSON datafile, replacing the target file.
  */
 function saveHunters() {
-    fs.writeFile(hunter_ids_filename, JSON.stringify(hunters, null, 1), file_encoding, (err) => {
+    fs.writeFile(hunter_ids_filename, JSON.stringify(hunters, null, 1), file_encoding, err => {
         if (err) {
             reject();
             return console.log(err);
         }
+        last_timestamps.hunter_save = DateTime.utc();
+        console.log(`Hunters saved successfully at ${last_timestamps.hunter_save}.`);
     });
-}
-
-/**
- * Wrapper function to get all the nicknames. Reinitializes the 'nicknames'
- * global based on the contents of the 'nickname_urls' object.
- */
-function getNicknames() {
-    nicknames = {}; //Clear it out
-    for (var key in nickname_urls) {
-        getNicknames(key);
-    }
 }
 
 /**
@@ -2017,7 +1949,7 @@ function prettyPrintArrayAsString(body, columnFormat, headers, headerUnderline) 
                 columnFormat[col.key].columnWidth = text.length;
             else if (diff > 0)
                 // Use padStart and padEnd to center-align this not-the-widest element.
-                text = text.padStart(Math.floor(diff / 2)).padEnd(Math.ceil(diff / 2));
+                text = text.padStart(Math.floor(diff / 2) + text.length).padEnd(columnFormat[col.key].columnWidth);
 
             row.push(text);
             return row;
