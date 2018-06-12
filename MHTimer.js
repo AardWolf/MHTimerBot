@@ -236,7 +236,7 @@ function createTimedAnnouncements(channel) {
             channel);
         timer.storeTimeout(timeout);
     });
-    console.log (`Let's say that ${timers_list.length} timeouts got created`);
+    console.log (`Timers: Let's say that ${timers_list.length} got created.`);
 }
 
 /**
@@ -453,7 +453,12 @@ function parseUserMessage(message) {
  * 
  * @param {Message} message a Discord message containing a htgb.co URL.
  */
-function convertRewardLink(message){
+function convertRewardLink(message) {
+    if (!settings.bitly_token) {
+        console.log(`Received link to convert, but don't have a valid 'bitly_token' specified in settings: ${settings}.`);
+        return;
+    }
+
     // Get the redirect url from htgb.co
     request({
         url: message.content.split(" ")[0],
@@ -806,7 +811,7 @@ function nextTimer(timerName) {
     // Inspect all known timers to determine the one that matches the requested area, and occurs soonest.
     const area = timerName.area,
         sub = timerName.sub_area,
-        areaTimers = timers_list.filter(timer => { return timer.getArea() === area; });
+        areaTimers = timers_list.filter(timer => (timer.getArea() === area));
 
     let nextTimer;
     for (let timer of areaTimers)
@@ -871,7 +876,7 @@ function timeLeft(in_date) {
     // Push any nonzero units into an array, removing "s" if appropriate (since unit is plural).
     const labels = [];
     units.forEach(unit => {
-        let val = remaining.get(unit);
+        let val = Math.floor(remaining.get(unit));
         if (val)
             labels.push(`${val.toLocaleString('en-US', { maximumFractionDigits: 2 })} ${(val !== 1) ? unit : unit.slice(0, -1)}`);
     });
@@ -904,10 +909,10 @@ function timeLeft(in_date) {
  * Read the reminders JSON file, and populate the array for use
  */
 function loadReminders() {
-    console.log(`Scheduling save for reminders every ~${refresh_rate.as('minutes')} minutes.`);
+    console.log(`Scheduling save for reminders every ~${2 * refresh_rate.as('minutes')} minutes.`);
     // Do we need to do anything if saveReminders calls its reject()?
     dataTimers['reminders'] = setInterval(saveReminders,
-        refresh_rate.as('milliseconds') * (Math.random() + 1));
+        refresh_rate.as('milliseconds') * (Math.random() + 2));
 
     console.log("loading reminders");
     fs.readFile(reminder_filename, file_encoding, (err, data) => {
@@ -919,7 +924,7 @@ function loadReminders() {
         }
 
         Array.prototype.push.apply(reminders, JSON.parse(data));
-        console.log (reminders.length + " reminders loaded");
+        console.log (`Reminders: ${reminders.length} loaded.`);
     });
 }
 
@@ -950,7 +955,7 @@ function saveReminders() {
             // If the current reminder is expired, splice it and the others away.
             if (i < reminders.length && reminders[i].count === 0) {
                 let discarded = reminders.splice(i, numExpired);
-                console.log(`Spliced ${discarded.length} expired records. ${reminders.length} remaining.`);
+                console.log(`Reminders: spliced ${discarded.length} that were expired. ${reminders.length} remaining.`);
             }
         }
     }
@@ -960,7 +965,7 @@ function saveReminders() {
             return console.log(err);
         }
         last_timestamps.reminder_save = DateTime.utc();
-        console.log(`Reminders saved successfully at ${last_timestamps.reminder_save}.`);
+        console.log(`Reminders: ${reminders.length} saved successfully.`);
     });
 }
 
@@ -1134,12 +1139,14 @@ function addRemind(timerRequest, message) {
     let responses = [];
     for (let reminder of reminders)
         if (reminder.user === message.author.id && reminder.area === area) {
+            let successText = `Updated reminder count for '${name}' from ${reminder.count === -1
+                ? `'always'` : reminder.count} to ${count}.`;
             if (subArea && reminder.sub_area === subArea) {
-                responses.push(`Updated reminder count for '${name}' from ${reminder.count} to ${count}.`);
+                responses.push(successText);
                 reminder.count = count;
             }
             else if (!subArea && !reminder.sub_area) {
-                responses.push(`Updated reminder count for '${name}' from ${reminder.count} to ${count}.`);
+                responses.push(successText);
                 reminder.count = count;
             }
         }
@@ -1160,9 +1167,8 @@ function addRemind(timerRequest, message) {
         responses.unshift(`Hi there! Reminders are only sent via PM, and I'm just making sure I can PM you.`);
 
     // Send notice of the update via PM.
-    message.author.send(responses.join(" ")).then(
-        () => console.log(`Added ${newReminder} for ${message.author.id} successfully.`),
-        () => console.log(`Reminder notification failure for ${message.author.id}. Still created and activated reminder ${newReminder}.`)
+    message.author.send(responses.join(" ")).catch(() =>
+        console.log(`Reminders: notification failure for ${message.author.username}.`)
     );
 }
 
@@ -1201,7 +1207,7 @@ function listRemind(message) {
     });
 
     pm_channel.send(userReminders.length ? timer_str : "I found no reminders for you, sorry.")
-        .catch(() => console.log(`PM Notification failure for ${pm_channel.username}. Possibly blocked.`));
+        .catch(() => console.log(`Reminders: notification failure for ${pm_channel.username}. Possibly blocked.`));
 }
 
 /**
@@ -1607,7 +1613,6 @@ function findItem(channel, args, command) {
                         isFixedWidth: true,
                         numDecimals: 3,
                         columnWidth: 7,
-                        suffix: "%"
                     };
 
                     let table = prettyPrintArrayAsString(attractions, columnFormatting, headers, "=");
@@ -1734,7 +1739,7 @@ function setHunterProperty(message, property, value) {
     let message_str = !hunters[hunter][property] ? "" : `Your ${property} used to be \`${hunters[hunter][property]}\`.`;
     hunters[hunter][property] = value;
 
-    message_str += `Your ${property} is set to \`${value}\``;
+    message_str += ` Your ${property} is set to \`${value}\``;
     message.channel.send(message_str);
 }
 
@@ -1742,10 +1747,10 @@ function setHunterProperty(message, property, value) {
  * Read the JSON datafile with hunter data, storing its contents in the 'hunters' global object.
  */
 function loadHunters() {
-    console.log(`Scheduling save for hunters every ~${refresh_rate.as('minutes')} minutes.`);
+    console.log(`Scheduling save for hunters every ~${2 * refresh_rate.as('minutes')} minutes.`);
     // Do we need to do anything if saveHunters calls its reject()?
     dataTimers['hunters'] = setInterval(saveHunters,
-        refresh_rate.as('milliseconds') * (Math.random() + 1));
+        refresh_rate.as('milliseconds') * (Math.random() + 2));
 
     console.log("loading hunters");
     fs.readFile(hunter_ids_filename, file_encoding, (err, data) => {
@@ -1757,7 +1762,7 @@ function loadHunters() {
         }
 
         hunters = JSON.parse(data);
-        console.log (Object.keys(hunters).length + " hunters loaded");
+        console.log(`Hunters: ${Object.keys(hunters).length} loaded.`);
     });
 }
 
@@ -1775,7 +1780,7 @@ function loadNicknameURLs() {
         }
 
         nickname_urls = JSON.parse(data);
-        console.log(`${Object.keys(nickname_urls).length} nickname URLs loaded from disk.`);
+        console.log(`Nicknames: ${Object.keys(nickname_urls).length} URLs loaded from disk.`);
         // Load all nicknames from all sources.
         nicknames = {};
         for (var key in nickname_urls)
@@ -1793,7 +1798,7 @@ function saveHunters() {
             return console.log(err);
         }
         last_timestamps.hunter_save = DateTime.utc();
-        console.log(`Hunters saved successfully at ${last_timestamps.hunter_save}.`);
+        console.log(`Hunters: ${Object.keys(hunters).length} saved successfully.`);
     });
 }
 
@@ -1825,7 +1830,7 @@ function getNicknames(type) {
                     nicknames[type][cols[0]] = cols[1];
             }
         }
-        console.log(`Loaded ${Object.keys(nicknames[type]).length} nicknames of type '${type}'.`);
+        console.log(`Nicknames: ${Object.keys(nicknames[type]).length} of type '${type}' loaded.`);
     });
 }
 
