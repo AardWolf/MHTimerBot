@@ -127,14 +127,16 @@ class Timer {
             let activations = Interval.fromDateTimes(this._seedTime, now).splitBy(this._repeatDuration).map(i => i.start);
             this._lastActivation = activations.pop();
 
-            console.log(`(${this.name}): rebuilt last activation cache.`);
+            console.log(`(${this.name}): Cached last activation (${this._lastActivation.toHTTP()})`);
         }
 
         // Ensure the cache is correct.
         let window = Interval.before(now, this._repeatDuration),
             advances = 0;
-        while (this._lastActivation < now && !window.contains(this._lastActivation))
+        while (this._lastActivation < now && !window.contains(this._lastActivation)) {
             this.advance();
+            ++advances;
+        }
         if (advances)
             console.log(`(${this.name}): cached activation time advanced x${advances}.`);
 

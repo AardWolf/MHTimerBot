@@ -15,8 +15,7 @@ const fs = require('fs');
 const request = require('request');
 
 // Globals
-// var guild_id = '245584660757872640';
-const client = new Discord.Client();
+const client = new Discord.Client({ disabledEvents: ["TYPING_START"] });
 const main_settings_filename = 'settings.json',
     timer_settings_filename = 'timer_settings.json',
     hunter_ids_filename = 'hunters.json',
@@ -85,90 +84,82 @@ process.on('uncaughtException', exception => {
 });
 
 function Main() {
-    // Load global settings
-    var a = new Promise(loadSettings);
+    // Load global settings.
+    var a = new Promise(loadSettings)
 
-    // Bot log in
-    a.then(() => { client.login(settings.token); });
-
-    // Create timers list from timers settings file
-    a.then( createTimersList );
-
-    // Load any saved reminders
-    a.then( loadReminders );
-
-    // Load any saved hunters
-    a.then( loadHunters );
-
-    // Bot start up tasks
-    a.then(() => {
-        client.on('ready', () => {
-            console.log('I am alive!');
-
-            //for each guild find its #timers channel (if it has one)
-            for (var [guildkey, guildvalue] of client.guilds) {
-                let canAnnounce = false;
-                for (var [chankey, chanvalue] of guildvalue.channels)
-                    if (chanvalue.name === settings.timedAnnouncementChannel) {
-                        createTimedAnnouncements(chanvalue);
-                        canAnnounce = true;
-                    }
-
-                if (!canAnnounce)
-                    console.log(`Timers: No channel for announcements in guild '${guildvalue.name}'.`);
-            }
-        });
-    });
-
-    // Message event router
-    a.then(() => {
-        client.on('message', message => {
-            if (message.author.id === client.user.id) {
-                return;
-            }
-            switch (message.channel.name){
-                case settings.linkConversionChannel:
-                    if(/^(http[s]?:\/\/htgb\.co\/).*/g.test(message.content.toLowerCase())){
-                        convertRewardLink(message);
-                    }
-                    break;
-                default:
-                    if (message.channel.type === 'dm') {
-                        parseUserMessage(message);
-                    } else if (message.content.startsWith(settings.botPrefix)) {
-                        parseUserMessage(message);
-                    }
-                    break;
-            }
-        });
-        client.on('error', error => {
-            console.log("Error Received", error);
-            client.destroy();
-            doSave();
-            process.exit();
-        });
-        client.on('disconnect', event => {
-            console.log("Close event: " + event.reason);
-            console.log("Close code: " + event.code);
-            client.destroy();
-            doSave();
-            process.exit();
-        });
-    });
-
-    // Load nickname urls and only afterwards query the mouse & item lists.
-    a.then( loadNicknameURLs )
-        .then( getMouseList )
-        .then( getItemList )
-        .catch(err => console.log(err));
-
-    // Set up periodic data saves
-    a.then(() => {
+    // Load local file databases, and schedule saving this data after it loads.
+    a.then(doLoadLocal).then(loadResult => {
         let interval = (Math.random() + 2) * refresh_rate.as('milliseconds');
         console.log(`Scheduling periodic data saves every ~${interval / (1000 * 60)} minutes.`);
         dataTimers['data'] = setInterval(doSaveAll, interval);
-    });
+    }).catch(err => console.log(`Local data acquisition error:`, err));
 
+    // Load remote URIs, and information from them.
+    a.then(loadNicknameURLs)
+        .then(refreshNicknameData)
+        // Schedule a periodic refresh of all nickname data.
+        .then(() => dataTimers['nicknames'] = setInterval(refreshNicknameData, 2 * refresh_rate.as('milliseconds')))
+        .then( getMouseList )
+        .then( getItemList )
+        .catch(err => console.log(`Remote data acquisition error:`, err));
+
+    // Bot configuration.
+    a.then(() => {
+        client.on("ready", () => {
+            console.log("I am alive!");
+
+            // Find its #timers channel (if it has one)
+            client.guilds.forEach(guild => {
+                let canAnnounce = false;
+                guild.channels
+                    .filter(channel => channel.name === settings.timedAnnouncementChannel)
+                    .forEach(announcable => { canAnnounce = createTimedAnnouncements(announcable) });
+                if (!canAnnounce)
+                    console.log(`Timers: No channel for announcements in guild '${guild.name}'.`);
+            });
+        });
+
+        // Message handling.
+        client.on('message', message => {
+            if (message.author.id === client.user.id)
+                return;
+
+            switch (message.channel.name) {
+                case settings.linkConversionChannel:
+                    if (/^(http[s]?:\/\/htgb\.co\/).*/g.test(message.content.toLowerCase()))
+                        convertRewardLink(message);
+                    break;
+                default:
+                    if (message.channel.type === 'dm')
+                        parseUserMessage(message);
+                    else if (message.content.startsWith(settings.botPrefix))
+                        parseUserMessage(message);
+                    break;
+            }
+        });
+
+        // WebSocket connection error for the bot client.
+        client.on('error', error => {
+            console.log("Error Received", error);
+            doSaveAll();
+            client.destroy();
+            process.exit();
+        });
+
+        client.on('reconnecting', () => console.log('Connection lost, reconnecting to Discord...'));
+        // WebSocket disconnected and is no longer trying to reconnect.
+        client.on('disconnect', event => {
+            console.log("Close event: " + event.reason);
+            console.log(`Close code: ${event.code} (${event.wasClean ? `not ` : ``}cleanly closed)`);
+            doSaveAll();
+            client.destroy();
+            process.exit();
+        });
+    }).then(() => client.login(settings.token)
+    ).catch(err => {
+        console.log(`Fatal bot error, exiting`, err);
+        process.exit(1);
+    });
 }
 try {
   Main();
@@ -182,9 +173,28 @@ catch(error) {
  * the bot shuts down, to minimize data loss.
  */
 function doSaveAll() {
-    // Do we need to do anything if these methods call their reject() methods?
     saveHunters();
     saveReminders();
+}
+
+/**
+ * Load data from local databases, like the hunter, timer, and reminder JSON files.
+ * Returns an object which indicates the load state of each local file.
+ * TODO: pass and use filenames from the resolution of loadSettings.
+ *   Requires a generic fsReadFile and then sending the data from the read to the relevant method.
+ *   Can then return a better result than [true, true, true] or <errmsg>
+ *
+ * @param {any} settingsResult The argument passed from loadSettings's 'resolve' call.
+ * @returns {Promise <boolean[]>} a mapping of the type name and whether it has been loaded.
+ */
+function doLoadLocal(settingsResult) {
+    const loader = Promise.all([
+        loadTimers(),
+        loadReminders(),
+        loadHunters()
+    ]);
+    return loader.then(loadResults => new Array(loadResults.length).fill(true))
+        .catch(err => console.log(err));
 }
 
 /**
@@ -208,39 +218,46 @@ function loadSettings(resolve, reject) {
             settings.timedAnnouncementChannel = "timers";
         if (!settings.botPrefix)
             settings.botPrefix = '-mh ';
-
-        resolve(`Settings: loaded ${Object.keys(settings).length} from '${main_settings_filename}'.`);
+        console.log(`Settings: loaded ${Object.keys(settings).length} from '${main_settings_filename}'.`);
+        resolve(/* could send data */);
     });
 }
 
 /**
  * Read individual timer settings from a file and create the associated timers.
+ * Resolves if the timer file didn't exist (e.g. no saved timers), or it was read without error.
+ * Rejects only if a read/parse error occurs.
  *
- * TODO: figure out how to call this such that resolve & reject are valid.
- * @param {callback} resolve A callback for successful execution.
- * @param {callback} reject A callback if an error occurred.
+ * returns {Promise <string>}
  */
-function createTimersList(resolve, reject) {
-    fs.readFile(timer_settings_filename, file_encoding, (readError, data) => {
-        if (readError) {
-            if (readError.code !== "ENOENT")
-                console.log(`Timers: Error during loading of '${timer_settings_filename}'`, readError);
-            return;
-        }
-
-        let obj = JSON.parse(data);
-        for (let i = 0; i < obj.length; i++) {
-            let timer;
-            try {
-                timer = new Timer(obj[i]);
-            } catch (error) {
-                // Bad timer input data.
-                console.log(`Timers: Bad data in element ${i} of '${timer_settings_filename}'`, `Data: ${obj[i]}`, error);
-                continue;
+function loadTimers() {
+    return new Promise((resolve, reject) => {
+        fs.readFile(timer_settings_filename, file_encoding, (readError, data) => {
+            if (readError && readError.code !== "ENOENT") {
+                reject(`Timers: Error during loading of '${timer_settings_filename}'`, readError);
+                return;
             }
-            timers_list.push(timer);
-        }
-        console.log(`Timers: loaded ${timers_list.length} from '${timer_settings_filename}'.`);
+            else if (!readError) {
+                let obj;
+                try { obj = JSON.parse(data); }
+                catch (jsonError) {
+                    reject(jsonError);
+                    return;
+                }
+                for (let i = 0; i < obj.length; i++) {
+                    let timer;
+                    try {
+                        timer = new Timer(obj[i]);
+                    } catch (error) {
+                        console.log(`Timers: Bad data in element ${i} of '${timer_settings_filename}'`, `Data: ${obj[i]}`, error);
+                        continue;
+                    }
+                    timers_list.push(timer);
+                }
+            }
+            console.log(`Timers: loaded ${timers_list.length} from '${timer_settings_filename}'.`);
+            resolve(/* could send data */);
+        });
     });
 }
 
@@ -967,19 +984,30 @@ function timeLeft(in_date) {
  */
 
 /**
- * Read the reminders JSON file, and populate the array for use
+ * Read the reminders JSON file, and populate the array for use.
+ * Resolves if the reminders file didn't exist (e.g. no saved reminders), or it was read without error.
+ * Rejects if any other error occurred.
+ *
+ * returns {Promise <string>}
  */
 function loadReminders() {
-    fs.readFile(reminder_filename, file_encoding, (err, data) => {
-        if (err) {
-            // ENOENT -> File did not exist in the given location.
-            if (err.code !== "ENOENT")
-                console.log(`Reminders: Error during loading of '${reminder_filename}'`, err);
-            return;
-        }
-
-        Array.prototype.push.apply(reminders, JSON.parse(data));
-        console.log(`Reminders: ${reminders.length} loaded from '${reminder_filename}'.`);
+    return new Promise((resolve, reject) => {
+        fs.readFile(reminder_filename, file_encoding, (err, data) => {
+            if (err && err.code !== "ENOENT") {
+                reject(`Reminders: Error during loading of '${reminder_filename}'`, err);
+                return;
+            }
+            else if (!err) {
+                try {
+                    Array.prototype.push.apply(reminders, JSON.parse(data));
+                } catch (jsonError) {
+                    reject(jsonError);
+                    return;
+                }
+            }
+            console.log(`Reminders: ${reminders.length} loaded from '${reminder_filename}'.`);
+            resolve(/* could send data */);
+        });
     });
 }
 
@@ -1018,7 +1046,6 @@ function saveReminders() {
     fs.writeFile(reminder_filename, JSON.stringify(reminders, null, 1), file_encoding, err => {
         if (err) {
             console.log(`Reminders: Error during serialization to '${reminder_filename}'`, err);
-            reject();
             return;
         }
         last_timestamps.reminder_save = DateTime.utc();
@@ -1437,18 +1464,16 @@ function getMouseList() {
             for (let i = 0, len = mice.length; i < len; ++i)
                 mice[i].lowerValue = mice[i].value.toLowerCase();
         }
-
-        // Populate the nickname values for mice.
-        getNicknames("mice");
     });
 }
 
 /**
  * Query @devjacksmith's database for information about the desired mouse.
+ * If no result is found, retries with an item search.
  *
  * @param {TextChannel} channel the channel on which to respond.
  * @param {string} args a lowercased string of search criteria.
- * @param {string} command the command switch used to arrive in this function. For a mouse lookup, this will be 'find'. If searching for a mouse with items, will be 'ifind'.
+ * @param {string} command the command switch used to initiate the request.
  */
 function findMouse(channel, args, command) {
     //NOTE: RH location is https://mhhunthelper.agiletravels.com/tracker.json
@@ -1586,12 +1611,17 @@ function getItemList() {
             for (let i = 0, len = items.length; i < len; ++i)
                 items[i].lowerValue = items[i].value.toLowerCase();
         }
-
-        // Populate the nickname values for loot.
-        getNicknames("loot");
     });
 }
 
+/**
+ * Query @devjacksmith's database for information about the desired item.
+ * If no result is found, retries with a mouse search.
+ *
+ * @param {TextChannel} channel the channel on which to respond.
+ * @param {string} args a lowercased string of search criteria.
+ * @param {string} command the command switch used to initiate the request.
+ */
 function findItem(channel, args, command) {
     //NOTE: RH location is https://mhhunthelper.agiletravels.com/tracker.json
     let url = 'https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=loot';
@@ -1803,40 +1833,70 @@ function setHunterProperty(message, property, value) {
 
 /**
  * Read the JSON datafile with hunter data, storing its contents in the 'hunters' global object.
+ * Resolves if the hunter data file doesn't exist (e.g. no saved hunter data), or it was read without error.
+ * Rejects if any other error occurred.
+ *
+ * returns {Promise <string>}
  */
 function loadHunters() {
-    fs.readFile(hunter_ids_filename, file_encoding, (err, data) => {
-        if (err) {
+    return new Promise((resolve, reject) => {
+        fs.readFile(hunter_ids_filename, file_encoding, (err, data) => {
             // ENOENT -> File did not exist in the given location.
-            if (err.code !== "ENOENT")
-                console.log(`Hunters: Error during loading of '${hunter_ids_filename}'`, err);
-            return;
-        }
-
-        hunters = JSON.parse(data);
-        console.log(`Hunters: ${Object.keys(hunters).length} loaded from '${hunter_ids_filename}'.`);
+            if (err && err.code !== "ENOENT") {
+                reject(`Hunters: Error during loading of '${hunter_ids_filename}'`, err);
+                return;
+            }
+            else if (!err) {
+                try {
+                    hunters = JSON.parse(data);
+                } catch (jsonError) {
+                    reject(jsonError);
+                    return;
+                }
+            }
+            console.log(`Hunters: ${Object.keys(hunters).length} loaded from '${hunter_ids_filename}'.`);
+            resolve(/* could send data */);
+        });
     });
 }
 
 /**
- * Read the JSON datafile with nickname URLs, storing its contents in the 'nickname_urls' global object
+ * Read the JSON datafile with nickname URLs, storing its contents in the 'nickname_urls' global object.
+ * Resolves if the nickname URL file didn't exist (e.g. no known nicknames), or it was read without error.
+ * Rejects if any other error occurs.
+ *
+ * returns {Promise <string>}
  */
 function loadNicknameURLs() {
-    fs.readFile(nickname_urls_filename, file_encoding, (err, data) => {
-        if (err) {
+    return new Promise((resolve, reject) => {
+        fs.readFile(nickname_urls_filename, file_encoding, (err, data) => {
             // ENOENT -> File did not exist in the given location.
-            if (err.code !== "ENOENT")
-                console.log(`Nicknames: Error during loading of '${nickname_urls_filename}'`, err);
-            return;
-        }
-
-        nickname_urls = JSON.parse(data);
-        console.log(`Nicknames: ${Object.keys(nickname_urls).length} URLs loaded from '${nickname_urls_filename}'.`);
-        // Load all nicknames from all sources.
-        nicknames = {};
-        for (var key in nickname_urls)
-            getNicknames(key);
+            if (err && err.code !== "ENOENT") {
+                reject(`Nicknames: Error during loading of '${nickname_urls_filename}'`, err);
+                return;
+            }
+            else if (!err) {
+                try {
+                    nickname_urls = JSON.parse(data);
+                } catch (jsonError) {
+                    reject(jsonError);
+                    return;
+                }
+            }
+            console.log(`Nicknames: ${Object.keys(nickname_urls).length} URLs loaded from '${nickname_urls_filename}'.`);
+            resolve(/* could send data */);
+        });
     });
+}
+
+/**
+ * Load all nicknames from all sources.
+ */
+function refreshNicknameData() {
+    console.log(`Nicknames: initializing knowledge of all types`);
+    nicknames = {};
+    for (let key in nickname_urls)
+        getNicknames(key);
 }
 
 /**
@@ -1846,7 +1906,6 @@ function saveHunters() {
     fs.writeFile(hunter_ids_filename, JSON.stringify(hunters, null, 1), file_encoding, err => {
         if (err) {
             console.log(`Hunters: Error during serialization of data object to '${hunter_ids_filename}'`, err);
-            reject();
             return;
         }
         last_timestamps.hunter_save = DateTime.utc();
