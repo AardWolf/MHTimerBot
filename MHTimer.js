@@ -6,7 +6,7 @@ const { DateTime, Duration, Interval } = require('luxon');
 const Discord = require('discord.js');
 
 // Import type-hinting definitions
-const { Client, ClientUser, Guild, Message, RichEmbed, TextChannel, User } = require('discord.js');
+const { Client, Guild, Message, RichEmbed, TextChannel, User } = require('discord.js');
 
 const Timer = require('./timerClass.js');
 // Access local URIs, like files.
@@ -144,8 +144,7 @@ function Main() {
             }
         });
         client.on('error', error => {
-          console.log("Error Received");
-          console.log(error);
+          console.log("Error Received", error);
           client.destroy();
           process.exit();
         });
@@ -160,14 +159,15 @@ function Main() {
     // Load nickname urls and only afterwards query the mouse & item lists.
     a.then( loadNicknameURLs )
         .then( getMouseList )
-        .then( getItemList );
+        .then( getItemList )
+        .catch(err => console.log(err));
 
 }
 try {
   Main();
 }
 catch(error) {
-  console.log(error);
+  console.log(`Error executing Main: ${error}`);
 }
 
 /**
@@ -180,7 +180,7 @@ function loadSettings(resolve, reject) {
     fs.readFile(main_settings_filename, file_encoding, (err, data) => {
         if (err) {
             console.log(err);
-            reject();
+            reject(err);
             return;
         }
         settings = JSON.parse(data);
@@ -188,26 +188,38 @@ function loadSettings(resolve, reject) {
             settings.linkConversionChannel = "larrys-freebies";
         if (!settings.timedAnnouncementChannel)
             settings.timedAnnouncementChannel = "timers";
-        resolve();
+        resolve(`Settings: loaded ${Object.keys(settings).length} from disk.`);
     });
 }
 
 /**
  * Read individual timer settings from a file and create the associated timers.
  *
+ * TODO: figure out how to call this such that resolve & reject are valid.
  * @param {callback} resolve A callback for successful execution.
  * @param {callback} reject A callback if an error occurred.
  */
 function createTimersList(resolve, reject) {
-    fs.readFile(timer_settings_filename, file_encoding, (err, data) => {
-        if (err) {
-            reject();
-            return console.log(err);
+    fs.readFile(timer_settings_filename, file_encoding, (readError, data) => {
+        if (readError) {
+            if (readError.code !== "ENOENT")
+                console.log(readError);
+            return;
         }
 
         let obj = JSON.parse(data);
-        for (let i = 0; i < obj.length; i++ )
-            timers_list.push(new Timer(obj[i]));
+        for (let i = 0; i < obj.length; i++) {
+            let timer;
+            try {
+                timer = new Timer(obj[i]);
+            } catch (error) {
+                // Bad timer input data.
+                console.log(error, `Element ${i} in ${timer_settings_filename}\n`, `Data ${obj[i]}`);
+                continue;
+            }
+            timers_list.push(timer);
+        }
+        console.log(`Timers: loaded ${timers_list.length} from ${timer_settings_filename}.`);
     });
 }
 
@@ -227,16 +239,45 @@ function createTimedAnnouncements(channel) {
                 timer.stopTimeout();
                 // Schedule the announcement on a repeated interval.
                 let interval = setInterval(
-                    (timer, channel) => { doAnnounce(timer, channel); },
+                    (timer, channel) => doAnnounce(timer, channel),
                     timer.getRepeatInterval().as('milliseconds'), timer, channel);
                 timer.storeInterval(interval);
+                console.log(`Timers: (${timer.name}): Converted from timeout to interval.`)
             },
             timer.getNext().diffNow().minus(timer.getAdvanceNotice()).as('milliseconds'),
             timer,
             channel);
         timer.storeTimeout(timeout);
     });
-    console.log (`Timers: Let's say that ${timers_list.length} got created.`);
+    console.log (`Timers: Let's say that ${timers_list.length} got set up.`);
+}
+
+/**
+ * Inspects the current timers list to dynamically determine the text to print when informing users
+ * of what timers are available.
+ *
+ * @returns {string} a ready-to-print string of timer details, with each timer on a new line.
+ */
+function getKnownTimersDetails() {
+    // Prepare a detailed list of known timers and their sub-areas.
+    /** @type {Object <string, Set<string>> */
+    const details = {};
+    timers_list.forEach(timer => {
+        let area = `**${timer.getArea()}**`;
+        if (!details[area])
+            details[area] = new Set();
+        if (timer.getSubArea())
+            details[area].add(timer.getSubArea());
+    });
+    const names = [];
+    for (let area in details) {
+        let description = area;
+        if (details[area].size)
+            description += ` (${Array.from(details[area]).join(", ")})`;
+        names.push(description);
+    }
+
+    return names.join("\n");
 }
 
 /**
@@ -268,7 +309,7 @@ function parseUserMessage(message) {
     switch (command.toLowerCase()) {
         // Display information about the next instance of a timer.
         case 'next':
-            let aboutTimers = "Did you want to know about `sg`, `fg`, `reset`, `spill`, or `cove`?";
+            let aboutTimers = `I know these timers:\n${getKnownTimersDetails()}`;
             if (!tokens.length) {
                 // received "-mh next" -> display the help string.
                 // TODO: pretty-print known timer info
@@ -329,7 +370,7 @@ function parseUserMessage(message) {
                 message.channel.send("You have to supply mice to find.");
             else {
                 let criteria = tokens.join(" ").trim().toLowerCase().replace(/ mouse$/,'');
-                if (criteria.length < 3)
+                if (criteria.length < 2)
                     message.channel.send("Your search string was too short, try again.");
                 else
                     findMouse(message.channel, criteria, 'find');
@@ -342,7 +383,7 @@ function parseUserMessage(message) {
                 message.channel.send("You have to supply an item to find");
             else {
                 let criteria = tokens.join(" ").trim().toLowerCase();
-                if (criteria.length < 3)
+                if (criteria.length < 2)
                     message.channel.send("Your search string was too short, try again.");
                 else
                     findItem(message.channel, criteria, 'ifind');
@@ -395,7 +436,7 @@ function parseUserMessage(message) {
             let searchType = tokens.shift().toLowerCase();
             if (!isNaN(parseInt(searchType, 10))) {
                 // hid lookup of 1 or more IDs.
-                tokens.unshift(parseInt(searchType, 10));
+                tokens.unshift(searchType);
                 findHunter(message, tokens, "hid");
                 return;
             }
@@ -530,8 +571,8 @@ function timerAliases(tokens) {
         sub_area: null,
         count: null
     };
-    const timerAreas = timers_list.map(timer => { return timer.getArea(); });
-    const timerSubAreas = timers_list.map(timer => { return timer.getSubArea(); });
+    const timerAreas = timers_list.map(timer => timer.getArea());
+    const timerSubAreas = timers_list.map(timer => timer.getSubArea());
     // Scan the input tokens and attempt to match them to a known timer.
     for (let i = 0; i < tokens.length; i++) {
         let token = tokens[i].toLowerCase();
@@ -565,7 +606,7 @@ function timerAliases(tokens) {
         // Upon reaching here, the token has no area, sub-area, or count information, or those fields
         // were already set, and thus it was not parsed for them.
         if (newReminder.area && newReminder.sub_area && newReminder.count !== null) {
-            console.log(`Parsing user input to find timers, got an extra token '${String(token)}' from input '${tokens}'.`);
+            console.log(`MessageHandling: got an extra token '${String(token)}' from user input '${tokens}'.`);
             break;
         }
     }
@@ -801,17 +842,16 @@ function parseTokenForCount(token, newReminder) {
 }
 
 /**
- * Returns the next occurrence of the class of timers as a RichEmbed, or a string if no
- * Timer matched the input TimerRequest.
- * TODO - this should take an array as an argument and process the words passed in
- * @param {ReminderRequest} timerName
- * @returns {RichEmbed|string}
+ * Returns the next occurrence of the desired class of timers as a RichEmbed.
+ *
+ * @param {ReminderRequest} validTimerData Validated input that is known to match an area and subarea
+ * @returns {RichEmbed} A rich snippet summary of the next occurrence of the matching timer.
  */
-function nextTimer(timerName) {
+function nextTimer(validTimerData) {
     // Inspect all known timers to determine the one that matches the requested area, and occurs soonest.
-    const area = timerName.area,
-        sub = timerName.sub_area,
-        areaTimers = timers_list.filter(timer => (timer.getArea() === area));
+    const area = validTimerData.area,
+        sub = validTimerData.sub_area,
+        areaTimers = timers_list.filter(timer => timer.getArea() === area);
 
     let nextTimer;
     for (let timer of areaTimers)
@@ -819,28 +859,7 @@ function nextTimer(timerName) {
             if (!nextTimer || timer.getNext() < nextTimer.getNext())
                 nextTimer = timer;
 
-    if (!nextTimer) {
-        // Prepare a detailed list of known timers and their sub-areas.
-        let details = {};
-        timers_list.forEach(timer => {
-            let area = `\`${timer.getArea()}\``;
-            if (!details[area])
-                details[area] = [];
-            if (timer.getSubArea())
-                details[area].push(timer.getSubArea());
-        });
-        let names = [];
-        for (let area in details) {
-            let description = area;
-            if (details[area].length)
-                description += ` (${details[area].join(", ")})`;
-            names.push(description);
-        }
-
-        return `I do not know that timer, but I do know:\n${names.join("\n")}`;
-    }
-
-    const sched_syntax = "-mh remind " + area + (sub ? " " + sub : "");
+    const sched_syntax = `-mh remind ${area}${sub ? ` ${sub}` : ""}`;
     return (new Discord.RichEmbed()
         .setDescription(nextTimer.getDemand()
             + "\n" + timeLeft(nextTimer.getNext())
@@ -876,9 +895,9 @@ function timeLeft(in_date) {
     // Push any nonzero units into an array, removing "s" if appropriate (since unit is plural).
     const labels = [];
     units.forEach(unit => {
-        let val = Math.floor(remaining.get(unit));
+        let val = remaining.get(unit);
         if (val)
-            labels.push(`${val.toLocaleString('en-US', { maximumFractionDigits: 2 })} ${(val !== 1) ? unit : unit.slice(0, -1)}`);
+            labels.push(`${val.toLocaleString('en-US', { maximumFractionDigits: 0 })} ${(val !== 1) ? unit : unit.slice(0, -1)}`);
     });
     // `labels` should not be empty at this point.
 
@@ -898,7 +917,7 @@ function timeLeft(in_date) {
 
 /**
  * @typedef {Object} TimerReminder
- * @property {ClientUser} user The Discord user who requested the reminder.
+ * @property {User} user The Discord user who requested the reminder.
  * @property {number} count The number of remaining times this reminder will activate.
  * @property {string} area The area to which this reminder applies, e.g. "fg"
  * @property {string} [sub_area] A logical "location" within the area, e.g. "close" or "open" for Forbidden Grove.
@@ -936,7 +955,7 @@ function saveReminders() {
     // Remove any expired timers - no need to save them.
     if (reminders.length) {
         // Move expired reminders to the end.
-        reminders.sort((a, b) => { return a.count === 0 ? 1 : (b.count - a.count); });
+        reminders.sort((a, b) => (a.count === 0) ? 1 : (b.count - a.count));
 
         // Find the first non-expired one.
         let i = reminders.length,
@@ -957,12 +976,14 @@ function saveReminders() {
                 let discarded = reminders.splice(i, numExpired);
                 console.log(`Reminders: spliced ${discarded.length} that were expired. ${reminders.length} remaining.`);
             }
+            else console.log(`Reminders: found ${numExpired} expired, but couldn't splice because reminder at index ${i} was bad: ${reminders}, ${reminders[i]}`);
         }
     }
     fs.writeFile(reminder_filename, JSON.stringify(reminders, null, 1), file_encoding, err => {
         if (err) {
+            console.log(err);
             reject();
-            return console.log(err);
+            return;
         }
         last_timestamps.reminder_save = DateTime.utc();
         console.log(`Reminders: ${reminders.length} saved successfully.`);
@@ -978,10 +999,7 @@ function saveReminders() {
  */
 function doAnnounce(timer, channel) {
     channel.send(timer.getAnnouncement())
-      .catch(error => {
-          console.log(error);
-          console.log(channel.client.status)
-      });
+        .catch(error => console.log(error, channel.client.status));
 
     doRemind(timer);
 }
@@ -997,75 +1015,74 @@ function doRemind(timer) {
     const area = timer.getArea(),
         sub = timer.getSubArea();
 
-    reminders.filter(reminder => { return area === reminder.area && reminder.count !== 0 })
-        .forEach(reminder => {
-            // If there no sub-area for this timer, or the one specified matches
-            // that of the reminder, activate the reminder.
-            if (!sub || sub === reminder.sub_area)
-                client.fetchUser(reminder.user)
-                    .then(user => { sendRemind(user, reminder, timer); })
-                    .catch(err => {
-                        reminder.fail = (reminder.fail || 0) + 1;
-                        console.log(err);
-                    });
+    reminders.filter(r => area === r.area && r.count !== 0)
+        // If there no sub-area for this reminder, or the one specified matches
+        // that of the timer, send the reminder.
+        .forEach(reminder => { if (!reminder.sub_area || sub === reminder.sub_area)
+            client.fetchUser(reminder.user)
+                .then(user => sendRemind(user, reminder, timer))
+                .catch(err => {
+                    reminder.fail = (reminder.fail || 0) + 1;
+                    console.log(err);
+                });
         });
-
-    // Serialize the current reminders and their updated remaining counts.
-    saveReminders();
 }
 
 /**
- * Takes a user object and a reminder "object" and sends the reminder text via PM.
- *
- * @param {ClientUser} user
+ * Takes a user object and a reminder "object" and sends
+ * the reminder as a RichEmbed via PM.
+ * MAYBE: Add ReminderInfo class, let Timers ID one, and have timer definitions provide additional information
+ *      to improve the appearance of the reminders.
+ * @param {User} user
  * @param {TimerReminder} remind
  * @param {Timer} timer
  */
 function sendRemind(user, remind, timer) {
-    // Don't remind invalid users, or chat with bots.
-    if (!user || user.bot) {
+    // Don't remind invalid users.
+    if (!user) {
         remind.fail = (remind.fail || 0) + 1;
-        return -1;
+        return;
     }
-
-    // For non-perpetual reminders, decrement the counter.
-    if (remind.count > 0)
-        --remind.count;
+    if (remind.count === 0)
+        return;
+    // TODO: better timer title info - no markdown formatting in the title.
+    const output = new Discord.RichEmbed({ title: timer.getAnnouncement() });
 
     // Describe the remaining reminders.
-    let count_str = "You have ";
-    if (remind.count < 0) {
-        count_str += "unlimited";
-    } else if (remind.count == 0) {
-        count_str += "no more";
-    } else {
-        count_str += remind.count;
-    }
-    count_str += " reminders left for this timer.";
+    if (remind.fail > 10)
+        remind.count = 1;
+    // For non-perpetual reminders, decrement the counter.
+    output.addField('Reminders Left', (remind.count < 0) ? "unlimited" : --remind.count, true);
+
+    let advanceAmount = timer.getAdvanceNotice().as('milliseconds');
+    // Should this be next user reminder, or next activation of this timer?
+    output.addField('Next Reminder', (advanceAmount
+        ? timer.getNext().plus(timer.getRepeatInterval()).minus(advanceAmount)
+        : timer.getNext()
+    ).diffNow().toFormat("dd'd 'hh'h 'mm'm'", { round: true }), true);
 
     // How to add or remove additional counts.
-    let alter_str = "Use `-mh remind " + remind.area;
-    if (typeof remind.sub_area !== 'undefined') {
-        alter_str += " " + remind.sub_area;
-    }
-    if (remind.count == 0) {
-        alter_str += "` to turn this reminder back on.";
-    } else {
-        alter_str += " stop` to end them sooner.";
-    }
-    alter_str += " See also `-mh help remind` for other options.";
+    let alter_str = `Use \`-mh remind ${remind.area}${remind.sub_area ? ` ${remind.sub_area}` : ""}`;
+    alter_str += (!remind.count) ? "` to turn this reminder back on." : " stop` to end these sooner.";
+    alter_str += "\nUse `- mh help remind` for additional info.";
+    output.addField('Updating:', alter_str, false);
+
 
     if (remind.fail) {
-        usage_str += " There were " + remind.fail + " failures before this got through.\n";
-        if (remind.fail > 10) {
-            console.log("I am removing a reminder for " + remind.user + " due to too many failures\n");
-            remind.count = 0;
-        }
+        output.setDescription(`There were ${remind.fail} failures before this got through.)`);
+        if (remind.fail > 10)
+            console.log(`Reminders: Removing reminder for ${remind.user} due to too many failures`);
     }
-    // console.log("Processed reminder", remind);
-    user.send(timer.getAnnouncement() + "\n" + usage_str )
-        .then(() => { remind.fail = 0; }, //worked
-            () => { remind.fail = (remind.fail || 0) + 1; });
+
+    // The timestamp could be the activation time, not the notification time. If there is
+    // advance notice, then the activation time is yet to come (vs. moments ago).
+    output.setTimestamp(new Date());
+    output.setFooter('Sent:');
+
+    user.send({ embed: output }).then(
+        () => remind.fail = 0,
+        () => remind.fail = (remind.fail || 0) + 1
+    );
 }
 
 /**
@@ -1087,7 +1104,7 @@ function addRemind(timerRequest, message) {
 
     // Default to reminding the user once.
     const count = timerRequest.count || (timerRequest.count === 0 ? 0 : 1);
-    const name = `${area}${subArea ? `: ${subArea}` : ""}`;
+    const requestName = `${area}${subArea ? `: ${subArea}` : ""}`;
 
     // Delete the reminder, if that is being requested.
     // (Rather than try to modify the positions and number of elements in
@@ -1098,35 +1115,53 @@ function addRemind(timerRequest, message) {
             if (reminder.user === message.author.id && reminder.area === area) {
                 if (subArea && subArea === reminder.sub_area) {
                     reminder.count = 0;
-                    responses.push(`Reminder for '${name}' turned off.`);
+                    responses.push(`Reminder for '${requestName}' turned off.`);
                 }
                 else if (!subArea && !reminder.sub_area) {
                     reminder.count = 0;
-                    responses.push(`Reminder for '${name}' turned off.`);
+                    responses.push(`Reminder for '${requestName}' turned off.`);
                 }
             }
 
         message.author.send(responses.length
             ? `\`\`\`${responses.join("\n")}\`\`\``
-            : `I couldn't find a reminder for you in '${name}'.`
+            : `I couldn't find a matching reminder for you in '${requestName}'.`
         );
         return;
     }
 
     // User asked to be reminded - find a timer that meets the request.
-    const choices = timers_list.filter(choice => {
-        return (area === choice.getArea() && (!subArea || subArea === choice.getSubArea()));
-    }).sort((a, b) => (a.getNext() - b.getNext()));
-    console.log(`Found ${choices.length} matching timer request:`, timerRequest, choices);
+    const choices = timers_list
+        .filter(t => area === t.getArea() && (!subArea || subArea === t.getSubArea()))
+        .sort((a, b) => a.getNext() - b.getNext());
+    console.log(`Timers: found ${choices.length} matching input request:`, timerRequest);
 
     // Assume the desired timer is the soonest one that matched the given criteria.
     let timer = choices.pop();
     if (!timer) {
-        // TODO: dynamic area response.
-        message.author.send("I'm sorry, there weren't any timers I know of that match your request.");
+        message.author.send(`I'm sorry, there weren't any timers I know of that match your request. I know\n${getKnownTimersDetails()}`);
         return;
     }
 
+    // If the reminder already exists, set its new count to the requested count.
+    let responses = [];
+    for (let reminder of reminders)
+        if (reminder.user === message.author.id && reminder.area === area)
+            if ((subArea && reminder.sub_area === subArea)
+                || (!subArea && !reminder.sub_area))
+            {
+                responses.push(`Updated reminder count for '${requestName}' from ${reminder.count === -1
+                    ? `'always'` : reminder.count} to ${count}.`);
+                reminder.count = count;
+            }
+
+    if (responses.length) {
+        console.log(`Reminders: updated ${responses.length} for ${message.author.username} to a count of ${count}.`, timerRequest);
+        message.author.send(`\`\`\`${responses.join("\n")}\`\`\``);
+        return;
+    }
+
+    // No updates were made - free to add a new reminder.
     const newReminder = {
         "count": count,
         "area": area,
@@ -1135,35 +1170,12 @@ function addRemind(timerRequest, message) {
     if (timer.getSubArea())
         newReminder.sub_area = subArea;
 
-    // If the reminder already exists, set its new count to the requested count.
-    let responses = [];
-    for (let reminder of reminders)
-        if (reminder.user === message.author.id && reminder.area === area) {
-            let successText = `Updated reminder count for '${name}' from ${reminder.count === -1
-                ? `'always'` : reminder.count} to ${count}.`;
-            if (subArea && reminder.sub_area === subArea) {
-                responses.push(successText);
-                reminder.count = count;
-            }
-            else if (!subArea && !reminder.sub_area) {
-                responses.push(successText);
-                reminder.count = count;
-            }
-        }
-
-    if (responses.length) {
-        console.log(`Updated ${responses.length} reminders for ${message.author.username} to a count of ${count}.`, timerRequest);
-        message.author.send(`\`\`\`${responses.join("\n")}\`\`\``);
-        return;
-    }
-
-    // No updates were made - free to add a new reminder.
     reminders.push(newReminder);
-    responses.push(`Reminder for ${name} set to PM you`);
-    responses.push((count === 1) ? "once" : (count < 0) ? "until you stop it" : `${count} times.`);
+    responses.push(`Reminder for **${timer.name}** is set. I'll PM you about it`);
+    responses.push((count === 1) ? "once." : (count < 0) ? "until you stop it." : `${count} times.`);
 
-    // Inform the user of the new reminder, in PM only.
-    if (message.channel.type !== "dm")
+    // Inform a new user of the reminder functionality (i.e. PM only).
+    if (message.channel.type !== "dm" && !reminders.some(r => r.user === message.author.id))
         responses.unshift(`Hi there! Reminders are only sent via PM, and I'm just making sure I can PM you.`);
 
     // Send notice of the update via PM.
@@ -1183,16 +1195,16 @@ function listRemind(message) {
     let timer_str = "Your reminders:";
     let usage_str;
 
-    const userReminders = reminders.filter(reminder => (reminder.user === user));
+    const userReminders = reminders.filter(r => r.user === user);
     userReminders.forEach(reminder => {
         // TODO: prettyPrint this info.
-        timer_str += `\nTimer:\t\`${reminder.area}\``;
+        let name = `${reminder.area}${reminder.sub_area ? ` (${reminder.sub_area})` : ""}`;
+        timer_str += `\nTimer:\t**${name}**`;
         usage_str = `\`-mh remind ${reminder.area}`;
-        if (reminder.sub_area) {
-            timer_str += ` (${reminder.sub_area})`;
+        if (reminder.sub_area)
             usage_str += ` ${reminder.sub_area}`;
-        }
 
+        timer_str += "\t";
         if (reminder.count === 1)
             timer_str += " one more time";
         else if (reminder.count === -1)
@@ -1200,7 +1212,7 @@ function listRemind(message) {
         else
             timer_str += ` ${reminder.count} times`;
 
-        timer_str += `.\n\t${usage_str} stop\` to turn off\n`;
+        timer_str += `.\nTo turn off\t${usage_str} stop\`\n`;
 
         if (reminder.fail)
             timer_str += `There have been ${reminder.fail} failed attempts to activate this reminder.\n`;
@@ -1236,7 +1248,7 @@ function buildSchedule(timer_request) {
     /** @type {{time: DateTime, message: string}[]} */
     const upcoming_timers = [];
     const max_timers = 24;
-    (!area ? timers_list : timers_list.filter(timer => (timer.getArea() === area)))
+    (!area ? timers_list : timers_list.filter(t => t.getArea() === area))
         .forEach(timer => {
             let message = timer.getDemand();
             for (let time of timer.upcoming(until))
@@ -1244,7 +1256,7 @@ function buildSchedule(timer_request) {
         });
 
     // Sort the list of upcoming timers in this area by time, so that the soonest is printed first.
-    upcoming_timers.sort((a, b) => { return a.time - b.time; });
+    upcoming_timers.sort((a, b) => a.time - b.time);
 
     // Make a nice message to display.
     let return_str = `I have ${upcoming_timers.length} timers coming up in the next ${req_hours.as('hours')} hours`;
@@ -1425,7 +1437,7 @@ function findMouse(channel, args, command) {
                 if (!error && response.statusCode === 200 && Array.isArray(body)) {
                     // body is an array of objects with: location, stage, total_hunts, rate, cheese
                     // Sort it by "rate" but only if hunts > 100
-                    body.filter(setup => (setup.total_hunts > 99)).forEach(setup => {
+                    body.filter(setup => setup.total_hunts > 99).forEach(setup => {
                         attractions.push(
                             {
                                 location: setup.location,
@@ -1445,7 +1457,7 @@ function findMouse(channel, args, command) {
                 let retStr = "";
                 if (attractions.length) {
                     // Sort that by Attraction Rate, descending.
-                    attractions.sort((a, b) => { return b.rate - a.rate; });
+                    attractions.sort((a, b) => (b.rate - a.rate));
                     // Keep only the top 10 results.
                     attractions.splice(10);
 
@@ -1456,7 +1468,7 @@ function findMouse(channel, args, command) {
                     // Specify the column order.
                     const order = ["location", "stage", "cheese", "rate", "total_hunts"];
                     // Inspect the attractions array to determine if we need to include the stage column.
-                    if (attractions.every(row => (row.stage === " N/A ")))
+                    if (attractions.every(row => row.stage === " N/A "))
                         order.splice(order.indexOf("stage"), 1);
 
                     // Build the header row.
@@ -1464,12 +1476,13 @@ function findMouse(channel, args, command) {
                     const headers = order.map(key => {
                         columnFormatting[key] = {
                             columnWidth: labels[key].length,
-                            alignRight: !isNaN(parseInt(attractions[0][key]))
+                            alignRight: !isNaN(parseInt(attractions[0][key], 10))
                         };
                         return { 'key': key, 'label': labels[key] };
                     })
 
                     // Give the numeric column proper formatting.
+                    // TODO: toLocaleString - can it replace integerComma too?
                     columnFormatting['rate'] = {
                         alignRight: true,
                         isFixedWidth: true,
@@ -1565,7 +1578,7 @@ function findItem(channel, args, command) {
                 if (!error && response.statusCode == 200 && Array.isArray(body)) {
                     // body is an array of objects with: location, stage, total_hunts, rate, cheese
                     // Sort by "rate" but only if hunts >= 100
-                    body.filter(setup => (setup.total_hunts > 99)).forEach(setup => {
+                    body.filter(setup => setup.total_hunts > 99).forEach(setup => {
                         attractions.push(
                             {
                                 location: setup.location,
@@ -1583,7 +1596,7 @@ function findItem(channel, args, command) {
                 let retStr = "";
                 if (attractions.length) {
                     // Sort the setups by the drop rate.
-                    attractions.sort((a, b) => { return b.rate - a.rate; });
+                    attractions.sort((a, b) => b.rate - a.rate);
                     // And keep only the top 10 results.
                     attractions.splice(10);
 
@@ -1594,7 +1607,7 @@ function findItem(channel, args, command) {
                     // Specify the column order.
                     const order = ["location", "stage", "cheese", "rate", "total_hunts"];
                     // Inspect the setups array to determine if we need to include the stage column.
-                    if (attractions.every(row => (row.stage === " N/A ")))
+                    if (attractions.every(row => row.stage === " N/A "))
                         order.splice(order.indexOf("stage"), 1);
 
                     // Build the header row.
@@ -1602,7 +1615,7 @@ function findItem(channel, args, command) {
                     const headers = order.map(key => {
                         columnFormatting[key] = {
                             columnWidth: labels[key].length,
-                            alignRight: !isNaN(parseInt(attractions[0][key]))
+                            alignRight: !isNaN(parseInt(attractions[0][key], 10))
                         };
                         return { 'key': key, 'label': labels[key] };
                     })
@@ -1794,8 +1807,9 @@ function loadNicknameURLs() {
 function saveHunters() {
     fs.writeFile(hunter_ids_filename, JSON.stringify(hunters, null, 1), file_encoding, err => {
         if (err) {
+            console.log(err);
             reject();
-            return console.log(err);
+            return;
         }
         last_timestamps.hunter_save = DateTime.utc();
         console.log(`Hunters: ${Object.keys(hunters).length} saved successfully.`);
@@ -1865,14 +1879,15 @@ function getHunterByDiscordID(discordId) {
  *
  * @param {string} property a hunter attribute, like "location" or "rank"
  * @param {string} criterion user-entered input.
+ * @param {number} limit the maximum number of hunters to return.
  * @returns {string[]} an array of up to 5 hunter ids where the property value matched the user's criterion
  */
-function getHuntersByProperty(property, criterion) {
+function getHuntersByProperty(property, criterion, limit = 5) {
     const valid = Object.keys(hunters)
-        .filter(key => (hunters[key][property] === criterion))
+        .filter(key => hunters[key][property] === criterion)
         .map(key => (hunters[key].hid));
 
-    return valid.sort(() => { return 0.5 - Math.random(); }).slice(0, 5);
+    return valid.sort(() => 0.5 - Math.random()).slice(0, limit);
 }
 
 /**
@@ -1912,17 +1927,17 @@ function prettyPrintArrayAsString(body, columnFormat, headers, headerUnderline) 
     if (!columnFormat || !Object.keys(columnFormat).length)
         throw new TypeError(`Input column formatter was of wrong type (or had no keys).`);
     // The headers should be an array of objects with at minimum 'key' and 'label' properties, of which 'key' must have a non-falsy value.
-    if (!headers || !Array.isArray(headers) || !headers.every(col => (col.hasOwnProperty("key") && col.hasOwnProperty("label") && col.key)))
+    if (!headers || !Array.isArray(headers) || !headers.every(col => col.hasOwnProperty("key") && col.hasOwnProperty("label") && col.key))
         throw new TypeError(`Input headers of incorrect type. Expected array of objects with properties 'key' and 'label'.`);
     // All object keys in the headers array must be found in both the body and columnFormat objects.
     let bodyKeys = body.reduce((acc, row) => { Object.keys(row).forEach(key => acc.add(key)); return acc; }, new Set());
-    if (!headers.every(col => (bodyKeys.has(col.key) && columnFormat.hasOwnProperty(col.key))))
+    if (!headers.every(col => bodyKeys.has(col.key) && columnFormat.hasOwnProperty(col.key)))
         throw new TypeError(`Input header array specifies non-existent columns.`);
 
     // Ensure that the column format prefix/suffix strings are initialized.
     for (let col in columnFormat) {
         ["prefix", "suffix"].forEach(key => {
-            columnFormat[col][key] = columnFormat[col][key] || (columnFormat[col][key] === 0 ? "0" : "")
+            columnFormat[col][key] = columnFormat[col][key] || (columnFormat[col][key] === 0 ? "0" : "");
         });
     }
 
