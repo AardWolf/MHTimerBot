@@ -103,7 +103,7 @@ function Main() {
     // Bot start up tasks
     a.then(() => {
         client.on('ready', () => {
-            console.log ('I am alive!');
+            console.log('I am alive!');
 
             //for each guild find its #timers channel (if it has one)
             for (var [guildkey, guildvalue] of client.guilds) {
@@ -115,7 +115,7 @@ function Main() {
                     }
 
                 if (!canAnnounce)
-                    console.log(`No channel for announcements in guild '${guildvalue.name}'.`);
+                    console.log(`Timers: No channel for announcements in guild '${guildvalue.name}'.`);
             }
         });
     });
@@ -224,7 +224,7 @@ function createTimersList(resolve, reject) {
     fs.readFile(timer_settings_filename, file_encoding, (readError, data) => {
         if (readError) {
             if (readError.code !== "ENOENT")
-                console.log(readError);
+                console.log(`Timers: Error during loading of '${timer_settings_filename}'`, readError);
             return;
         }
 
@@ -235,12 +235,12 @@ function createTimersList(resolve, reject) {
                 timer = new Timer(obj[i]);
             } catch (error) {
                 // Bad timer input data.
-                console.log(error, `Element ${i} in ${timer_settings_filename}\n`, `Data ${obj[i]}`);
+                console.log(`Timers: Bad data in element ${i} of '${timer_settings_filename}'`, `Data: ${obj[i]}`, error);
                 continue;
             }
             timers_list.push(timer);
         }
-        console.log(`Timers: loaded ${timers_list.length} from ${timer_settings_filename}.`);
+        console.log(`Timers: loaded ${timers_list.length} from '${timer_settings_filename}'.`);
     });
 }
 
@@ -251,7 +251,7 @@ function createTimersList(resolve, reject) {
  * @param {TextChannel} channel A channel interface on which announcements should be sent.
  */
 function createTimedAnnouncements(channel) {
-    console.log('Initializing announcements...');
+    console.log('Timers: Setting up announcements.');
     timers_list.forEach(timer => {
         let timeout = setTimeout(
             (timer, channel) => {
@@ -263,14 +263,13 @@ function createTimedAnnouncements(channel) {
                     (timer, channel) => doAnnounce(timer, channel),
                     timer.getRepeatInterval().as('milliseconds'), timer, channel);
                 timer.storeInterval(interval);
-                console.log(`Timers: (${timer.name}): Converted from timeout to interval.`)
             },
             timer.getNext().diffNow().minus(timer.getAdvanceNotice()).as('milliseconds'),
             timer,
             channel);
         timer.storeTimeout(timeout);
     });
-    console.log (`Timers: Let's say that ${timers_list.length} got set up.`);
+    console.log(`Timers: Let's say that ${timers_list.length} got set up.`);
 }
 
 /**
@@ -534,7 +533,7 @@ function parseUserMessage(message) {
  */
 function convertRewardLink(message) {
     if (!settings.bitly_token) {
-        console.log(`Received link to convert, but don't have a valid 'bitly_token' specified in settings: ${settings}.`);
+        console.log(`Links: Received link to convert, but don't have a valid 'bitly_token' specified in settings: ${settings}.`);
         return;
     }
 
@@ -555,14 +554,14 @@ function convertRewardLink(message) {
             }, (error, response, body) => {
                 if (!error && response.statusCode == 200) {
                     const responseJSON = JSON.parse(response.body);
-                    console.log("MH reward link converted for non-facebook users");
+                    console.log("Links: MH reward link converted for non-facebook users");
                     message.channel.send(responseJSON.data.url + " <-- Non-Facebook Link");
                 } else {
-                    console.log("Bitly shortener failed for some reason" + error + response + body);
+                    console.log("Links: Bitly shortener failed for some reason", error, response, body);
                 }
             });
         } else {
-            console.log("GET to htgb.co failed for some reason" + error + response + body);
+            console.log("Links: GET to htgb.co failed for some reason", error, response, body);
         }
     });
 }
@@ -1031,7 +1030,7 @@ function saveReminders() {
  */
 function doAnnounce(timer, channel) {
     channel.send(timer.getAnnouncement())
-        .catch(error => console.log(error, channel.client.status));
+        .catch(error => console.log(`Timers: Error during announcement. Status ${channel.client.status}`, error));
 
     doRemind(timer);
 }
@@ -1055,7 +1054,7 @@ function doRemind(timer) {
                 .then(user => sendRemind(user, reminder, timer))
                 .catch(err => {
                     reminder.fail = (reminder.fail || 0) + 1;
-                    console.log(err);
+                    console.log(`Reminders: Error during user notification`, err);
                 });
         });
 }
@@ -1406,7 +1405,6 @@ function getHelpMessage(tokens) {
  * Updates the mouse nicknames as well.
  */
 function getMouseList() {
-    console.log("Checking mouse dates");
     const now = DateTime.utc();
     // Only request a mouse list update every so often.
     if ("mouse_refresh" in last_timestamps) {
@@ -1417,13 +1415,14 @@ function getMouseList() {
     last_timestamps.mouse_refresh = now;
 
     // Query @devjacksmith's tools for mouse lists.
+    console.log("Mice: Requesting a new mouse list.");
     const url = "https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=mouse&item_id=all";
     request({
         url: url,
         json: true
     }, (error, response, body) => {
         if (!error && response.statusCode == 200) {
-            console.log("Got a mouse list");
+            console.log("Mice: Got a new mouse list.");
             mice.length = 0;
             Array.prototype.push.apply(mice, body);
             for (let i = 0, len = mice.length; i < len; ++i)
@@ -1489,7 +1488,7 @@ function findMouse(channel, args, command) {
                             });
                     });
                 } else {
-                    console.log("Lookup failed for some reason:", error, response, body);
+                    console.log("Mice: Lookup failed for some reason:", error, response, body);
                     channel.send(`Could not process results for '${args}', AKA ${mouseName}`);
                     return;
                 }
@@ -1557,7 +1556,6 @@ function findMouse(channel, args, command) {
  * Updates the loot nicknames as well.
  */
 function getItemList() {
-    console.log("Checking item dates");
     const now = DateTime.utc();
     if ("item_refresh" in last_timestamps) {
         let next_refresh = last_timestamps.item_refresh.plus(refresh_rate);
@@ -1566,13 +1564,14 @@ function getItemList() {
     }
     last_timestamps.item_refresh = now;
 
+    console.log("Loot: Requesting a new loot list.");
     const url = "https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=loot&item_id=all";
     request({
         url: url,
         json: true
     }, (error, response, body) => {
         if (!error && response.statusCode == 200) {
-            console.log("Got a loot list");
+            console.log("Loot: Got a new loot list");
             items.length = 0;
             Array.prototype.push.apply(items, body);
             for (let i = 0, len = items.length; i < len; ++i)
@@ -1630,7 +1629,7 @@ function findItem(channel, args, command) {
                             });
                     });
                 } else {
-                    console.log("Lookup failed for some reason", error, response, body);
+                    console.log("Loot: Lookup failed for some reason", error, response, body);
                     channel.send(`Could not process results for '${args}', AKA ${itemName}`);
                     return;
                 }
@@ -1749,28 +1748,24 @@ function unsetHunterID(message) {
  * Sets the message author's hunter ID to the passed argument, and messages the user back.
  * 
  * @param {Message} message a Discord message object from a user
- * @param {string} hid a "Hunter ID" string, which should parse to a number.
+ * @param {string} hid a "Hunter ID" string, which is known to parse to a number.
  */
 function setHunterID(message, hid) {
-    let hunter = message.author.id;
+    const discordId = message.author.id;
     let message_str = "";
-    if (isNaN(hid)) {
-        message.channel.send(`I'm not sure that \`${hid}\` is a number so I am ignoring you.`);
-        return;
-    }
 
     // Initialize the data for any new registrants.
-    if (!hunters[hunter]) {
-        hunters[hunter] = {};
-        console.log(" OMG! A new hunter " + hunter);
+    if (!hunters[discordId]) {
+        hunters[discordId] = {};
+        console.log(`Hunters: OMG! A new hunter id '${discordId}'`);
     }
 
     // If they already registered a hunter ID, update it.
-    if (hunters[hunter]['hid']) {
-        message_str = `You used to be known as \`${hunters[hunter]['hid']}\`. `;
-        console.log("Found an old hid");
+    if (hunters[discordId]['hid']) {
+        message_str = `You used to be known as \`${hunters[discordId]['hid']}\`. `;
+        console.log(`Hunters: Updating hid ${hunters[discordId]['hid']} to ${hid}`);
     }
-    hunters[hunter]['hid'] = hid;
+    hunters[discordId]['hid'] = hid;
     message_str += `If people look you up they'll see \`${hid}\`.`;
 
     message.channel.send(message_str);
@@ -1784,14 +1779,14 @@ function setHunterID(message, hid) {
  * @param {any} value the property's new value.
  */
 function setHunterProperty(message, property, value) {
-    let hunter = message.author.id;
-    if (!hunters[hunter] || !hunters[hunter]['hid']) {
+    const discordId = message.author.id;
+    if (!hunters[discordId] || !hunters[discordId]['hid']) {
         message.channel.send("I don't know who you are so you can't set that now; set your hunter ID first.");
         return;
     }
 
-    let message_str = !hunters[hunter][property] ? "" : `Your ${property} used to be \`${hunters[hunter][property]}\`.`;
-    hunters[hunter][property] = value;
+    let message_str = !hunters[discordId][property] ? "" : `Your ${property} used to be \`${hunters[discordId][property]}\`.`;
+    hunters[discordId][property] = value;
 
     message_str += ` Your ${property} is set to \`${value}\``;
     message.channel.send(message_str);
@@ -1818,17 +1813,16 @@ function loadHunters() {
  * Read the JSON datafile with nickname URLs, storing its contents in the 'nickname_urls' global object
  */
 function loadNicknameURLs() {
-    console.log("loading nicknames");
     fs.readFile(nickname_urls_filename, file_encoding, (err, data) => {
         if (err) {
             // ENOENT -> File did not exist in the given location.
             if (err.code !== "ENOENT")
-                console.log(err);
+                console.log(`Nicknames: Error during loading of '${nickname_urls_filename}'`, err);
             return;
         }
 
         nickname_urls = JSON.parse(data);
-        console.log(`Nicknames: ${Object.keys(nickname_urls).length} URLs loaded from disk.`);
+        console.log(`Nicknames: ${Object.keys(nickname_urls).length} URLs loaded from '${nickname_urls_filename}'.`);
         // Load all nicknames from all sources.
         nicknames = {};
         for (var key in nickname_urls)
@@ -1862,7 +1856,7 @@ function saveHunters() {
  */
 function getNicknames(type) {
     if (!nickname_urls[type]) {
-        console.log(`Received '${type}' but I don't know that URL.`);
+        console.log(`Nicknames: Received '${type}' but I don't know its URL.`);
         return false;
     }
     nicknames[type] = {};
