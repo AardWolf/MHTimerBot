@@ -28,23 +28,21 @@ const timers_list = [];
 /** @type {TimerReminder[]} */
 const reminders = [];
 const file_encoding = 'utf8';
+
 var settings = {};
 const mice = [];
 const items = [];
 var hunters = {};
 var nicknames = {};
 var nickname_urls = {};
+const refresh_rate = Duration.fromObject({ minutes: 5 });
+/** @type {Object <string, NodeJS.Timer>} */
+const dataTimers = {};
 /** @type {Object <string, DateTime>} */
 const last_timestamps = {
     reminder_save: null,
     hunter_save: null
 }
-/** @type {Object <string, NodeJS.Timer>} */
-const dataTimers = {};
-const refresh_rate = Duration.fromObject({ minutes: 5 });
-
-//Only support announcing in 1 channel
-var announce_channel;
 
 //https://stackoverflow.com/questions/12008120/console-log-timestamps-in-chrome
 console.logCopy = console.log.bind(console);
@@ -80,7 +78,7 @@ console.log = function()
     }
 };
 
-process.on('uncaughtException', function (exception) {
+process.on('uncaughtException', exception => {
   console.log(exception); // to see your exception details in the console
   // if you are on production, maybe you can send the exception details to your
   // email as well ?
@@ -137,22 +135,24 @@ function Main() {
                 default:
                     if (message.channel.type === 'dm') {
                         parseUserMessage(message);
-                    } else if (message.content.startsWith('-mh ')) {
+                    } else if (message.content.startsWith(settings.botPrefix)) {
                         parseUserMessage(message);
                     }
                     break;
             }
         });
         client.on('error', error => {
-          console.log("Error Received", error);
-          client.destroy();
-          process.exit();
+            console.log("Error Received", error);
+            client.destroy();
+            doSave();
+            process.exit();
         });
         client.on('disconnect', event => {
-          console.log("Close event: " + event.reason);
-          console.log("Close code: " + event.code);
-          client.destroy();
-          process.exit();
+            console.log("Close event: " + event.reason);
+            console.log("Close code: " + event.code);
+            client.destroy();
+            doSave();
+            process.exit();
         });
     });
 
@@ -162,12 +162,29 @@ function Main() {
         .then( getItemList )
         .catch(err => console.log(err));
 
+    // Set up periodic data saves
+    a.then(() => {
+        let interval = (Math.random() + 2) * refresh_rate.as('milliseconds');
+        console.log(`Scheduling periodic data saves every ~${interval / (1000 * 60)} minutes.`);
+        dataTimers['data'] = setInterval(doSaveAll, interval);
+    });
+
 }
 try {
   Main();
 }
 catch(error) {
-  console.log(`Error executing Main: ${error}`);
+  console.log(`Error executing Main`, error);
+}
+
+/**
+ * Any object which stores user-entered data should be periodically saved, or at minimum saved before
+ * the bot shuts down, to minimize data loss.
+ */
+function doSaveAll() {
+    // Do we need to do anything if these methods call their reject() methods?
+    saveHunters();
+    saveReminders();
 }
 
 /**
@@ -928,22 +945,16 @@ function timeLeft(in_date) {
  * Read the reminders JSON file, and populate the array for use
  */
 function loadReminders() {
-    console.log(`Scheduling save for reminders every ~${2 * refresh_rate.as('minutes')} minutes.`);
-    // Do we need to do anything if saveReminders calls its reject()?
-    dataTimers['reminders'] = setInterval(saveReminders,
-        refresh_rate.as('milliseconds') * (Math.random() + 2));
-
-    console.log("loading reminders");
     fs.readFile(reminder_filename, file_encoding, (err, data) => {
         if (err) {
             // ENOENT -> File did not exist in the given location.
             if (err.code !== "ENOENT")
-                console.log(err);
+                console.log(`Reminders: Error during loading of '${reminder_filename}'`, err);
             return;
         }
 
         Array.prototype.push.apply(reminders, JSON.parse(data));
-        console.log (`Reminders: ${reminders.length} loaded.`);
+        console.log(`Reminders: ${reminders.length} loaded from '${reminder_filename}'.`);
     });
 }
 
@@ -981,12 +992,12 @@ function saveReminders() {
     }
     fs.writeFile(reminder_filename, JSON.stringify(reminders, null, 1), file_encoding, err => {
         if (err) {
-            console.log(err);
+            console.log(`Reminders: Error during serialization to '${reminder_filename}'`, err);
             reject();
             return;
         }
         last_timestamps.reminder_save = DateTime.utc();
-        console.log(`Reminders: ${reminders.length} saved successfully.`);
+        console.log(`Reminders: ${reminders.length} saved successfully to '${reminder_filename}'.`);
     });
 }
 
@@ -1760,22 +1771,16 @@ function setHunterProperty(message, property, value) {
  * Read the JSON datafile with hunter data, storing its contents in the 'hunters' global object.
  */
 function loadHunters() {
-    console.log(`Scheduling save for hunters every ~${2 * refresh_rate.as('minutes')} minutes.`);
-    // Do we need to do anything if saveHunters calls its reject()?
-    dataTimers['hunters'] = setInterval(saveHunters,
-        refresh_rate.as('milliseconds') * (Math.random() + 2));
-
-    console.log("loading hunters");
     fs.readFile(hunter_ids_filename, file_encoding, (err, data) => {
         if (err) {
             // ENOENT -> File did not exist in the given location.
             if (err.code !== "ENOENT")
-                console.log(err);
+                console.log(`Hunters: Error during loading of '${hunter_ids_filename}'`, err);
             return;
         }
 
         hunters = JSON.parse(data);
-        console.log(`Hunters: ${Object.keys(hunters).length} loaded.`);
+        console.log(`Hunters: ${Object.keys(hunters).length} loaded from '${hunter_ids_filename}'.`);
     });
 }
 
@@ -1807,12 +1812,12 @@ function loadNicknameURLs() {
 function saveHunters() {
     fs.writeFile(hunter_ids_filename, JSON.stringify(hunters, null, 1), file_encoding, err => {
         if (err) {
-            console.log(err);
+            console.log(`Hunters: Error during serialization of data object to '${hunter_ids_filename}'`, err);
             reject();
             return;
         }
         last_timestamps.hunter_save = DateTime.utc();
-        console.log(`Hunters: ${Object.keys(hunters).length} saved successfully.`);
+        console.log(`Hunters: ${Object.keys(hunters).length} saved successfully to '${hunter_ids_filename}'.`);
     });
 }
 
