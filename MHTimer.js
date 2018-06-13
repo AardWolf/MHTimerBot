@@ -1667,7 +1667,7 @@ function findHunter(message, searchValues, type) {
         // Use message text or mentions to obtain the discord ID.
         let member = message.mentions.members.first() || message.guild.members
             .filter(member => member.displayName.toLowerCase() === searchValues[0].toLowerCase()).first();
-        if (member)
+        if (member && getHunterByDiscordID(member.id))
             discordId = member.id;
     } else {
         // This is self-volunteered information that is tracked.
