@@ -249,27 +249,32 @@ function createTimersList(resolve, reject) {
  * Also sets up the conversion from a single timeout-based call into a repeated-every-X interval.
  * 
  * @param {TextChannel} channel A channel interface on which announcements should be sent.
+ * @returns {boolean} if any timers have been initialized.
  */
 function createTimedAnnouncements(channel) {
-    console.log('Timers: Setting up announcements.');
+    let location = `'#${channel.name}' in server '${channel.guild.name}'`;
+    let key = `${channel.id}${channel.guild.id}`;
+    console.log(`Timers: Setting up announcements for ${location}.`);
     timers_list.forEach(timer => {
         let timeout = setTimeout(
             (timer, channel) => {
                 // When activated, print the associated announcement.
                 doAnnounce(timer, channel);
-                timer.stopTimeout();
+                timer.stopTimeout(key);
                 // Schedule the announcement on a repeated interval.
                 let interval = setInterval(
                     (timer, channel) => doAnnounce(timer, channel),
                     timer.getRepeatInterval().as('milliseconds'), timer, channel);
-                timer.storeInterval(interval);
+                timer.storeInterval(key, interval);
             },
             timer.getNext().diffNow().minus(timer.getAdvanceNotice()).as('milliseconds'),
             timer,
             channel);
-        timer.storeTimeout(timeout);
+        timer.storeTimeout(key, timeout);
     });
-    console.log(`Timers: Let's say that ${timers_list.length} got set up.`);
+    console.log(`Timers: ${timers_list.length} configured for ${location}.`);
+    // Not sure how we would check for initialization errors for a given server.
+    return true;
 }
 
 /**

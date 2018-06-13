@@ -78,10 +78,10 @@ class Timer {
         // If no advance warning is specified, the timer will send reminders only when it activates.
         this._advanceNotice = getAsDuration(seed.announce_offset || 0, true);
 
-        /** @type {NodeJS.Timer} the NodeJS.Timer object created by NodeJS.setTimeout() */
-        this._timeout = null;
-        /** @type {NodeJS.Timer} the NodeJS.Timer object created by NodeJS.setInterval() */
-        this._interval = null;
+        /** @type {Object <string, NodeJS.Timer>} the NodeJS.Timer object created by NodeJS.setTimeout() */
+        this._timeout = {};
+        /** @type {Object <string, NodeJS.Timer>} the NodeJS.Timer object created by NodeJS.setInterval() */
+        this._interval = {};
     }
 
     /**
@@ -234,26 +234,28 @@ class Timer {
      * stopping any existing timeout.
      *
      * @instance
+     * @param {string} key The channel and guild identifier for this particular timeout.
      * @param {NodeJS.Timer} timeout a Node.js Timer started with setTimeout()
      */
-    storeTimeout(timeout) {
-        if (!timeout)
+    storeTimeout(key, timeout) {
+        if (!key || !timeout)
             return;
-        this.stopTimeout();
+        this.stopTimeout(key);
     
-        this._timeout = timeout;
+        this._timeout[key] = timeout;
     }
 
     /**
      * Stops and also removes the existing Node.js Timer object for this timer instance
      *
      * @instance
+     * @param {string} key The channel and guild identifier for this particular timeout.
      */
-    stopTimeout() {
-        if (this._timeout)
-            clearTimeout(this._timeout);
+    stopTimeout(key) {
+        if (this._timeout[key])
+            clearTimeout(this._timeout[key]);
 
-        this._timeout = null;
+        this._timeout[key] = null;
     }
 
     /**
@@ -261,26 +263,28 @@ class Timer {
      * stopping any existing intervals.
      *
      * @instance
+     * @param {string} key The channel and guild identifier for this particular interval.
      * @param {NodeJS.Timer} interval a Node.js Timer initiated with setInterval()
      */
-    storeInterval(interval) {
-        if (!interval)
+    storeInterval(key, interval) {
+        if (!key || !interval)
             return;
-        this.stopInterval();
+        this.stopInterval(key);
 
-        this._interval = interval;
+        this._interval[key] = interval;
     }
 
     /**
      * Stops and also removes the existing Node.js Timer object for this timer instance.
      *
      * @instance
+     * @param {string} key The channel and guild identifier for this particular interval.
      */
-    stopInterval() {
-        if (this._interval)
-            clearInterval(this._interval);
+    stopInterval(key) {
+        if (this._interval[key])
+            clearInterval(this._interval[key]);
 
-        this._interval = null;
+        this._interval[key] = null;
     }
 }
 
