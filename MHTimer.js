@@ -1046,6 +1046,9 @@ function doRemind(timer) {
     const area = timer.getArea(),
         sub = timer.getSubArea();
 
+    let start = DateTime.utc();
+    // TODO: Build a basic embed template object and package that to each recipient, rather than
+    // fully construct the (basically equivalent) embed for each user.
     reminders.filter(r => area === r.area && r.count !== 0)
         // If there no sub-area for this reminder, or the one specified matches
         // that of the timer, send the reminder.
@@ -1057,6 +1060,7 @@ function doRemind(timer) {
                     console.log(`Reminders: Error during user notification`, err);
                 });
         });
+    console.log(`Timers: Announcements for ${timer.name} completed in ${start.diffNow('seconds', 'milliseconds').toFormat('ss.SSS')}.`);
 }
 
 /**
@@ -1095,8 +1099,8 @@ function sendRemind(user, remind, timer) {
     // How to add or remove additional counts.
     let alter_str = `Use \`${settings.botPrefix}remind ${remind.area}${remind.sub_area ? ` ${remind.sub_area}` : ""}`;
     alter_str += (!remind.count) ? "` to turn this reminder back on." : " stop` to end these sooner.";
-    alter_str += "\nUse `- mh help remind` for additional info.";
-    output.addField('Updating:', alter_str, false);
+    alter_str += `\nUse \`${settings.botPrefix}help remind\` for additional info.`;
+    output.addField('To Update:', alter_str, false);
 
 
     if (remind.fail) {
