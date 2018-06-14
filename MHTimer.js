@@ -455,17 +455,17 @@ function parseUserMessage(message) {
                 // Nobody should need this many tokens to specify their input, but someone is gonna try for more.
                 let userText = tokens.slice(1, 10).join(" ").trim().toLowerCase();
                 let userCommand = tokens[0].toLowerCase();
-                if (userCommand === "in") {
+                if (userCommand === "in" && userText) {
                     if (nicknames["locations"][userText])
                         userText = nicknames["locations"][userText];
                     setHunterProperty(message, "location", userText);
                 }
-                else if (["rank", "title", "a"].indexOf(userCommand) !== -1) {
+                else if (["rank", "title", "a"].indexOf(userCommand) !== -1 && userText) {
                     if (nicknames["ranks"][userText])
                         userText = nicknames["ranks"][userText];
                     setHunterProperty(message, "rank", userText);
                 }
-                else if (userCommand.substring(0, 3) === "snu" && tokens[1])
+                else if (userCommand.substring(0, 3) === "snu" && userText)
                     setHunterProperty(message, "snuid", userText);
                 else {
                     let prefix = settings.botPrefix;
@@ -1840,10 +1840,10 @@ function setHunterProperty(message, property, value) {
         return;
     }
 
-    let message_str = !hunters[discordId][property] ? "" : `Your ${property} used to be \`${hunters[discordId][property]}\`.`;
+    let message_str = !hunters[discordId][property] ? "" : `Your ${property} used to be \`${hunters[discordId][property]}\`. `;
     hunters[discordId][property] = value;
 
-    message_str += ` Your ${property} is set to \`${value}\``;
+    message_str += `Your ${property} is set to \`${value}\``;
     message.channel.send(message_str);
 }
 
@@ -1976,9 +1976,10 @@ function getNicknames(type) {
  * @returns {string?} The discord ID, or undefined if the hunter ID was not registered.
  */
 function getHunterByID(input, type) {
-    for (let key in hunters)
-        if (hunters[key][type] === input)
-            return key;
+    if (input)
+        for (let key in hunters)
+            if (hunters[key][type] === input)
+                return key;
 }
 
 /**
