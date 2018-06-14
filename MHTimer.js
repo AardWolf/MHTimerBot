@@ -1762,25 +1762,31 @@ function findHunter(message, searchValues, type) {
         // Use message text or mentions to obtain the discord ID.
         let member = message.mentions.members.first() || message.guild.members
             .filter(member => member.displayName.toLowerCase() === searchValues[0].toLowerCase()).first();
-        if (member && getHunterByDiscordID(member.id))
-            discordId = member.id;
-    } else {
+        if (member) {
+            // Prevent mentioning this user in our reply.
+            searchValues[0] = member.displayName;
+            // Ensure only registered hunters get a link in our reply.
+            if (getHunterByDiscordID(member.id))
+                discordId = member.id;
+        }
+    } else if (searchValues[0]) {
         // This is self-volunteered information that is tracked.
         discordId = getHunterByID(searchValues[0], type);
     }
     if (!discordId) {
-        message.channel.send(`I did not find a registered hunter with \`${searchValues[0]}\` as a ${type === "hid" ? "hunter ID" : type}.`);
+        message.channel.send(`I did not find a registered hunter with **${searchValues[0]}** as a ${type === "hid" ? "hunter ID" : type}.`,
+            { disableEveryone: true });
         return;
     }
-    // Require that this Discord user has volunteered their information (i.e. the id appears in the 'hunters' object).
-    const hunterId = getHunterByDiscordID(discordId);
-    client.fetchUser(discordId)
-        .then(user => {
-            message.guild.fetchMember(user)
-                .then(member => message.channel.send(`\`${searchValues[0]}\` is ${member.displayName} <https://mshnt.ca/p/${hunterId}>`))
-                .catch(err => message.channel.send("That person may not be on this server."))
-        })
-        .catch(err => message.channel.send("That person may not have a Discord account any longer."));
+    // The Discord ID belongs to a registered member of this server.
+    const link = `<https://mshnt.ca/p/${getHunterByDiscordID(discordId)}>`;
+    client.fetchUser(discordId).then(message.guild.fetchMember)
+        .then(member => message.channel.send(`**${searchValues[0]}** is ${member.displayName} ${link}`,
+            { disableEveryone: true }))
+        .catch(err => {
+            console.log(err);
+            message.channel.send("That person may not be on this server.");
+        });
 }
 
 /**
