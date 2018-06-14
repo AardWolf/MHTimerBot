@@ -1780,7 +1780,7 @@ function findHunter(message, searchValues, type) {
     }
     // The Discord ID belongs to a registered member of this server.
     const link = `<https://mshnt.ca/p/${getHunterByDiscordID(discordId)}>`;
-    client.fetchUser(discordId).then(message.guild.fetchMember)
+    client.fetchUser(discordId).then(user => message.guild.fetchMember(user))
         .then(member => message.channel.send(`**${searchValues[0]}** is ${member.displayName} ${link}`,
             { disableEveryone: true }))
         .catch(err => {
