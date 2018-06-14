@@ -226,8 +226,8 @@ function loadSettings(resolve, reject) {
             settings.linkConversionChannel = "larrys-freebies";
         if (!settings.timedAnnouncementChannel)
             settings.timedAnnouncementChannel = "timers";
-        if (!settings.botPrefix)
-            settings.botPrefix = '-mh ';
+        settings.botPrefix = settings.botPrefix ? settings.botPrefix.trim() : '-mh';
+
         console.log(`Settings: loaded ${Object.keys(settings).length} from '${main_settings_filename}'.`);
         resolve(/* could send data */);
     });
@@ -471,11 +471,11 @@ function parseUserMessage(message) {
                     let prefix = settings.botPrefix;
                     let commandSyntax = [
                         `I'm not sure what to do with that. Try:`,
-                        `\`${prefix}iam ####\` to set a hunter ID.`,
-                        `\`${prefix}iam rank <rank>\` to set a rank.`,
-                        `\`${prefix}iam in <location>\` to set a location`,
-                        `\`${prefix}iam snuid ####\` to set your in-game user id`,
-                        `\`${prefix}iam not\` to unregister (and delete your data)`
+                        `\`${prefix} iam ####\` to set a hunter ID.`,
+                        `\`${prefix} iam rank <rank>\` to set a rank.`,
+                        `\`${prefix} iam in <location>\` to set a location`,
+                        `\`${prefix} iam snuid ####\` to set your in-game user id`,
+                        `\`${prefix} iam not\` to unregister (and delete your data)`
                     ];
                     message.channel.send(commandSyntax.join("\n\t"));
                 }
@@ -533,8 +533,8 @@ function parseUserMessage(message) {
                     let prefix = settings.botPrefix;
                     let commandSyntax = [
                         `I'm not sure what to do with that. Try:`,
-                        `\`${prefix}whois [#### | <mention>]`` to look up specific hunters`,
-                        `\`${prefix}whois [in <location> | a <rank>]\` to find up to 5 random new friends`,
+                        `\`${prefix} whois [#### | <mention>]`` to look up specific hunters`,
+                        `\`${prefix} whois [in <location> | a <rank>]\` to find up to 5 random new friends`,
                     ];
                     message.channel.send(commandSyntax.join("\n\t"));
                     return;
@@ -928,7 +928,7 @@ function nextTimer(validTimerData) {
             if (!nextTimer || timer.getNext() < nextTimer.getNext())
                 nextTimer = timer;
 
-    const sched_syntax = `${settings.botPrefix}remind ${area}${sub ? ` ${sub}` : ""}`;
+    const sched_syntax = `${settings.botPrefix} remind ${area}${sub ? ` ${sub}` : ""}`;
     return (new Discord.RichEmbed()
         .setDescription(nextTimer.getDemand()
             + "\n" + timeLeft(nextTimer.getNext())
@@ -1145,9 +1145,9 @@ function sendRemind(user, remind, timer) {
     ).diffNow().toFormat("dd'd 'hh'h 'mm'm'", { round: true }), true);
 
     // How to add or remove additional counts.
-    let alter_str = `Use \`${settings.botPrefix}remind ${remind.area}${remind.sub_area ? ` ${remind.sub_area}` : ""}`;
+    let alter_str = `Use \`${settings.botPrefix} remind ${remind.area}${remind.sub_area ? ` ${remind.sub_area}` : ""}`;
     alter_str += (!remind.count) ? "` to turn this reminder back on." : " stop` to end these sooner.";
-    alter_str += `\nUse \`${settings.botPrefix}help remind\` for additional info.`;
+    alter_str += `\nUse \`${settings.botPrefix} help remind\` for additional info.`;
     output.addField('To Update:', alter_str, false);
 
 
@@ -1283,7 +1283,7 @@ function listRemind(message) {
         // TODO: prettyPrint this info.
         let name = `${reminder.area}${reminder.sub_area ? ` (${reminder.sub_area})` : ""}`;
         timer_str += `\nTimer:\t**${name}**`;
-        usage_str = `\`${settings.botPrefix}remind ${reminder.area}`;
+        usage_str = `\`${settings.botPrefix} remind ${reminder.area}`;
         if (reminder.sub_area)
             usage_str += ` ${reminder.sub_area}`;
 
@@ -1372,8 +1372,8 @@ function getHelpMessage(tokens) {
         return [
             `**help**`,
             `I know the keywords ${keywords}.`,
-            `You can use \`${prefix}help <keyword>\` to get specific information about how to use it.`,
-            `Example: \`${prefix}help next\` provides help about the 'next' keyword, \`${prefix}help remind\` provides help about the 'remind' keyword.`,
+            `You can use \`${prefix} help <keyword>\` to get specific information about how to use it.`,
+            `Example: \`${prefix} help next\` provides help about the 'next' keyword, \`${prefix} help remind\` provides help about the 'remind' keyword.`,
             "Pro Tip: **All commands work in PM!**"
         ].join("\n");
     }
@@ -1385,29 +1385,29 @@ function getHelpMessage(tokens) {
     if (tokens[0] === 'next') {
         return [
             `**next**`,
-            `Usage: \`${prefix}next [<area> | <sub-area>]\` will provide a message about the next related occurrence.`,
+            `Usage: \`${prefix} next [<area> | <sub-area>]\` will provide a message about the next related occurrence.`,
             areaInfo,
             subAreaInfo,
-            `Example: \`${prefix}next fall\` will tell when it is Autumn in the Seasonal Garden.`
+            `Example: \`${prefix} next fall\` will tell when it is Autumn in the Seasonal Garden.`
         ].join("\n");
     }
     else if (tokens[0] === 'remind') {
         return [
             `**remind**`,
-            `Usage: \`${prefix}remind [<area> | <sub-area>] [<number> | always | stop]\` will control my reminder function relating to you specifically.`,
+            `Usage: \`${prefix} remind [<area> | <sub-area>] [<number> | always | stop]\` will control my reminder function relating to you specifically.`,
             "Using the word `stop` will turn off a reminder if it exists.",
             "Using a number means I will remind you that many times for that timer.",
             "Use the word `always` to have me remind you for every occurrence.",
-            `Just using \`${prefix}remind\` will list all your existing reminders and how to turn off each`,
+            `Just using \`${prefix} remind\` will list all your existing reminders and how to turn off each`,
             areaInfo,
             subAreaInfo,
-            `Example: \`${prefix}remind close always\` will always PM you 15 minutes before the Forbidden Grove closes.`
+            `Example: \`${prefix} remind close always\` will always PM you 15 minutes before the Forbidden Grove closes.`
         ].join("\n");
     }
     else if (tokens[0].substring(0, 5) === 'sched') {
         return [
             `**schedule**`,
-            `Usage: \`${prefix}schedule [<area>] [<number>]\` will tell you the timers scheduled for the next \`<number>\` of hours. Default is 24, max is 240.`,
+            `Usage: \`${prefix} schedule [<area>] [<number>]\` will tell you the timers scheduled for the next \`<number>\` of hours. Default is 24, max is 240.`,
             "If you provide an area, I will only report on that area.",
             areaInfo
         ].join("\n");
@@ -1415,7 +1415,7 @@ function getHelpMessage(tokens) {
     else if (tokens[0] === 'find') {
         return [
             `**find**`,
-            `Usage \`${prefix}find <mouse>\` will print the top attractions for the mouse, capped at 10.`,
+            `Usage \`${prefix} find <mouse>\` will print the top attractions for the mouse, capped at 10.`,
             "All attraction data is from <https://mhhunthelper.agiletravels.com/>.",
             "Help populate the database for better information!"
         ].join("\n");
@@ -1423,7 +1423,7 @@ function getHelpMessage(tokens) {
     else if (tokens[0] === 'ifind') {
         return [
             `**ifind**`,
-            `Usage \`${prefix}ifind <item>\` will print the top 10 drop rates for the item.`,
+            `Usage \`${prefix} ifind <item>\` will print the top 10 drop rates for the item.`,
             "All drop rate data is from <https://mhhunthelper.agiletravels.com/>.",
             "Help populate the database for better information!"
         ].join("\n");
@@ -1431,20 +1431,20 @@ function getHelpMessage(tokens) {
     else if (tokens[0] === 'iam') {
         return [
             `**iam**`,
-            `Usage \`${prefix}iam <####>\` will set your hunter ID. **This must be done before the other options will work.**`,
-            `  \`${prefix}iam in <location>\` will set your hunting location. Nicknames are allowed.`,
-            `  \`${prefix}iam rank <rank>\` will set your rank. Nicknames are allowed.`,
-            `  \`${prefix}iam not\` will remove you from results.`,
+            `Usage \`${prefix} iam <####>\` will set your hunter ID. **This must be done before the other options will work.**`,
+            `  \`${prefix} iam in <location>\` will set your hunting location. Nicknames are allowed.`,
+            `  \`${prefix} iam rank <rank>\` will set your rank. Nicknames are allowed.`,
+            `  \`${prefix} iam not\` will remove you from results.`,
             privacyWarning
         ].join("\n");
     }
     else if (tokens[0] === 'whois') {
         return [
             `**whois**`,
-            `Usage \`${prefix}whois <####>\` will try to look up a Discord user by MH ID. Only works if they set their ID.`,
-            `  \`${prefix}whois <user>\` will try to look up a hunter ID based on a user in the server.`,
-            `  \`${prefix}whois in <location>\` will find up to 5 random hunters in that location.`,
-            `  \`${prefix}whois rank <rank>\` will find up to 5 random hunters with that rank.`,
+            `Usage \`${prefix} whois <####>\` will try to look up a Discord user by MH ID. Only works if they set their ID.`,
+            `  \`${prefix} whois <user>\` will try to look up a hunter ID based on a user in the server.`,
+            `  \`${prefix} whois in <location>\` will find up to 5 random hunters in that location.`,
+            `  \`${prefix} whois rank <rank>\` will find up to 5 random hunters with that rank.`,
             privacyWarning
         ].join("\n");
     }
