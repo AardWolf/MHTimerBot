@@ -78,9 +78,10 @@ console.log = function()
 };
 
 process.on('uncaughtException', exception => {
-  console.log(exception); // to see your exception details in the console
-  // if you are on production, maybe you can send the exception details to your
-  // email as well ?
+    console.log(exception); // to see your exception details in the console
+    // if you are on production, maybe you can send the exception details to your
+    // email as well ?
+    doSaveAll().then(didSave => console.log(`Save status: ${didSave.length} files saved.`));
 });
 
 function Main() {
@@ -140,10 +141,13 @@ function Main() {
 
         // WebSocket connection error for the bot client.
         client.on('error', error => {
-            console.log("Error Received", error);
-            doSaveAll();
-            client.destroy();
-            process.exit();
+            console.log("Error Received: ", error);
+            doSaveAll()
+                .then(didSave => console.log(didSave ? "saved first" : "baaiiiilllllllllllll"),
+                    err => console.log(err))
+                .then(client.destroy)
+                .then(result => process.exit(1))
+                .catch(err => console.log(err));
         });
 
         client.on('reconnecting', () => console.log('Connection lost, reconnecting to Discord...'));
@@ -151,9 +155,13 @@ function Main() {
         client.on('disconnect', event => {
             console.log("Close event: " + event.reason);
             console.log(`Close code: ${event.code} (${event.wasClean ? `not ` : ``}cleanly closed)`);
-            doSaveAll();
             client.destroy();
-            process.exit();
+            doSaveAll()
+                .then(didSave => console.log(didSave ? "saved first" : "baaiiiilllllllllllll"),
+                    err => console.log(err))
+                .then(client.destroy)
+                .then(result => process.exit(1))
+                .catch(err => console.log(err));
         });
     }).then(() => client.login(settings.token)
     ).catch(err => {
@@ -173,8 +181,10 @@ catch(error) {
  * the bot shuts down, to minimize data loss.
  */
 function doSaveAll() {
-    saveHunters();
-    saveReminders();
+    return Promise.all([
+        saveHunters(),
+        saveReminders()
+    ]);
 }
 
 /**
@@ -335,8 +345,8 @@ function parseUserMessage(message) {
         return;
     }
 
-    // Messages that come in from public chat channels will be prefixed with '-mh'.
-    if (tokens[0] === '-mh')
+    // Messages that come in from public chat channels will be prefixed with the bot's command prefix.
+    if (tokens[0] === settings.botPrefix.trim())
         tokens.shift();
 
     const command = tokens.shift();
@@ -1014,6 +1024,8 @@ function loadReminders() {
 /**
  * Serialize the reminders array to the reminders JSON file, to guard against data loss
  * from crashes, disconnects, reboots, etc.
+ *
+ * @returns {Promise <boolean>}
  */
 function saveReminders() {
     // Remove any expired timers - no need to save them.
@@ -1043,13 +1055,17 @@ function saveReminders() {
             else console.log(`Reminders: found ${numExpired} expired, but couldn't splice because reminder at index ${i} was bad: ${reminders}, ${reminders[i]}`);
         }
     }
-    fs.writeFile(reminder_filename, JSON.stringify(reminders, null, 1), file_encoding, err => {
-        if (err) {
-            console.log(`Reminders: Error during serialization to '${reminder_filename}'`, err);
-            return;
-        }
-        last_timestamps.reminder_save = DateTime.utc();
-        console.log(`Reminders: ${reminders.length} saved successfully to '${reminder_filename}'.`);
+    return new Promise((resolve, reject) => {
+        fs.writeFile(reminder_filename, JSON.stringify(reminders, null, 1), file_encoding, err => {
+            if (err) {
+                console.log(`Reminders: Error during serialization to '${reminder_filename}'`, err);
+                reject(err);
+                return;
+            }
+            last_timestamps.reminder_save = DateTime.utc();
+            console.log(`Reminders: ${reminders.length} saved successfully to '${reminder_filename}'.`);
+            resolve(true);
+        });
     });
 }
 
@@ -1354,7 +1370,7 @@ function getHelpMessage(tokens) {
     const prefix = settings.botPrefix;
     if (!tokens || !tokens.length) {
         return [
-            `**help**`
+            `**help**`,
             `I know the keywords ${keywords}.`,
             `You can use \`${prefix}help <keyword>\` to get specific information about how to use it.`,
             `Example: \`${prefix}help next\` provides help about the 'next' keyword, \`${prefix}help remind\` provides help about the 'remind' keyword.`,
@@ -1901,15 +1917,21 @@ function refreshNicknameData() {
 
 /**
  * Serialize the 'hunters' global object into a JSON datafile, replacing the target file.
+ *
+ * @returns {Promise <boolean>}
  */
 function saveHunters() {
-    fs.writeFile(hunter_ids_filename, JSON.stringify(hunters, null, 1), file_encoding, err => {
-        if (err) {
-            console.log(`Hunters: Error during serialization of data object to '${hunter_ids_filename}'`, err);
-            return;
-        }
-        last_timestamps.hunter_save = DateTime.utc();
-        console.log(`Hunters: ${Object.keys(hunters).length} saved successfully to '${hunter_ids_filename}'.`);
+    return new Promise((resolve, reject) => {
+        fs.writeFile(hunter_ids_filename, JSON.stringify(hunters, null, 1), file_encoding, err => {
+            if (err) {
+                console.log(`Hunters: Error during serialization of data object to '${hunter_ids_filename}'`, err);
+                reject(err);
+                return;
+            }
+            last_timestamps.hunter_save = DateTime.utc();
+            console.log(`Hunters: ${Object.keys(hunters).length} saved successfully to '${hunter_ids_filename}'.`);
+            resolve(true);
+        });
     });
 }
 

@@ -131,14 +131,9 @@ class Timer {
         }
 
         // Ensure the cache is correct.
-        let window = Interval.before(now, this._repeatDuration),
-            advances = 0;
-        while (this._lastActivation < now && !window.contains(this._lastActivation)) {
+        let window = Interval.before(now, this._repeatDuration);
+        while (this._lastActivation < now && !window.contains(this._lastActivation))
             this.advance();
-            ++advances;
-        }
-        if (advances)
-            console.log(`(${this.name}): cached activation time advanced x${advances}.`);
 
         return this._lastActivation;
     }
