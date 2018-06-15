@@ -972,15 +972,7 @@ function timeLeft(in_date) {
 
     // Join the labels together with commas. We use extra logic for the 'and'
     // return labels.join(", ");
-    let retStr = "in ", line = 0, numLines = labels.length;
-    for (; line < numLines - 2; ++line)
-        retStr += labels[line] + ", ";
-    if (numLines > 1)
-        retStr += labels[line] + (numLines > 2 ? ", and " : " and ") + labels[line + 1];
-    else
-        retStr += labels[line];
-
-    return retStr;
+    return `in ${oxfordStringifyValues(labels, `and`)}`;
 }
 
 
@@ -1152,7 +1144,7 @@ function sendRemind(user, remind, timer) {
 
 
     if (remind.fail) {
-        output.setDescription(`There were ${remind.fail} failures before this got through.)`);
+        output.setDescription(`(There were ${remind.fail} failures before this got through.)`);
         if (remind.fail > 10)
             console.log(`Reminders: Removing reminder for ${remind.user} due to too many failures`);
     }
@@ -1250,11 +1242,19 @@ function addRemind(timerRequest, message) {
         "area": area,
         "user": message.author.id
     };
+    // If the matched timer has a sub-area, we need to care about the sub-area specified
+    // in the request. It will either be the same as that of this timer, or it will be
+    // null / undefined (i.e. a request for reminders from all timers in the area).
     if (timer.getSubArea())
         newReminder.sub_area = subArea;
-
     reminders.push(newReminder);
-    responses.push(`Reminder for **${timer.name}** is set. I'll PM you about it`);
+
+    // If the user entered a generic reminder, they may not expect the specific name. Generic reminder
+    // requests will have matched more than one timer, so we can reference 'choices' to determine the
+    // proper response.
+    const others = choices.reduce((s, t) => { s.add(`**${t.getSubArea()}**`); return s; }, new Set());
+    responses.push(`Your reminder for **${timer.name}** is set. ${choices.length ?
+        `You'll also get reminders for ${oxfordStringifyValues(others)}. I'll PM you about them ` : `I'll PM you about it `}`)
     responses.push((count === 1) ? "once." : (count < 0) ? "until you stop it." : `${count} times.`);
 
     // Inform a new user of the reminder functionality (i.e. PM only).
@@ -2024,6 +2024,37 @@ function getHuntersByProperty(property, criterion, limit = 5) {
 function integerComma(number) {
     return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
+
+/**
+ * Helper function to convert all elements of an iterable container into an oxford-comma-delimited
+ * string.
+ * @param {string[] | Set <string> | Map <string, string> | Object <string, string>} container
+ *        An iterable container, of which the contents should be converted into a string.
+ * @param {string} [final] The final conjuction ('and' or 'or')
+ * @returns {string}
+ */
+function oxfordStringifyValues(container, final = 'and') {
+    let printables = [];
+    if (Array.isArray(container))
+        printables = container;
+    else if (container instanceof Set)
+        printables = Array.from(container);
+    else if (container instanceof Map)
+        printables = Array.from(container, ([k, v]) => v);
+    else
+        printables = Array.from(Object.values(container));
+
+    let count = printables.length;
+    if (!count)
+        return "";
+    else if (count === 1)
+        return `${printables[0]}`;
+    else if (count === 2)
+        return `${printables[0]} ${final} ${printables[1]}`;
+
+    return printables.slice(0, -1).join(', ') + `, ${final} ${printables.slice(-1)}`;
+}
+
 
 /**
  * @typedef {Object} ColumnFormatOptions
