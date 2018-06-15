@@ -121,6 +121,8 @@ function Main() {
         });
 
         // Message handling.
+        const re = new RegExp('^' + settings.botPrefix + '\\s');
+        console.log(re);
         client.on('message', message => {
             if (message.author.id === client.user.id)
                 return;
@@ -133,8 +135,10 @@ function Main() {
                 default:
                     if (message.channel.type === 'dm')
                         parseUserMessage(message);
-                    else if (message.content.startsWith(settings.botPrefix))
+                    // else if (message.content.startsWith(settings.botPrefix))
+                    else if (re.test(message.content))
                         parseUserMessage(message);
+                    console.log(message.content, re);
                     break;
             }
         });
