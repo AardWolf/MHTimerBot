@@ -14,6 +14,12 @@ const fs = require('fs');
 // Access external URIs, like @devjacksmith 's tools.
 const request = require('request');
 
+
+// Convert callbacks to 'Promise' versions
+const util = require('util');
+const fs_readFile = util.promisify(fs.readFile);
+const fs_writeFile = util.promisify(fs.writeFile);
+
 // Globals
 const client = new Discord.Client({ disabledEvents: ["TYPING_START"] });
 const main_settings_filename = 'settings.json',
@@ -176,104 +182,120 @@ catch(error) {
 }
 
 /**
+ * Generic Promise-based file read.
+ * Returns the data as an object, or the error that occurred when reading and parsing the file.
+ * A common error code will be 'ENOENT' (the file did not exist).
+ *
+ * @param {string} filename the name of a file in the current working directory (or a path and the name)
+ *                          from which raw data will be read, and then parsed as JSON.
+ * @returns {Promise <any>}
+ */
+function loadDataFromJSON(filename) {
+    return fs_readFile(filename, { encoding: file_encoding })
+        .then(data => {
+            console.log(`I/O: data read from '${filename}'.`);
+            return data;
+        }).then(rawData => JSON.parse(rawData));
+}
+/**
+ * Generic Promise-based file write.
+ * Returns true if the file was written without error.
+ * Returns false if an error occurred. Depending on the error, the data may have been written anyway.
+ *
+ * @param {string} filename the name of a file in the current working directory (or a path and the name)
+ *                          to which data will be serialized as JSON.
+ * @param {any} rawData raw object data which can be serialized as JSON, via JSON.stringify()
+ * @returns {Promise <boolean>}
+ */
+function saveDataAsJSON(filename, rawData) {
+    return fs_writeFile(filename, JSON.stringify(rawData, null, 1), { encoding: file_encoding })
+        .then(() => {
+            console.log(`I/O: data written to '${filename}'.`)
+            return true;
+        }).catch(err => {
+            console.log(`I/O: error writing to '${filename}':\n`, err);
+            return false;
+        });
+}
+
+/**
  * Any object which stores user-entered data should be periodically saved, or at minimum saved before
  * the bot shuts down, to minimize data loss.
  */
 function doSaveAll() {
-    return Promise.all([
-        saveHunters(),
-        saveReminders()
-    ]);
+    return saveHunters()
+        .then(() => saveReminders())
 }
 
+
+
 /**
- * Load data from local databases, like the hunter, timer, and reminder JSON files.
- * Returns an object which indicates the load state of each local file.
- * TODO: pass and use filenames from the resolution of loadSettings.
- *   Requires a generic fsReadFile and then sending the data from the read to the relevant method.
- *   Can then return a better result than [true, true, true] or <errmsg>
+ * Load (or reload) settings from the input path, defaulting to the value of 'main_settings_filename'.
+ * Any keys in the global settings object will be overwritten if they are defined in the file.
  *
- * @param {any} settingsResult The argument passed from loadSettings's 'resolve' call.
- * @returns {Promise <boolean[]>} a mapping of the type name and whether it has been loaded.
+ * @param {string} [path] The path to a JSON file to read data from. Default is the 'main_settings_filename'.
+ * @returns {Promise <boolean>} Whether the read was successful.
  */
-function doLoadLocal(settingsResult) {
-    const loader = Promise.all([
-        loadTimers(),
-        loadReminders(),
-        loadHunters()
-    ]);
-    return loader.then(loadResults => new Array(loadResults.length).fill(true))
-        .catch(err => console.log(err));
-}
-
-/**
- * Load settings from the 'main_settings_filename'
- * 
- * @param {callback} resolve A callback for successful execution
- * @param {callback} reject A callback if an error occurred.
- */
-function loadSettings(resolve, reject) {
-    fs.readFile(main_settings_filename, file_encoding, (err, data) => {
-        if (err) {
-            console.log(`Settings: Error during loading of '${main_settings_filename}'`, err);
-            reject(err);
-            return;
-        }
-        settings = JSON.parse(data);
+function loadSettings(path = main_settings_filename) {
+    return loadDataFromJSON(path).then(data => {
+        // (Re)initialize any keys to the value specified in the file.
+        Object.assign(settings, data);
         // Set defaults if they were not specified.
         if (!settings.linkConversionChannel)
             settings.linkConversionChannel = "larrys-freebies";
         if (!settings.timedAnnouncementChannel)
             settings.timedAnnouncementChannel = "timers";
         settings.botPrefix = settings.botPrefix ? settings.botPrefix.trim() : '-mh';
-
-        console.log(`Settings: loaded ${Object.keys(settings).length} from '${main_settings_filename}'.`);
-        resolve(/* could send data */);
+        return true;
+    }).catch(err => {
+        console.log(`Settings: error while reading settings from '${path}':\n`, err);
+        return false;
     });
 }
 
 /**
- * Read individual timer settings from a file and create the associated timers.
- * Resolves if the timer file didn't exist (e.g. no saved timers), or it was read without error.
- * Rejects only if a read/parse error occurs.
+ * Load timer data from the input path, defaulting to the value of 'timer_settings_filename'.
+ * Returns an array of data objects (or an empty array if there was an error reading the file)
+ * that can be made into timers.
  *
- * returns {Promise <string>}
+ * @param {string} [path] The path to a JSON file to read data from. Default is the 'timer_settings_filename'
+ * @returns {Promise <TimerSeed[]>}
  */
-function loadTimers() {
-    return new Promise((resolve, reject) => {
-        fs.readFile(timer_settings_filename, file_encoding, (readError, data) => {
-            if (readError && readError.code !== "ENOENT") {
-                reject(`Timers: Error during loading of '${timer_settings_filename}'`, readError);
-                return;
-            }
-            else if (!readError) {
-                let obj;
-                try { obj = JSON.parse(data); }
-                catch (jsonError) {
-                    reject(jsonError);
-                    return;
-                }
-                for (let i = 0; i < obj.length; i++) {
-                    let timer;
-                    try {
-                        timer = new Timer(obj[i]);
-                    } catch (error) {
-                        console.log(`Timers: Bad data in element ${i} of '${timer_settings_filename}'`, `Data: ${obj[i]}`, error);
-                        continue;
-                    }
-                    timers_list.push(timer);
-                }
-            }
-            console.log(`Timers: loaded ${timers_list.length} from '${timer_settings_filename}'.`);
-            resolve(/* could send data */);
-        });
+function loadTimers(path = timer_settings_filename) {
+    return loadDataFromJSON(path).then(data => {
+        return Array.isArray(data) ? data : Array.from(data);
+    }).catch(err => {
+        console.log(`Timers: error during load from '${path}'. None loaded.\n`, err);
+        return [];
     });
+}
+
+/**
+ * Create Timer objects from the given array input.
+ * Returns true if any timers were created, false if none were created.
+ *
+ * @param {TimerSeed[]} timerData An array containing data objects, each of which can create a timer, e.g. a timer "seed"
+ * @returns {boolean} Whether or not any timers were created from the input.
+ */
+function createTimersFromList(timerData) {
+    const knownTimers = timers_list.length;
+    for (let seed of timerData) {
+        let timer;
+        try {
+            timer = new Timer(seed);
+        } catch (err) {
+            console.log(`Timers: error occured while constructing timer: '${err}'. Received object:\n`, seed);
+            continue;
+        }
+        timers_list.push(timer);
+    }
+    return timers_list.length !== knownTimers;
 }
 
 /**
  * When the bot initializes, go through all known Timers and schedule their next announcement.
  * Also sets up the conversion from a single timeout-based call into a repeated-every-X interval.
- * 
+ *
  * @param {TextChannel} channel A channel interface on which announcements should be sent.
  * @returns {boolean} if any timers have been initialized.
  */
@@ -981,40 +1003,43 @@ function timeLeft(in_date) {
  */
 
 /**
- * Read the reminders JSON file, and populate the array for use.
- * Resolves if the reminders file didn't exist (e.g. no saved reminders), or it was read without error.
- * Rejects if any other error occurred.
+ * Load reminder data from the input path, defaulting to the value of 'reminder_filename'.
+ * Returns an array of data objects (or an empty array if there was an error reading the file)
+ * that can be made into reminders.
  *
- * returns {Promise <string>}
+ * @param {string} [path] The path to a JSON file to read data from. Default is the 'reminder_filename'.
+ * @returns {Promise <ReminderSeed[]>}
  */
-function loadReminders() {
-    return new Promise((resolve, reject) => {
-        fs.readFile(reminder_filename, file_encoding, (err, data) => {
-            if (err && err.code !== "ENOENT") {
-                reject(`Reminders: Error during loading of '${reminder_filename}'`, err);
-                return;
-            }
-            else if (!err) {
-                try {
-                    Array.prototype.push.apply(reminders, JSON.parse(data));
-                } catch (jsonError) {
-                    reject(jsonError);
-                    return;
-                }
-            }
-            console.log(`Reminders: ${reminders.length} loaded from '${reminder_filename}'.`);
-            resolve(/* could send data */);
-        });
+function loadReminders(path = reminder_filename) {
+    return loadDataFromJSON(path).then(data => {
+        return Array.isArray(data) ? data : Array.from(data);
+    }).catch(err => {
+        console.log(`Reminders: error during loading from '${path}':\n`, err);
+        return [];
     });
 }
 
 /**
- * Serialize the reminders array to the reminders JSON file, to guard against data loss
- * from crashes, disconnects, reboots, etc.
+ * Create reminder objects from the given array input
+ * Returns true if any reminders were created, false if none were created.
  *
- * @returns {Promise <boolean>}
+ * @param {ReminderSeed[]} reminderData An array of data objects, each of which can create a reminder, e.g. a reminder "seed"
+ * @returns {boolean} Whether or not any reminders were created from the input.
  */
-function saveReminders() {
+function createRemindersFromData(reminderData) {
+    const knownReminders = reminders.length;
+    /** TODO: Reminders as class instead of just formatted object
+     * Class instantiation code would be here and replace the push call.
+     */
+    // Add each of these objects to the reminder list.
+    Array.prototype.push.apply(reminders, reminderData);
+    return reminders.length !== knownReminders;
+}
+
+/**
+ * Inspect the reminders list and remove any that are no longer active.
+ */
+function pruneExpiredReminders() {
     // Remove any expired timers - no need to save them.
     if (reminders.length) {
         // Move expired reminders to the end.
@@ -1039,20 +1064,24 @@ function saveReminders() {
                 let discarded = reminders.splice(i, numExpired);
                 console.log(`Reminders: spliced ${discarded.length} that were expired. ${reminders.length} remaining.`);
             }
-            else console.log(`Reminders: found ${numExpired} expired, but couldn't splice because reminder at index ${i} was bad: ${reminders}, ${reminders[i]}`);
+            else
+                console.log(`Reminders: found ${numExpired} expired, but couldn't splice because reminder at index ${i} was bad:\n`, reminders, `\n`, reminders[i]);
         }
     }
-    return new Promise((resolve, reject) => {
-        fs.writeFile(reminder_filename, JSON.stringify(reminders, null, 1), file_encoding, err => {
-            if (err) {
-                console.log(`Reminders: Error during serialization to '${reminder_filename}'`, err);
-                reject(err);
-                return;
-            }
-            last_timestamps.reminder_save = DateTime.utc();
-            console.log(`Reminders: ${reminders.length} saved successfully to '${reminder_filename}'.`);
-            resolve(true);
-        });
+}
+
+/**
+ * Serialize the reminders object to the given path, defaulting to the value of 'reminder_filename'
+ *
+ * @param {string} [path] The path to a file to write JSON data to. Default is the 'reminder_filename'.
+ * @returns {Promise <boolean>} Whether the save operation completed without error.
+ */
+function saveReminders(path = reminder_filename) {
+    //Write out the JSON of the reminders array
+    return saveDataAsJSON(path, reminders).then(didSave => {
+        console.log(`Reminders: ${didSave ? `Saved` : `Failed to save`} ${reminders.length} to '${path}'.`);
+        last_timestamps.reminder_save = DateTime.utc();
+        return didSave;
     });
 }
 
@@ -1855,60 +1884,59 @@ function setHunterProperty(message, property, value) {
 }
 
 /**
- * Read the JSON datafile with hunter data, storing its contents in the 'hunters' global object.
- * Resolves if the hunter data file doesn't exist (e.g. no saved hunter data), or it was read without error.
- * Rejects if any other error occurred.
+ * Load hunter data from the input path, defaulting to the value of 'hunter_ids_filename'.
+ * Returns the hunter data contained in the given file.
  *
- * returns {Promise <string>}
+ * @param {string} [path] The path to a JSON file to read data from. Default is the 'hunter_ids_filename'.
+ * @returns {Promise <{}>}
  */
-function loadHunters() {
-    return new Promise((resolve, reject) => {
-        fs.readFile(hunter_ids_filename, file_encoding, (err, data) => {
-            // ENOENT -> File did not exist in the given location.
-            if (err && err.code !== "ENOENT") {
-                reject(`Hunters: Error during loading of '${hunter_ids_filename}'`, err);
-                return;
-            }
-            else if (!err) {
-                try {
-                    hunters = JSON.parse(data);
-                } catch (jsonError) {
-                    reject(jsonError);
-                    return;
-                }
-            }
-            console.log(`Hunters: ${Object.keys(hunters).length} loaded from '${hunter_ids_filename}'.`);
-            resolve(/* could send data */);
-        });
+function loadHunterData(path = hunter_ids_filename) {
+    return loadDataFromJSON(path).catch(err => {
+        console.log(`Hunters: Error loading data from '${path}':\n`, err);
+        return {};
     });
 }
 
 /**
- * Read the JSON datafile with nickname URLs, storing its contents in the 'nickname_urls' global object.
- * Resolves if the nickname URL file didn't exist (e.g. no known nicknames), or it was read without error.
- * Rejects if any other error occurs.
+ * Update the hunter data object with the key-value pairs from the given object input.
+ * Returns true if data was imported. (The data may have been the same as what was known.)
  *
- * returns {Promise <string>}
+ * @param {Object <string, HunterData>} hunterData
+ * @returns {boolean} Whether the input data contained anything to import.
  */
-function loadNicknameURLs() {
-    return new Promise((resolve, reject) => {
-        fs.readFile(nickname_urls_filename, file_encoding, (err, data) => {
-            // ENOENT -> File did not exist in the given location.
-            if (err && err.code !== "ENOENT") {
-                reject(`Nicknames: Error during loading of '${nickname_urls_filename}'`, err);
-                return;
-            }
-            else if (!err) {
-                try {
-                    nickname_urls = JSON.parse(data);
-                } catch (jsonError) {
-                    reject(jsonError);
-                    return;
-                }
-            }
-            console.log(`Nicknames: ${Object.keys(nickname_urls).length} URLs loaded from '${nickname_urls_filename}'.`);
-            resolve(/* could send data */);
-        });
+function addHuntersFromData(hunterData) {
+    if (!hunterData || !Object.keys(hunterData).length)
+        return false;
+
+    Object.assign(hunters, hunterData);
+    return true;
+}
+
+/**
+ * Serialize the hunters object to the given path, defaulting to the value of 'hunter_ids_filename'
+ *
+ * @param {string} [path] The path to a file to write JSON data to. Default is the 'hunter_ids_filename'.
+ * @returns {Promise <boolean>} Whether the save operation completed without error.
+ */
+function saveHunters(path = hunter_ids_filename) {
+    return saveDataAsJSON(path, hunters).then(didSave => {
+        console.log(`Hunters: ${didSave ? `Saved` : `Failed to save`} ${Object.keys(hunters).length} to '${path}'.`);
+        last_timestamps.hunter_save = DateTime.utc();
+        return didSave;
+    });
+}
+
+/**
+ * Load nickname data from the input path, defaulting to the value of 'nickname_urls_filename'.
+ * Returns the type: url data contained in the given file. (Does not assign it.)
+ *
+ * @param {string} [path] The path to a JSON file to read data from. Default is the 'nickname_urls_filename'.
+ * @returns {Promise <{}>}
+ */
+function loadNicknameURLs(path = nickname_urls_filename) {
+    return loadDataFromJSON(path).catch(err => {
+        console.log(`Nicknames: Error loading data from '${path}':\n`, err);
+        return {};
     });
 }
 
@@ -1916,39 +1944,18 @@ function loadNicknameURLs() {
  * Load all nicknames from all sources.
  */
 function refreshNicknameData() {
-    console.log(`Nicknames: initializing knowledge of all types`);
     nicknames = {};
     for (let key in nickname_urls)
         getNicknames(key);
 }
 
 /**
- * Serialize the 'hunters' global object into a JSON datafile, replacing the target file.
- *
- * @returns {Promise <boolean>}
- */
-function saveHunters() {
-    return new Promise((resolve, reject) => {
-        fs.writeFile(hunter_ids_filename, JSON.stringify(hunters, null, 1), file_encoding, err => {
-            if (err) {
-                console.log(`Hunters: Error during serialization of data object to '${hunter_ids_filename}'`, err);
-                reject(err);
-                return;
-            }
-            last_timestamps.hunter_save = DateTime.utc();
-            console.log(`Hunters: ${Object.keys(hunters).length} saved successfully to '${hunter_ids_filename}'.`);
-            resolve(true);
-        });
-    });
-}
-
-/**
  * Read the CSV exported from a Google Sheets file containing nicknames, and
  * initialize the specific 'nickname' property denoted by 'type'.
- * 
+ *
  * // TODO use the Google Sheets REST API or an Apps Script webapp for
  * better control / formatting (e.g. JSON output, referencing sheets by name)
- * 
+ *
  * @param {string} type The type of nickname to populate. Determines the sheet that is read.
  */
 function getNicknames(type) {
