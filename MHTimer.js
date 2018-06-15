@@ -34,7 +34,7 @@ const timers_list = [];
 const reminders = [];
 const file_encoding = 'utf8';
 
-var settings = {};
+const settings = {};
 const mice = [];
 const items = [];
 var hunters = {};
@@ -91,94 +91,169 @@ process.on('uncaughtException', exception => {
 });
 
 function Main() {
-    // Load global settings.
-    var a = new Promise(loadSettings)
-
-    // Load local file databases, and schedule saving this data after it loads.
-    a.then(doLoadLocal).then(loadResult => {
-        let interval = (Math.random() + 2) * refresh_rate.as('milliseconds');
-        console.log(`Scheduling periodic data saves every ~${interval / (1000 * 60)} minutes.`);
-        dataTimers['data'] = setInterval(doSaveAll, interval);
-    }).catch(err => console.log(`Local data acquisition error:`, err));
-
-    // Load remote URIs, and information from them.
-    a.then(loadNicknameURLs)
-        .then(refreshNicknameData)
-        // Schedule a periodic refresh of all nickname data.
-        .then(() => dataTimers['nicknames'] = setInterval(refreshNicknameData, 2 * refresh_rate.as('milliseconds')))
-        .then( getMouseList )
-        .then( getItemList )
-        .catch(err => console.log(`Remote data acquisition error:`, err));
-
-    // Bot configuration.
-    a.then(() => {
-        client.on("ready", () => {
-            console.log("I am alive!");
-
-            // Find its #timers channel (if it has one)
-            client.guilds.forEach(guild => {
-                let canAnnounce = false;
-                guild.channels
-                    .filter(channel => channel.name === settings.timedAnnouncementChannel)
-                    .forEach(announcable => { canAnnounce = createTimedAnnouncements(announcable) });
-                if (!canAnnounce)
-                    console.log(`Timers: No channel for announcements in guild '${guild.name}'.`);
-            });
-        });
-
-        // Message handling.
-        client.on('message', message => {
-            if (message.author.id === client.user.id)
-                return;
-
-            switch (message.channel.name) {
-                case settings.linkConversionChannel:
-                    if (/^(http[s]?:\/\/htgb\.co\/).*/g.test(message.content.toLowerCase()))
-                        convertRewardLink(message);
-                    break;
-                default:
-                    if (message.channel.type === 'dm')
-                        parseUserMessage(message);
-                    else if (message.content.startsWith(settings.botPrefix))
-                        parseUserMessage(message);
-                    break;
+    // Load saved settings data, such as the token for the bot.
+    loadSettings()
+        .then(hasSettings => {
+            if (!hasSettings) {
+                process.exitCode = 1;
+                throw new Error(`Exiting due to failure to acquire local settings data.`);
             }
-        });
+            function failedLoad(prefix, reason) {
+                console.log(prefix, reason);
+                return false;
+            }
+            // Settings loaded successfully, so initiate loading of other resources.
+            let saveInterval = refresh_rate.as('milliseconds');
 
-        // WebSocket connection error for the bot client.
-        client.on('error', error => {
-            console.log("Error Received: ", error);
-            doSaveAll()
-                .then(didSave => console.log(didSave ? "saved first" : "baaiiiilllllllllllll"),
-                    err => console.log(err))
-                .then(client.destroy)
-                .then(result => process.exitCode = 1)
-                .catch(err => console.log(err));
-        });
+            // Create timers list from the timers file.
+            const hasTimers = loadTimers()
+                .then(timerData => {
+                    createTimersFromList(timerData);
+                    console.log(`Timers: imported ${timerData.length} from file.`);
+                    return timers_list.length > 0;
+                })
+                .catch(err => failedLoad(`Timers: import error:\n`, err));
 
-        client.on('reconnecting', () => console.log('Connection lost, reconnecting to Discord...'));
-        // WebSocket disconnected and is no longer trying to reconnect.
-        client.on('disconnect', event => {
-            console.log("Close event: " + event.reason);
-            console.log(`Close code: ${event.code} (${event.wasClean ? `not ` : ``}cleanly closed)`);
-            doSaveAll()
-                .then(didSave => console.log(didSave ? "saved first" : "baaiiiilllllllllllll"),
-                    err => console.log(err))
-                .then(client.destroy)
-                .then(result => process.exitCode = 1)
-                .catch(err => console.log(err));
+            // Create reminders list from the reminders file.
+            const hasReminders = loadReminders()
+                .then(reminderData => {
+                    createRemindersFromData(reminderData);
+                    console.log(`Reminders: imported ${reminderData.length} from file.`);
+                    return reminders.length > 0;
+                })
+                .catch(err => failedLoad(`Reminders: import error:\n`, err));
+            hasReminders.then(hasReminders => {
+                console.log(`Reminders: Configuring save every ${saveInterval / (60 * 1000)} min.`);
+                dataTimers['reminders'] = setInterval(saveReminders, saveInterval)
+            });
+
+            // Create hunters data from the hunters file.
+            const hasHunters = loadHunterData()
+                .then(hunterData => {
+                    Object.assign(hunters, hunterData);
+                    console.log(`Hunters: imported ${Object.keys(hunterData).length} from file.`);
+                    return Object.keys(hunters).length > 0;
+                })
+                .catch(err => failedLoad(`Hunters: import error:\n`, err));
+            hasHunters.then(hasHunters => {
+                console.log(`Hunters: Configuring save every ${saveInterval / (60 * 1000)} min.`);
+                dataTimers['hunters'] = setInterval(saveHunters, saveInterval)
+            });
+
+            // Register known nickname URIs
+            const hasNicknames = loadNicknameURLs()
+                .then(urls => {
+                    Object.assign(nickname_urls, urls);
+                    console.log(`Nicknames: imported ${Object.keys(urls).length} sources from file.`);
+                    return Object.keys(nickname_urls).length > 0;
+                })
+                .catch(err => failedLoad(`Nicknames: import error:\n`, err));
+            hasNicknames
+                .then(refreshNicknameData)
+                .then(() => {
+                console.log(`Nicknames: Configuring data refresh every ${saveInterval / (60 * 1000)} min.`);
+                dataTimers['nicknames'] = setInterval(refreshNicknameData, saveInterval)
+            });
+
+            // Load remote data.
+            const remoteData = Promise.resolve()
+                .then(getMouseList)
+                .then(getItemList)
+
+            // Configure the bot behavior.
+            client.on("ready", () => {
+                console.log("I am alive!");
+
+                // Find its #timers channel (if it has one)
+                client.guilds.forEach(guild => {
+                    let canAnnounce = false;
+                    guild.channels
+                        .filter(channel => channel.name === settings.timedAnnouncementChannel)
+                        .forEach(announcable => { canAnnounce = createTimedAnnouncements(announcable) });
+                    if (!canAnnounce)
+                        console.log(`Timers: No channel for announcements in guild '${guild.name}'.`);
+                });
+            });
+
+            // Message handling.
+            client.on('message', message => {
+                if (message.author.id === client.user.id)
+                    return;
+
+                switch (message.channel.name) {
+                    case settings.linkConversionChannel:
+                        if (/^(http[s]?:\/\/htgb\.co\/).*/g.test(message.content.toLowerCase()))
+                            convertRewardLink(message);
+                        break;
+                    default:
+                        if (message.channel.type === 'dm')
+                            parseUserMessage(message);
+                        else if (message.content.startsWith(settings.botPrefix))
+                            parseUserMessage(message);
+                        break;
+                }
+            });
+
+            // WebSocket connection error for the bot client.
+            client.on('error', error => {
+                console.log(`Discord Client Error Received: "${error.message}"\n`, error.error);
+                quit(); // Should we? or just let it attempt to reconnect?
+            });
+
+            client.on('reconnecting', () => console.log('Connection lost, reconnecting to Discord...'));
+            // WebSocket disconnected and is no longer trying to reconnect.
+            client.on('disconnect', event => {
+                console.log("Close event: " + event.reason);
+                console.log(`Close code: ${event.code} (${event.wasClean ? `not ` : ``}cleanly closed)`);
+                quit();
+            });
+            // Configuration complete. Using Promise.all() requires these tasks to complete
+            // prior to bot login.
+            return Promise.all([
+                hasTimers,
+                hasReminders,
+                hasNicknames,
+                remoteData
+            ]);
+        })
+        // Finally, log in now that we have loaded all data from disk,
+        // requested data from remote sources, and configured the bot.
+        .then(didConfig => client.login(settings.token))
+        .catch(err => {
+            console.log(err);
+            client.destroy()
+                .then(() => process.exitCode = 1);
         });
-    }).then(() => client.login(settings.token)
-    ).catch(err => {
-        console.log(`Fatal bot error, exiting promptly`, err);
-        process.exit(1);
-    });
 }
 try {
   Main();
 }
 catch(error) {
-  console.log(`Error executing Main`, error);
+  console.log(`Error executing Main:\n`, error);
+}
+
+function quit() {
+    return doSaveAll()
+        .then(didSave => {
+            console.log(`Shutdown: data saves completed`);
+            return didSave;
+        }, err => console.log(`Shutdown: error while saving:\n`, err))
+        .then(didSave => { console.log(`Shutdown: destroying client`); return client.destroy(); })
+        .then(() => {
+            console.log(`Shutdown: deactivating data refreshes`);
+            for (let timer of Object.values(dataTimers))
+                clearInterval(timer);
+            console.log(`Shutdown: deactivating timers`);
+            for (let timer of timers_list) {
+                timer.stopInterval();
+                timer.stopTimeout();
+            }
+        })
+        .then(result => process.exitCode = 1)
+        .catch(err => {
+            console.log(`Shutdown: unhandled error:\n`, err, `\nImmediately exiting.`);
+            process.exit();
+        });
 }
 
 /**

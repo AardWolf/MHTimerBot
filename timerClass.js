@@ -238,21 +238,28 @@ class Timer {
         if (!key || !timeout)
             return;
         this.stopTimeout(key);
-    
+
         this._timeout[key] = timeout;
     }
 
     /**
      * Stops and also removes the existing Node.js Timer object for this timer instance
-     *
+     * If no key is given, all existing timeouts will be cleared.
      * @instance
-     * @param {string} key The channel and guild identifier for this particular timeout.
+     * @param {string} [key] The channel and guild identifier for this particular timeout.
      */
     stopTimeout(key) {
-        if (this._timeout[key])
-            clearTimeout(this._timeout[key]);
+        if (key) {
+            if (this._timeout[key])
+                clearTimeout(this._timeout[key]);
 
-        this._timeout[key] = null;
+            this._timeout[key] = null;
+        }
+        else {
+            for (let key in this._timeout)
+                clearTimeout(this._timeout[key]);
+            this._timeout = {};
+        }
     }
 
     /**
@@ -273,15 +280,23 @@ class Timer {
 
     /**
      * Stops and also removes the existing Node.js Timer object for this timer instance.
+     * If no key is given, all existing intervals will be cleared.
      *
      * @instance
-     * @param {string} key The channel and guild identifier for this particular interval.
+     * @param {string} [key] The channel and guild identifier for this particular interval.
      */
     stopInterval(key) {
-        if (this._interval[key])
-            clearInterval(this._interval[key]);
+        if (key) {
+            if (this._interval[key])
+                clearInterval(this._interval[key]);
 
-        this._interval[key] = null;
+            this._interval[key] = null;
+        }
+        else {
+            for (let key in this._interval)
+                clearInterval(this._interval[key]);
+            this._interval = {};
+        }
     }
 }
 
