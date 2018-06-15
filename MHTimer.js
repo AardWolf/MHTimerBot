@@ -559,7 +559,7 @@ function parseUserMessage(message) {
 /**
  * Convert a HitGrab shortlink into a BitLy shortlink that does not send the clicker to Facebook.
  * If successful, sends the converted link to the same channel that received the input message.
- * 
+ *
  * @param {Message} message a Discord message containing a htgb.co URL.
  */
 function convertRewardLink(message) {
@@ -588,11 +588,11 @@ function convertRewardLink(message) {
                     console.log("Links: MH reward link converted for non-facebook users");
                     message.channel.send(responseJSON.data.url + " <-- Non-Facebook Link");
                 } else {
-                    console.log("Links: Bitly shortener failed for some reason", error, response, body);
+                    console.log("Links: Bitly shortener failed for some reason", error, response.toJSON(), body);
                 }
             });
         } else {
-            console.log("Links: GET to htgb.co failed for some reason", error, response, body);
+            console.log("Links: GET to htgb.co failed for some reason:\n", error, response.toJSON(), body);
         }
     });
 }
@@ -942,7 +942,7 @@ function nextTimer(validTimerData) {
 /**
  * Returns a string ending that specifies the (human-comprehensible) amount of
  * time remaining before the given input.
- * Ex "in 35 days, 14 hours, and 1 minute" 
+ * Ex "in 35 days, 14 hours, and 1 minute"
  *
  * @param {DateTime} in_date The impending time that humans must be warned about.
  * @returns {string} A timestring that indicates the amount of time left before the given Date.
@@ -950,7 +950,7 @@ function nextTimer(validTimerData) {
 function timeLeft(in_date) {
     const units = ["days", "hours", "minutes"];
     const remaining = in_date.diffNow(units);
-    
+
     // Make a nice string, but only if there are more than 60 seconds remaining.
     if (remaining.as("milliseconds") < 60 * 1000)
         return "in less than a minute";
@@ -967,10 +967,6 @@ function timeLeft(in_date) {
         if (val)
             labels.push(`${val.toLocaleString('en-US', { maximumFractionDigits: 0 })} ${(val !== 1) ? unit : unit.slice(0, -1)}`);
     });
-    // `labels` should not be empty at this point.
-
-    // Join the labels together with commas. We use extra logic for the 'and'
-    // return labels.join(", ");
     return `in ${oxfordStringifyValues(labels, `and`)}`;
 }
 
@@ -1069,8 +1065,9 @@ function saveReminders() {
  */
 function doAnnounce(timer, channel) {
     channel.send(timer.getAnnouncement())
-        .catch(error => console.log(`Timers: Error during announcement. Status ${channel.client.status}`, error));
+        .catch(error => console.log(`Timers: Error during announcement. Status ${channel.client.status}\n`, error));
 
+    // TODO: schedule this independently of the channel (multiple channels = multiple reminders)
     doRemind(timer);
 }
 
@@ -1084,8 +1081,8 @@ function doRemind(timer) {
     // Cache these values.
     const area = timer.getArea(),
         sub = timer.getSubArea();
+    console.log(`Timers: Sending announcements for ${timer.name}.`);
 
-    let start = DateTime.utc();
     // TODO: Build a basic embed template object and package that to each recipient, rather than
     // fully construct the (basically equivalent) embed for each user.
     reminders.filter(r => area === r.area && r.count !== 0)
@@ -1096,10 +1093,9 @@ function doRemind(timer) {
                 .then(user => sendRemind(user, reminder, timer))
                 .catch(err => {
                     reminder.fail = (reminder.fail || 0) + 1;
-                    console.log(`Reminders: Error during user notification`, err);
+                    console.log(`Reminders: Error during user notification:\n`, err);
                 });
         });
-    console.log(`Timers: Announcements for ${timer.name} completed in ${start.diffNow('seconds', 'milliseconds').toFormat('ss.SSS')}.`);
 }
 
 /**
@@ -1161,7 +1157,7 @@ function sendRemind(user, remind, timer) {
 
 /**
  * Add (or remove) a reminder.
- * 
+ *
  * @param {ReminderRequest} timerRequest a timer request which has already passed through token
  *                                       validation to set 'area' and 'sub_area' as possible.
  * @param {Message} message the Discord message that initiated this request.
@@ -1208,7 +1204,7 @@ function addRemind(timerRequest, message) {
     const choices = timers_list
         .filter(t => area === t.getArea() && (!subArea || subArea === t.getSubArea()))
         .sort((a, b) => a.getNext() - b.getNext());
-    console.log(`Timers: found ${choices.length} matching input request:`, timerRequest);
+    console.log(`Timers: found ${choices.length} matching input request:\n`, timerRequest);
 
     // Assume the desired timer is the soonest one that matched the given criteria.
     let timer = choices.pop();
@@ -1268,7 +1264,7 @@ function addRemind(timerRequest, message) {
 
 /**
  * List the reminders for the user, and PM them the result.
- * 
+ *
  * @param {Message} message a Discord message containing the request to list reminders.
  */
 function listRemind(message) {
@@ -1308,7 +1304,7 @@ function listRemind(message) {
  * Compute which timers are coming up in the next bit of time, for the requested area.
  * Returns a ready-to-print string listing up to 24 of the found timers, with their "demand" and when they will activate.
  * TODO: should this return a RichEmbed?
- * 
+ *
  * @param {{area: string, count: number}} timer_request A request that indicates the number of hours to search ahead, and the area in which to search
  * @returns {string} a ready-to-print string containing the timer's demand, and how soon it will occur.
  */
@@ -1453,12 +1449,11 @@ function getHelpMessage(tokens) {
 
 /**
  * Initialize (or refresh) the known mice lists from @devjacksmith's tools.
- * Updates the mouse nicknames as well.
  */
 function getMouseList() {
     const now = DateTime.utc();
     // Only request a mouse list update every so often.
-    if ("mouse_refresh" in last_timestamps) {
+    if (last_timestamps.mouse_refresh) {
         let next_refresh = last_timestamps.mouse_refresh.plus(refresh_rate);
         if (now < next_refresh)
             return;
@@ -1472,7 +1467,11 @@ function getMouseList() {
         url: url,
         json: true
     }, (error, response, body) => {
-        if (!error && response.statusCode == 200) {
+        if (error)
+            console.log(`Mice: request failed with error:\n`, error, response.toJSON());
+        else if (response.statusCode !== 200)
+            console.log(`Mice: request returned response "${response.statusCode}: ${response.statusMessage}"\n`, response.toJSON());
+        else {
             console.log("Mice: Got a new mouse list.");
             mice.length = 0;
             Array.prototype.push.apply(mice, body);
@@ -1537,7 +1536,7 @@ function findMouse(channel, args, command) {
                             });
                     });
                 } else {
-                    console.log("Mice: Lookup failed for some reason:", error, response, body);
+                    console.log("Mice: Lookup failed for some reason:\n", error, response.toJSON(), body);
                     channel.send(`Could not process results for '${args}', AKA ${mouseName}`);
                     return;
                 }
@@ -1602,11 +1601,10 @@ function findMouse(channel, args, command) {
 
 /**
  * Initialize (or refresh) the known loot lists from @devjacksmith's tools.
- * Updates the loot nicknames as well.
  */
 function getItemList() {
     const now = DateTime.utc();
-    if ("item_refresh" in last_timestamps) {
+    if (last_timestamps.item_refresh) {
         let next_refresh = last_timestamps.item_refresh.plus(refresh_rate);
         if (now < next_refresh)
             return;
@@ -1619,7 +1617,11 @@ function getItemList() {
         url: url,
         json: true
     }, (error, response, body) => {
-        if (!error && response.statusCode == 200) {
+        if (error)
+            console.log(`Loot: request failed with error:\n`, error, response.toJSON());
+        else if (response.statusCode !== 200)
+            console.log(`Loot: request returned response "${response.statusCode}: ${response.statusMessage}"\n`, response.toJSON());
+        else {
             console.log("Loot: Got a new loot list");
             items.length = 0;
             Array.prototype.push.apply(items, body);
@@ -1683,7 +1685,7 @@ function findItem(channel, args, command) {
                             });
                     });
                 } else {
-                    console.log("Loot: Lookup failed for some reason", error, response, body);
+                    console.log("Loot: Lookup failed for some reason", error, response.toJSON(), body);
                     channel.send(`Could not process results for '${args}', AKA ${itemName}`);
                     return;
                 }
@@ -1806,7 +1808,7 @@ function unsetHunterID(message) {
 
 /**
  * Sets the message author's hunter ID to the passed argument, and messages the user back.
- * 
+ *
  * @param {Message} message a Discord message object from a user
  * @param {string} hid a "Hunter ID" string, which is known to parse to a number.
  */
@@ -1833,7 +1835,7 @@ function setHunterID(message, hid) {
 
 /**
  * Accepts a message object and hunter id, sets the author's hunter ID to the passed argument
- * 
+ *
  * @param {Message} message a Discord message object
  * @param {string} property the property key for the given user, e.g. 'hid', 'rank', 'location'
  * @param {any} value the property's new value.
@@ -1959,7 +1961,11 @@ function getNicknames(type) {
     request({
         url: nickname_urls[type]
     }, (error, response, body) => {
-        if (!error && response.statusCode == 200) {
+        if (error)
+            console.log(`Nicknames: request failed with error:\n`, error, response.toJSON());
+        else if (response.statusCode !== 200)
+            console.log(`Nicknames: request returned response "${response.statusCode}: ${response.statusMessage}"\n`, response.toJSON());
+        else {
             let rows = body.split(/[\r\n]+/);
             let headers = rows.shift();
             for (let row of rows) {
@@ -1990,7 +1996,7 @@ function getHunterByID(input, type) {
 /**
  * Find the self-registered account for the user identified by the given Discord ID.
  * Returns undefined if the user has not self-registered.
- * 
+ *
  * @param {string} discordId the Discord ID of a registered hunter.
  * @returns {string?} the hunter ID of the registered hunter having that Discord ID.
  */
@@ -2029,7 +2035,7 @@ function integerComma(number) {
  * string.
  * @param {string[] | Set <string> | Map <string, string> | Object <string, string>} container
  *        An iterable container, of which the contents should be converted into a string.
- * @param {string} [final] The final conjuction ('and' or 'or')
+ * @param {string} [final] The final conjunction ('and' or 'or')
  * @returns {string}
  */
 function oxfordStringifyValues(container, final = 'and') {
@@ -2068,7 +2074,7 @@ function oxfordStringifyValues(container, final = 'and') {
 
 /**
  * Given the input array and headers, computes a ready-to-print string that lines up the values in each column.
- * 
+ *
  * @param {Object <string, any>[]} body an array of object data to be printed.
  * @param {Object <string, ColumnFormatOptions>} columnFormat An array of objects that describe the formatting to apply to the given column in the output table.
  * @param {{key: string, label: string}[]} headers The headers which will label the columns in the output table, in the order to be arranged. The key property should

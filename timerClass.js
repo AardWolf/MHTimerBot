@@ -32,13 +32,13 @@ class Timer {
     constructor(seed) {
         if (!seed)
             throw new TypeError("Timer construction requires an input seed object.");
-        
+
         // If the input Timer seed is a primitive (e.g. 1), or is missing required properties, bail. 
         const keys = Object.keys(seed);
         const required = ['area', 'seed_time', 'repeat_time'];
         // If a required key is missing, or has a falsy value, then the seed is invalid.
         if (!keys.length || !required.every(rq => (keys.indexOf(rq) !== -1 && seed[rq])))
-            throw new TypeError(`Input timer seed is missing required keys. Found only: ${keys.toString()}`);
+            throw new TypeError(`Input timer seed is missing required keys or values. Require values for keys "${required.join(`", "`)}".`);
 
         // Assign area and sub_area.
         this._area = String(seed.area);
@@ -48,16 +48,16 @@ class Timer {
         // Validate and assign time values.
         this._seedTime = DateTime.fromISO(seed.seed_time); // Are they ISO format? or something else?
         if (!this._seedTime.isValid)
-            throw new TypeError(`(${this.name}): Input seed time ${seed.seed_time} failed to parse into a valid DateTime.`);
+            throw new TypeError(`(${this.name}): Input seed time "${seed.seed_time}" failed to parse into a valid DateTime.`);
 
         // Create the Duration that represents the time period between activations.
         this._repeatDuration = getAsDuration(seed.repeat_time || 0, true);
         if (this._repeatDuration.as('minutes') < 1)
-            throw new RangeError(`(${this.name}): Input repeat duration is ${seed.repeat_time} (invalid or too short).`);
+            throw new RangeError(`(${this.name}): Input repeat duration is "${seed.repeat_time}" (invalid or too short).`);
 
         // Require the stored seed time to be in the past.
         while (DateTime.utc() < this._seedTime) {
-            console.log(`(${this.name}): seed time ('${this._seedTime}') in future: decrementing ${this._repeatDuration.as('minutes')} minutes.`);
+            console.log(`(${this.name}): seed time ("${this._seedTime}") in future: decrementing ${this._repeatDuration.as('minutes')} minutes.`);
             this._seedTime = this._seedTime.minus(this._repeatDuration);
         }
 
@@ -295,7 +295,7 @@ class Timer {
 function getAsDuration(value, normalize = false) {
     let dur = _isLuxonObject(value) ? Duration.fromObject(value) : Duration.fromMillis(value || 0);
     if (!dur.isValid) {
-        console.log(`Received invalid input ${value} to convert to a Duration.`);
+        console.log(`Received invalid input "${value}" to convert to a Duration.`);
         dur = Duration.fromMillis(0);
         // throw new TypeError(`Invalid argument to Duration constructor: ${value}`);
     }
