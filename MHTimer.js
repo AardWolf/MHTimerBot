@@ -146,7 +146,7 @@ function Main() {
                 .then(didSave => console.log(didSave ? "saved first" : "baaiiiilllllllllllll"),
                     err => console.log(err))
                 .then(client.destroy)
-                .then(result => process.exit(1))
+                .then(result => process.exitCode = 1)
                 .catch(err => console.log(err));
         });
 
@@ -155,17 +155,16 @@ function Main() {
         client.on('disconnect', event => {
             console.log("Close event: " + event.reason);
             console.log(`Close code: ${event.code} (${event.wasClean ? `not ` : ``}cleanly closed)`);
-            client.destroy();
             doSaveAll()
                 .then(didSave => console.log(didSave ? "saved first" : "baaiiiilllllllllllll"),
                     err => console.log(err))
                 .then(client.destroy)
-                .then(result => process.exit(1))
+                .then(result => process.exitCode = 1)
                 .catch(err => console.log(err));
         });
     }).then(() => client.login(settings.token)
     ).catch(err => {
-        console.log(`Fatal bot error, exiting`, err);
+        console.log(`Fatal bot error, exiting promptly`, err);
         process.exit(1);
     });
 }
