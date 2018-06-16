@@ -175,24 +175,25 @@ function Main() {
                 });
             });
 
-            // Message handling.
-            client.on('message', message => {
-                if (message.author.id === client.user.id)
-                    return;
+        // Message handling.
+        const re = new RegExp('^' + settings.botPrefix + '\\s');
+        client.on('message', message => {
+            if (message.author.id === client.user.id)
+                return;
 
-                switch (message.channel.name) {
-                    case settings.linkConversionChannel:
-                        if (/^(http[s]?:\/\/htgb\.co\/).*/g.test(message.content.toLowerCase()))
-                            convertRewardLink(message);
-                        break;
-                    default:
-                        if (message.channel.type === 'dm')
-                            parseUserMessage(message);
-                        else if (message.content.startsWith(settings.botPrefix))
-                            parseUserMessage(message);
-                        break;
-                }
-            });
+            switch (message.channel.name) {
+                case settings.linkConversionChannel:
+                    if (/^(http[s]?:\/\/htgb\.co\/).*/g.test(message.content.toLowerCase()))
+                        convertRewardLink(message);
+                    break;
+                default:
+                    if (message.channel.type === 'dm')
+                        parseUserMessage(message);
+                    else if (re.test(message.content))
+                        parseUserMessage(message);
+                    break;
+            }
+        });
 
             // WebSocket connection error for the bot client.
             client.on('error', error => {
