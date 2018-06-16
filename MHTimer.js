@@ -1101,21 +1101,41 @@ function doRemind(timer) {
     const area = timer.getArea(),
         sub = timer.getSubArea();
 
-    let start = DateTime.utc();
     // TODO: Build a basic embed template object and package that to each recipient, rather than
     // fully construct the (basically equivalent) embed for each user.
-    reminders.filter(r => area === r.area && r.count !== 0)
+    const toDispatch = reminders
         // If there no sub-area for this reminder, or the one specified matches
         // that of the timer, send the reminder.
-        .forEach(reminder => { if (!reminder.sub_area || sub === reminder.sub_area)
-            client.fetchUser(reminder.user)
-                .then(user => sendRemind(user, reminder, timer))
+        .filter(r => area === r.area && r.count !== 0 && (!r.sub_area || r.sub_area === sub))
+        // The reminder is sent using whichever one has the fewest remaining reminders.
+        // For reminders with equivalent remaining quota, the more specific reminder is sent.
+        .sort((a, b) => {
+            if (a.count === b.count)
+                // The two reminder quotas are equal: coerce the sub-areas from string -> bool -> int
+                // and then return a descending sort (since true -> 1 and true means it was specific).
+                return (!!b.sub_area) * 1 - (!!a.sub_area) * 1;
+
+            // For dissimilar quotas, we know only one can be perpetual. If one is perpetual, sort descending.
+            // Else, sort ascending.
+            if (a.count === -1 || b.count === -1)
+                return b.count - a.count;
+            return a.count - b.count;
+        });
+
+    // Obtain a set of users who have not yet been notified from the sorted reminder array.
+    const sent = new Set();
+    // Dispatch the reminders, and update the set as we go.
+    toDispatch.forEach(reminder => {
+        let uid = reminder.user;
+        if (!sent.has(uid)) {
+            sent.add(uid);
+            client.fetchUser(uid).then(user => sendRemind(user, reminder, timer))
                 .catch(err => {
                     reminder.fail = (reminder.fail || 0) + 1;
-                    console.log(`Reminders: Error during user notification`, err);
+                    console.log(`Reminders: Error during notification of user <@${uid}>:\n`, err);
                 });
-        });
-    console.log(`Timers: Announcements for ${timer.name} completed in ${start.diffNow('seconds', 'milliseconds').toFormat('ss.SSS')}.`);
+        }
+    });
 }
 
 /**
