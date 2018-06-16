@@ -22,7 +22,7 @@ const main_settings_filename = 'settings.json',
     reminder_filename = 'reminders.json',
     nickname_urls_filename = 'nicknames.json';
 
-/** @type Timer[] */
+/** @type {Timer[]} */
 const timers_list = [];
 /** @type {TimerReminder[]} */
 const reminders = [];
@@ -37,10 +37,11 @@ var nickname_urls = {};
 const refresh_rate = Duration.fromObject({ minutes: 5 });
 /** @type {Object <string, NodeJS.Timer>} */
 const dataTimers = {};
-/** @type {Object <string, DateTime>} */
 const last_timestamps = {
-    reminder_save: null,
-    hunter_save: null
+    reminder_save: DateTime.utc(),
+    hunter_save: DateTime.utc(),
+    /** @type {Object <string, {activated: DateTime, nodeTimer: NodeJS.Timer>} */
+    timer_config: {}
 }
 
 //https://stackoverflow.com/questions/12008120/console-log-timestamps-in-chrome
@@ -108,6 +109,7 @@ function Main() {
     a.then(() => {
         client.on("ready", () => {
             console.log("I am alive!");
+            const now = DateTime.utc();
 
             // Find its #timers channel (if it has one)
             client.guilds.forEach(guild => {
@@ -118,6 +120,19 @@ function Main() {
                 if (!canAnnounce)
                     console.log(`Timers: No channel for announcements in guild '${guild.name}'.`);
             });
+
+            // Schedule reminders only once, no matter how many guilds we belong to.
+            timers_list.filter(t => !last_timestamps.timer_config[t.name])
+                .forEach(t => {
+                    let timeout = setTimeout(timer => {
+                        // Reschedule using the repeating interval information.
+                        last_timestamps.timer_config[timer.name].nodeTimer = setInterval(doRemind, timer.getRepeatInterval().as('milliseconds'), timer);
+                        last_timestamps.timer_config[timer.name].activated = DateTime.utc();
+                        // Issue the reminder for this timer, to any who have registered to receive it.
+                        doRemind(timer);
+                    }, t.getNext().diffNow().minus(t.getAdvanceNotice()).as('milliseconds'), t);
+                    last_timestamps.timer_config[t.name] = { nodeTimer: timeout, activated: now };
+                });
         });
 
         // Message handling.
@@ -1063,8 +1078,8 @@ function saveReminders() {
 }
 
 /**
- * Send the given timer's announcement to the given channel, and then process
- * any reminders that chatters may have set up.
+ * Send the given timer's announcement to the given channel. This is called for
+ * each channel the bot is able to announce on.
  *
  * @param {Timer} timer The timer being announced.
  * @param {TextChannel} channel The Discord channel that will receive the message.
@@ -1073,7 +1088,6 @@ function doAnnounce(timer, channel) {
     channel.send(timer.getAnnouncement())
         .catch(error => console.log(`Timers: Error during announcement. Status ${channel.client.status}`, error));
 
-    doRemind(timer);
 }
 
 /**
