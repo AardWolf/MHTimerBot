@@ -126,6 +126,7 @@ function Main() {
 
             // Use one timeout per timer to manage default reminders and announcements.
             timers_list.forEach(timer => scheduleTimer(timer, announcables));
+            console.log(`Timers: Initialized ${timer_config.size} timers on channels ${announcables}.`);
 
             // If we disconnect and then reconnect, do not bother rescheduling the already-scheduled timers.
             client.on("ready", () => console.log("I am alive again!"));
@@ -310,7 +311,7 @@ function scheduleTimer(timer, channels) {
             doAnnounce(t);
         }, msUntilActivation, timer)
     );
-    timer_config[timer.id] = { active: true, channels: channels, inactiveChannels: [] };
+    timer_config.set(timer.id, { active: true, channels: channels, inactiveChannels: [] });
 }
 
 /**
