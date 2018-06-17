@@ -82,6 +82,9 @@ class Timer {
         this._timeout = {};
         /** @type {Object <string, NodeJS.Timer>} the NodeJS.Timer object created by NodeJS.setInterval() */
         this._interval = {};
+
+        // Set a unique id for this timer.
+        this._id = getId();
     }
 
     /**
@@ -92,6 +95,16 @@ class Timer {
      */
     get name() {
         return `${this._area}${this._subArea ? `: ${this._subArea}` : ""}`;
+    }
+
+    /**
+     * A uniquely-identifing property for this specific timer.
+     *
+     * @instance
+     * @returns {string} e.g. "1"
+     */
+    get id() {
+        return this._id;
     }
 
     /**
@@ -285,6 +298,26 @@ class Timer {
     }
 }
 
+/**
+ * Generator for timer identifiers
+ *
+ * @generator
+ */
+function* nextId() {
+    var id = 0;
+    while (true)
+        yield (id++).toString();
+}
+/** Reference to an instantiated generator */
+const id = nextId();
+/**
+ * Method to simplify timer identifier assignment
+ *
+ * @returns {string} a unique string identifier.
+ */
+function getId() {
+    return id.next().value;
+}
 /**
  * Convert the given input into a Duration object
  * @param {{} | number} value a value from a user/file to be cast to a duration.
