@@ -1279,7 +1279,7 @@ function listRemind(message) {
     let timer_str = "Your reminders:";
     let usage_str;
 
-    const userReminders = reminders.filter(r => r.user === user);
+    const userReminders = reminders.filter(r => r.user === user && r.count);
     userReminders.forEach(reminder => {
         // TODO: prettyPrint this info.
         let name = `${reminder.area}${reminder.sub_area ? ` (${reminder.sub_area})` : ""}`;
