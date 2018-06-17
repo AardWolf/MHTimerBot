@@ -240,8 +240,13 @@ function loadSettings(resolve, reject) {
         // Set defaults if they were not specified.
         if (!settings.linkConversionChannel)
             settings.linkConversionChannel = "larrys-freebies";
-        if (!settings.timedAnnouncementChannel)
-            settings.timedAnnouncementChannel = "timers";
+
+        if (!settings.timedAnnouncementChannels)
+            settings.timedAnnouncementChannels = ["timers"];
+        if (!Array.isArray(settings.timedAnnouncementChannels))
+            settings.timedAnnouncementChannels = settings.timedAnnouncementChannels.split(",").map(s => s.trim());
+        settings.timedAnnouncementChannels = new Set(settings.timedAnnouncementChannels);
+
         settings.botPrefix = settings.botPrefix ? settings.botPrefix.trim() : '-mh';
 
         console.log(`Settings: loaded ${Object.keys(settings).length} from '${main_settings_filename}'.`);
