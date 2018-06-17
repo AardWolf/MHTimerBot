@@ -109,7 +109,7 @@ function Main() {
 
     // Bot configuration.
     a.then(() => {
-        client.on("ready", () => {
+        client.once("ready", () => {
             console.log("I am alive!");
 
             // Find all text channels on which to send announcements.
