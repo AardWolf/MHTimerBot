@@ -37,12 +37,14 @@ var nickname_urls = {};
 const refresh_rate = Duration.fromObject({ minutes: 5 });
 /** @type {Object <string, NodeJS.Timer>} */
 const dataTimers = {};
+/** @type {Object<string, DateTime>} */
 const last_timestamps = {
     reminder_save: DateTime.utc(),
     hunter_save: DateTime.utc(),
-    /** @type {Object <string, {activated: DateTime, nodeTimer: NodeJS.Timer>} */
-    timer_config: {}
-}
+};
+/** @type {Map <string, {active: boolean, channels: TextChannel[], inactiveChannels: TextChannel[]}>} */
+const timer_config = new Map();
+const textChannelTypes = new Set(['text', 'dm', 'group']);
 
 //https://stackoverflow.com/questions/12008120/console-log-timestamps-in-chrome
 console.logCopy = console.log.bind(console);
@@ -109,30 +111,24 @@ function Main() {
     a.then(() => {
         client.on("ready", () => {
             console.log("I am alive!");
-            const now = DateTime.utc();
 
-            // Find its #timers channel (if it has one)
-            client.guilds.forEach(guild => {
-                let canAnnounce = false;
-                guild.channels
-                    .filter(channel => channel.name === settings.timedAnnouncementChannel)
-                    .forEach(announcable => { canAnnounce = createTimedAnnouncements(announcable) });
-                if (!canAnnounce)
-                    console.log(`Timers: No channel for announcements in guild '${guild.name}'.`);
-            });
+            // Find all text channels on which to send announcements.
+            const announcables = client.guilds.reduce((channels, guild) => {
+                let candidates = guild.channels
+                    .filter(c => settings.timedAnnouncementChannels.has(c.name) && textChannelTypes.has(c.type))
+                    .map(tc => tc);
+                if (candidates.length)
+                    Array.prototype.push.apply(channels, candidates);
+                else
+                    console.log(`Timers: No valid channels in ${guild.name} for announcements.`)
+                return channels;
+            }, []);
 
-            // Schedule reminders only once, no matter how many guilds we belong to.
-            timers_list.filter(t => !last_timestamps.timer_config[t.name])
-                .forEach(t => {
-                    let timeout = setTimeout(timer => {
-                        // Reschedule using the repeating interval information.
-                        last_timestamps.timer_config[timer.name].nodeTimer = setInterval(doRemind, timer.getRepeatInterval().as('milliseconds'), timer);
-                        last_timestamps.timer_config[timer.name].activated = DateTime.utc();
-                        // Issue the reminder for this timer, to any who have registered to receive it.
-                        doRemind(timer);
-                    }, t.getNext().diffNow().minus(t.getAdvanceNotice()).as('milliseconds'), t);
-                    last_timestamps.timer_config[t.name] = { nodeTimer: timeout, activated: now };
-                });
+            // Use one timeout per timer to manage default reminders and announcements.
+            timers_list.forEach(timer => scheduleTimer(timer, announcables));
+
+            // If we disconnect and then reconnect, do not bother rescheduling the already-scheduled timers.
+            client.on("ready", () => console.log("I am alive again!"));
         });
 
         // Message handling.
@@ -296,33 +292,25 @@ function loadTimers() {
  * When the bot initializes, go through all known Timers and schedule their next announcement.
  * Also sets up the conversion from a single timeout-based call into a repeated-every-X interval.
  * 
- * @param {TextChannel} channel A channel interface on which announcements should be sent.
- * @returns {boolean} if any timers have been initialized.
+ * @param {Timer} timer The timer to schedule.
+ * @param {GuildChannel[]} channels the channels on which this timer will initially perform announcements.
  */
-function createTimedAnnouncements(channel) {
-    let location = `'#${channel.name}' in server '${channel.guild.name}'`;
-    let key = `${channel.id}${channel.guild.id}`;
-    console.log(`Timers: Setting up announcements for ${location}.`);
-    timers_list.forEach(timer => {
-        let timeout = setTimeout(
-            (timer, channel) => {
-                // When activated, print the associated announcement.
-                doAnnounce(timer, channel);
-                timer.stopTimeout(key);
-                // Schedule the announcement on a repeated interval.
-                let interval = setInterval(
-                    (timer, channel) => doAnnounce(timer, channel),
-                    timer.getRepeatInterval().as('milliseconds'), timer, channel);
-                timer.storeInterval(key, interval);
-            },
-            timer.getNext().diffNow().minus(timer.getAdvanceNotice()).as('milliseconds'),
-            timer,
-            channel);
-        timer.storeTimeout(key, timeout);
-    });
-    console.log(`Timers: ${timers_list.length} configured for ${location}.`);
-    // Not sure how we would check for initialization errors for a given server.
-    return true;
+function scheduleTimer(timer, channels) {
+    let msUntilActivation = timer.getNext().diffNow().minus(timer.getAdvanceNotice()).as('milliseconds');
+    timer.storeTimeout('scheduling',
+        setTimeout(t => {
+            t.stopTimeout('scheduling');
+            t.storeInterval('scheduling',
+                setInterval(timer => {
+                    doRemind(timer);
+                    doAnnounce(timer);
+                }, t.getRepeatInterval().as('milliseconds'), t)
+            );
+            doRemind(t);
+            doAnnounce(t);
+        }, msUntilActivation, timer)
+    );
+    timer_config[timer.id] = { active: true, channels: channels, inactiveChannels: [] };
 }
 
 /**
@@ -1083,16 +1071,34 @@ function saveReminders() {
 }
 
 /**
- * Send the given timer's announcement to the given channel. This is called for
- * each channel the bot is able to announce on.
+ * Instruct the given timer to send its announcement to all channels it is instructed to send to.
  *
  * @param {Timer} timer The timer being announced.
- * @param {TextChannel} channel The Discord channel that will receive the message.
  */
-function doAnnounce(timer, channel) {
-    channel.send(timer.getAnnouncement())
-        .catch(error => console.log(`Timers: Error during announcement. Status ${channel.client.status}`, error));
+function doAnnounce(timer) {
+    if (!timer)
+        return;
+    let config = timer_config.get(timer.id);
+    if (!config || !config.active)
+        return;
+    if (!config.channels.length)
+        config.active = false;
 
+    let message = timer.getAnnouncement();
+    config.channels.forEach(tc => {
+        if(tc.guild.available)
+            tc.send(message).catch(err => {
+                console.log(`(${timer.name}): Error during announcement on channel ${tc.name} in ${tc.guild.name}. Client status: ${client.status}\n`, err);
+                // Deactivate this channel only if we are connected to Discord. (Status === 'READY')
+                // TODO: actually use the enum instead of a value for the enum (in case it changes):
+                // https://github.com/discordjs/discord.js/blob/d97af9d2e0a8c4cc3cd18b7b93ba6b93fe3772f6/src/util/Constants.js#L158
+                if (client.status === 0) {
+                    let index = config.channels.indexOf(tc);
+                    Array.prototype.push.apply(config.inactiveChannels, config.channels.splice(index, 1));
+                    console.log(`(${timer.name}): deactivated announcement on channel ${tc.name} in ${tc.guild.name} due to send error during send.`);
+                }
+            });
+    });
 }
 
 /**
