@@ -1226,8 +1226,8 @@ function addRemind(timerRequest, message) {
             if ((subArea && reminder.sub_area === subArea)
                 || (!subArea && !reminder.sub_area))
             {
-                responses.push(`Updated reminder count for '${requestName}' from ${reminder.count === -1
-                    ? `'always'` : reminder.count} to ${count}.`);
+                responses.push(`Updated reminder count for '${requestName}' from '${reminder.count === -1
+                    ? `always` : reminder.count}' to '${count === -1 ? `always` : count}'.`);
                 reminder.count = count;
             }
 
