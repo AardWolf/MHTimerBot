@@ -1376,8 +1376,8 @@ function addRemind(timerRequest, message) {
             if ((subArea && reminder.sub_area === subArea)
                 || (!subArea && !reminder.sub_area))
             {
-                responses.push(`Updated reminder count for '${requestName}' from ${reminder.count === -1
-                    ? `'always'` : reminder.count} to ${count}.`);
+                responses.push(`Updated reminder count for '${requestName}' from '${reminder.count === -1
+                    ? `always` : reminder.count}' to '${count === -1 ? `always` : count}'.`);
                 reminder.count = count;
             }
 
@@ -1429,7 +1429,7 @@ function listRemind(message) {
     let timer_str = "Your reminders:";
     let usage_str;
 
-    const userReminders = reminders.filter(r => r.user === user);
+    const userReminders = reminders.filter(r => r.user === user && r.count);
     userReminders.forEach(reminder => {
         // TODO: prettyPrint this info.
         let name = `${reminder.area}${reminder.sub_area ? ` (${reminder.sub_area})` : ""}`;
