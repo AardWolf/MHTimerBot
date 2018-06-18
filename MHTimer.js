@@ -14,7 +14,6 @@ const fs = require('fs');
 // Access external URIs, like @devjacksmith 's tools.
 const request = require('request');
 
-
 // Convert callbacks to 'Promise' versions
 const util = require('util');
 const fs_readFile = util.promisify(fs.readFile);
@@ -22,35 +21,37 @@ const fs_writeFile = util.promisify(fs.writeFile);
 
 // Globals
 const client = new Discord.Client({ disabledEvents: ["TYPING_START"] });
+const textChannelTypes = new Set(['text', 'dm', 'group']);
 const main_settings_filename = 'settings.json',
     timer_settings_filename = 'timer_settings.json',
     hunter_ids_filename = 'hunters.json',
     reminder_filename = 'reminders.json',
     nickname_urls_filename = 'nicknames.json';
+const file_encoding = 'utf8';
+
+const settings = {},
+    mice = [],
+    items = [],
+    hunters = {},
+    nicknames = new Map(),
+    nickname_urls = {};
 
 /** @type {Timer[]} */
 const timers_list = [];
 /** @type {TimerReminder[]} */
 const reminders = [];
-const file_encoding = 'utf8';
 
-const settings = {};
-const mice = [];
-const items = [];
-var hunters = {};
-var nicknames = {};
-var nickname_urls = {};
 const refresh_rate = Duration.fromObject({ minutes: 5 });
-/** @type {Object <string, NodeJS.Timer>} */
-const dataTimers = {};
 /** @type {Object<string, DateTime>} */
 const last_timestamps = {
     reminder_save: DateTime.utc(),
     hunter_save: DateTime.utc(),
 };
+
+/** @type {Object <string, NodeJS.Timer>} */
+const dataTimers = {};
 /** @type {Map <string, {active: boolean, channels: TextChannel[], inactiveChannels: TextChannel[]}>} */
 const timer_config = new Map();
-const textChannelTypes = new Set(['text', 'dm', 'group']);
 
 //https://stackoverflow.com/questions/12008120/console-log-timestamps-in-chrome
 console.logCopy = console.log.bind(console);
@@ -120,14 +121,18 @@ function Main() {
             // Create reminders list from the reminders file.
             const hasReminders = loadReminders()
                 .then(reminderData => {
-                    createRemindersFromData(reminderData);
+                    if (createRemindersFromData(reminderData))
+                        pruneExpiredReminders();
                     console.log(`Reminders: imported ${reminderData.length} from file.`);
                     return reminders.length > 0;
                 })
                 .catch(err => failedLoad(`Reminders: import error:\n`, err));
             hasReminders.then(hasReminders => {
                 console.log(`Reminders: Configuring save every ${saveInterval / (60 * 1000)} min.`);
-                dataTimers['reminders'] = setInterval(saveReminders, saveInterval)
+                dataTimers['reminders'] = setInterval(() => {
+                    pruneExpiredReminders();
+                    saveReminders();
+                }, saveInterval)
             });
 
             // Create hunters data from the hunters file.
@@ -562,13 +567,13 @@ function parseUserMessage(message) {
                 let userText = tokens.slice(1, 10).join(" ").trim().toLowerCase();
                 let userCommand = tokens[0].toLowerCase();
                 if (userCommand === "in" && userText) {
-                    if (nicknames["locations"][userText])
-                        userText = nicknames["locations"][userText];
+                    if (nicknames.get("locations")[userText])
+                        userText = nicknames.get("locations")[userText];
                     setHunterProperty(message, "location", userText);
                 }
                 else if (["rank", "title", "a"].indexOf(userCommand) !== -1 && userText) {
-                    if (nicknames["ranks"][userText])
-                        userText = nicknames["ranks"][userText];
+                    if (nicknames.get("ranks")[userText])
+                        userText = nicknames.get("ranks")[userText];
                     setHunterProperty(message, "rank", userText);
                 }
                 else if (userCommand.substring(0, 3) === "snu" && userText)
@@ -624,14 +629,14 @@ function parseUserMessage(message) {
                 // Rank or location lookup. tokens[] contains the terms to search
                 let search = tokens.join(" ").toLowerCase();
                 if (searchType === "in") {
-                    if (nicknames["locations"][search]) {
-                        search = nicknames["locations"][search];
+                    if (nicknames.get("locations")[search]) {
+                        search = nicknames.get("locations")[search];
                     }
                     searchType = "location";
                 }
                 else if (["rank", "title", "a"].indexOf(searchType) !== -1) {
-                    if (nicknames["ranks"][search]) {
-                        search = nicknames["ranks"][search];
+                    if (nicknames.get("ranks")[search]) {
+                        search = nicknames.get("ranks")[search];
                     }
                     searchType = "rank";
                 }
@@ -1186,7 +1191,7 @@ function doAnnounce(timer) {
 
     let message = timer.getAnnouncement();
     config.channels.forEach(tc => {
-        if(tc.guild.available)
+        if (tc.guild.available)
             tc.send(message).catch(err => {
                 console.log(`(${timer.name}): Error during announcement on channel ${tc.name} in ${tc.guild.name}. Client status: ${client.status}\n`, err);
                 // Deactivate this channel only if we are connected to Discord. (Status === 'READY')
@@ -1658,8 +1663,8 @@ function findMouse(channel, args, command) {
         args = tokens.join(" ");
     }
     // If the input was a nickname, convert it to the queryable value.
-    if (nicknames["mice"][args])
-        args = nicknames["mice"][args];
+    if (nicknames.get("mice")[args])
+        args = nicknames.get("mice")[args];
 
 
     const MATCH_LENGTH = args.length;
@@ -1808,8 +1813,8 @@ function findItem(channel, args, command) {
         args = tokens.join(" ");
     }
     // If the input was a nickname, convert it to the queryable value.
-    if (nicknames["loot"][args])
-        args = nicknames["loot"][args];
+    if (nicknames.get("loot")[args])
+        args = nicknames.get("loot")[args];
 
     const MATCH_LENGTH = args.length;
     for (let i = 0, len = items.length; i < len; ++i)
@@ -2066,7 +2071,7 @@ function loadNicknameURLs(path = nickname_urls_filename) {
  * Load all nicknames from all sources.
  */
 function refreshNicknameData() {
-    nicknames = {};
+    nicknames.clear();
     for (let key in nickname_urls)
         getNicknames(key);
 }
@@ -2085,7 +2090,7 @@ function getNicknames(type) {
         console.log(`Nicknames: Received '${type}' but I don't know its URL.`);
         return false;
     }
-    nicknames[type] = {};
+    let newData = {};
     // It returns a string as CSV, not JSON.
     request({
         url: nickname_urls[type]
@@ -2100,10 +2105,11 @@ function getNicknames(type) {
             for (let row of rows) {
                 let cols = row.toLowerCase().split(',', 2);
                 if (cols.length === 2)
-                    nicknames[type][cols[0]] = cols[1];
+                    newData[cols[0]] = cols[1];
             }
         }
-        console.log(`Nicknames: ${Object.keys(nicknames[type]).length} of type '${type}' loaded.`);
+        nicknames.set(type, newData);
+        console.log(`Nicknames: ${Object.keys(newData).length} of type '${type}' loaded.`);
     });
 }
 
