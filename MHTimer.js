@@ -1805,9 +1805,19 @@ function findItem(channel, args, command) {
 
     // Process args for flags, like the -e event filter.
     let tokens = args.split(/\s+/);
+    let timefilter = "";
     if (tokens.length > 2) {
         if (tokens[0] === "-e") {
+            switch (tokens[1]) {
+                //Add a special case for a weird event time. May update this if new filters get added
+                case '3':
+                case '3d':
+                    tokens[1] = 'last3days';
+                    break;
+            }
+
             url += `&timefilter=${tokens[1]}`;
+            timefilter = tokens[1];
             tokens.splice(0, 2);
         }
         args = tokens.join(" ");
@@ -1883,7 +1893,7 @@ function findItem(channel, args, command) {
 
                     let table = prettyPrintArrayAsString(attractions, columnFormatting, headers, "=");
                     retStr = `${itemName} (loot) can be found the following ways:\n\`\`\`\n${table}\n\`\`\`\n`;
-                    retStr += `HTML version at: <https://mhhunthelper.agiletravels.com/loot.php?item=${itemID}>`;
+                    retStr += `HTML version at: <https://mhhunthelper.agiletravels.com/loot.php?item=${itemID}&timefilter=${timefilter ? timefilter : "all"}>`;
                 } else
                     retStr = `${itemName} either hasn't been seen enough, or something broke.`;
                 channel.send(retStr);
