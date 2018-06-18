@@ -1574,7 +1574,7 @@ function getHelpMessage(tokens) {
     else if (tokens[0] === 'ifind') {
         return [
             `**ifind**`,
-            `Usage \`${prefix} ifind <item>\` will print the top 10 drop rates for the item.`,
+            `Usage \`${prefix} ifind <item>\` will print the top 10 drop rates (per catch) for the item.`,
             "All drop rate data is from <https://mhhunthelper.agiletravels.com/>.",
             "Help populate the database for better information!"
         ].join("\n");
@@ -1829,14 +1829,15 @@ function findItem(channel, args, command) {
                 const attractions = [];
                 if (!error && response.statusCode == 200 && Array.isArray(body)) {
                     // body is an array of objects with: location, stage, total_hunts, rate, cheese
+                    // 2018-06-18 rate -> rate_per_catch; total_hunts -> total_catches
                     // Sort by "rate" but only if hunts >= 100
-                    body.filter(setup => setup.total_hunts > 99).forEach(setup => {
+                    body.filter(setup => setup.total_catches > 99).forEach(setup => {
                         attractions.push(
                             {
                                 location: setup.location,
                                 stage: setup.stage === null ? " N/A " : setup.stage,
-                                total_hunts: integerComma(setup.total_hunts),
-                                rate: setup.rate * 1.0 / 1000, // Divide by 1000? should this be 100?
+                                total_hunts: integerComma(setup.total_catches),
+                                rate: setup.rate_per_catch * 1.0 / 1000, // Divide by 1000? should this be 100?
                                 cheese: setup.cheese
                             });
                     });
@@ -1863,7 +1864,7 @@ function findItem(channel, args, command) {
                         order.splice(order.indexOf("stage"), 1);
 
                     // Build the header row.
-                    const labels = { location: "Location", stage: "Stage", total_hunts: "Hunts", rate: "DR", cheese: "Cheese" }
+                    const labels = { location: "Location", stage: "Stage", total_hunts: "Catches", rate: "DR", cheese: "Cheese" }
                     const headers = order.map(key => {
                         columnFormatting[key] = {
                             columnWidth: labels[key].length,
