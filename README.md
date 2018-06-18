@@ -25,3 +25,13 @@ Timers need a way to catch back up if offline a while.
 * Configure which channel is announced on (should be #timers at some point)  
 * Read/Save reminder requests.  
 * Add commands to listener
+
+## To Use In Your Own Server
+
+Make a bot account. Google that if you don't know how. In the settings.json file you will need the following entries:
+
+* token - this is your bot token  
+* bitly_token - this does link conversion. Not setting this just causes weird output but the bot works fine.
+* linkConversionChannel - (optional) the name of the channel to monitor for links (default: larrys-freebies)
+* timedAnnouncementsChannel - (optional) the name of the channel to announce timers in (default: timers)
+* botPrefix - (optional) the prefix for the bot's commands (default: -mh)
