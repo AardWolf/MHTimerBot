@@ -1,6 +1,8 @@
     {
         "token": "",
         "linkConversionChannel": "larrys-freebies",
-        "timedAnnouncementChannel": "timers",
+        "timedAnnouncementChannels": [
+          "timers"
+        ],
         "botPrefix": "-mh"
     }
