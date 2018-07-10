@@ -2131,7 +2131,7 @@ function getNicknames(type) {
             }
         }
         nicknames.set(type, newData);
-        parser.end();
+        parser.end(() => console.log(`Nicknames: ${Object.keys(newData).length} of type '${type}' loaded.`));
     });
     console.log(`Nicknames: ${Object.keys(newData).length} of type '${type}' loaded.`);
 }
