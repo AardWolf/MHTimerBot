@@ -13,6 +13,8 @@ const Timer = require('./timerClass.js');
 const fs = require('fs');
 // Access external URIs, like @devjacksmith 's tools.
 const request = require('request');
+// We need more robust CSV handling
+const csv_parse = require('csv-parse');
 
 // Convert callbacks to 'Promise' versions
 const util = require('util');
@@ -1652,6 +1654,8 @@ function findMouse(channel, args, command) {
 
     // Deep copy the input args, in case we modify them.
     const orig_args = JSON.parse(JSON.stringify(args));
+    console.log("In findMouse");
+    console.log(orig_args);
 
     // Process args for flags, like the -e event filter.
     let tokens = args.split(/\s+/);
@@ -1665,6 +1669,8 @@ function findMouse(channel, args, command) {
     // If the input was a nickname, convert it to the queryable value.
     if (nicknames.get("mice")[args])
         args = nicknames.get("mice")[args];
+    
+    console.log("New args: ", args);
 
 
     const MATCH_LENGTH = args.length;
@@ -2111,13 +2117,30 @@ function getNicknames(type) {
         else if (response.statusCode !== 200)
             console.log(`Nicknames: request returned response "${response.statusCode}: ${response.statusMessage}"\n`, response.toJSON());
         else {
+            // Set up the parser
+            let parser = csv_parse({delimiter: ","});
+            parser.on('readable', function(){
+                while(record = parser.read()){
+                    newData[record[0]] = record[1];
+                    console.log(`Read record: ${record[0]} points to ${record[1]} from ${record}`);
+                }
+            });
+            parser.on('error', function(err){
+                console.log(err.message);
+            });
+            
             let rows = body.split(/[\r\n]+/);
             let headers = rows.shift();
+            console.log(`Nicknames: Adding ${headers.length} of type ${type}`);
+//            parser.write(rows);
             for (let row of rows) {
-                let cols = row.toLowerCase().split(',', 2);
-                if (cols.length === 2)
-                    newData[cols[0]] = cols[1];
+                parser.write(row.toLowerCase() + "\n");
+//                console.log(`Sent row ${row}`);
+//                let cols = row.toLowerCase().split(',', 2);
+//                if (cols.length === 2)
+//                    newData[cols[0]] = cols[1];
             }
+            parser.end();
         }
         nicknames.set(type, newData);
         console.log(`Nicknames: ${Object.keys(newData).length} of type '${type}' loaded.`);
