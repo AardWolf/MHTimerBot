@@ -2105,15 +2105,13 @@ function getNicknames(type) {
     let newData = {};
     // It returns a string as CSV, not JSON.
     // Set up the parser
-    let parser = csv_parse({delimiter: ","});
-    parser.on('readable', function(){
-        while(record = parser.read()){
-            newData[record[0]] = record[1];
-        }
-    });
-    parser.on('error', function(err){
-        console.log(err.message);
-    });
+    let parser = csv_parse({delimiter: ","})
+        .on('readable', () => {
+            while(record = parser.read())
+                newData[record[0]] = record[1];
+        })
+        .on('error', err => console.log(err.message));
+
     request({
         url: nickname_urls[type]
     }, (error, response, body) => {
@@ -2122,13 +2120,8 @@ function getNicknames(type) {
         else if (response.statusCode !== 200)
             console.log(`Nicknames: request returned response "${response.statusCode}: ${response.statusMessage}"\n`, response.toJSON());
         else {
-            
-            let rows = body.split(/[\r\n]+/);
-            let headers = rows.shift();
-//            parser.write(rows);
-            for (let row of rows) {
-                parser.write(row.toLowerCase() + "\n");
-            }
+            // Pass the response to the CSV parser (after removing the header row).
+            parser.write(body.split(/[\r\n]+/).splice(1).join("\n").toLowerCase());
         }
         nicknames.set(type, newData);
         parser.end(() => console.log(`Nicknames: ${Object.keys(newData).length} of type '${type}' loaded.`));
