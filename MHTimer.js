@@ -520,12 +520,7 @@ function parseUserMessage(message) {
 
             let usage_str = buildSchedule(reminderRequest);
             // Discord limits messages to 2000 characters, so use multiple messages if necessary.
-            while (usage_str.length > 2000) {
-                let part_str = usage_str.substr(0, usage_str.lastIndexOf('\n', 2000));
-                message.channel.send(part_str);
-                usage_str = usage_str.substr(part_str.length);
-            }
-            message.channel.send(usage_str);
+            message.channel.send(usage_str, { split: true });
             break;
 
         // Display information about the desired mouse.
@@ -1703,8 +1698,9 @@ function findMouse(channel, args, command) {
                 if (attractions.length) {
                     // Sort that by Attraction Rate, descending.
                     attractions.sort((a, b) => (b.rate - a.rate));
-                    // Keep only the top 10 results.
-                    attractions.splice(10);
+                    // Keep only the top 10 results, unless this is a DM.
+                    if (channel.type !== 'dm')
+                        attractions.splice(10);
 
                     // Column Formatting specification.
                     /** @type {Object <string, ColumnFormatOptions>} */
@@ -1735,13 +1731,13 @@ function findMouse(channel, args, command) {
                         suffix: "%"
                     };
 
-                    let table = prettyPrintArrayAsString(attractions, columnFormatting, headers, "=");
-                    retStr = `${mouseName} (mouse) can be found the following ways:\n\`\`\`\n${table}\n\`\`\`\n`;
-                    retStr += `HTML version at: <https://mhhunthelper.agiletravels.com/?mouse=${mouseID}>`;
+                    retStr = `${mouseName} (mouse) can be found the following ways:\n\`\`\``;
+                    retStr += prettyPrintArrayAsString(attractions, columnFormatting, headers, "=");
+                    retStr += `\`\`\`\nHTML version at: <https://mhhunthelper.agiletravels.com/?mouse=${mouseID}>`;
                 }
                 else
                     retStr = `${mouseName} either hasn't been seen enough, or something broke.`;
-                channel.send(retStr);
+                channel.send(retStr, { split: { prepend: '```', append: '```'} });
             });
             return;
         }
@@ -1861,8 +1857,9 @@ function findItem(channel, args, command) {
                 if (attractions.length) {
                     // Sort the setups by the drop rate.
                     attractions.sort((a, b) => b.rate - a.rate);
-                    // And keep only the top 10 results.
-                    attractions.splice(10);
+                    // Keep only the top 10 results, unless this is a DM.
+                    if (channel.type !== 'dm')
+                        attractions.splice(10);
 
                     // Column Formatting specification.
                     /** @type {Object <string, ColumnFormatOptions>} */
@@ -1892,12 +1889,12 @@ function findItem(channel, args, command) {
                         columnWidth: 7,
                     };
 
-                    let table = prettyPrintArrayAsString(attractions, columnFormatting, headers, "=");
-                    retStr = `${itemName} (loot) can be found the following ways:\n\`\`\`\n${table}\n\`\`\`\n`;
-                    retStr += `HTML version at: <https://mhhunthelper.agiletravels.com/loot.php?item=${itemID}&timefilter=${timefilter ? timefilter : "all"}>`;
+                    retStr = `${itemName} (loot) can be found the following ways:\n\`\`\``;
+                    retStr += prettyPrintArrayAsString(attractions, columnFormatting, headers, "=");
+                    retStr += `\`\`\`\nHTML version at: <https://mhhunthelper.agiletravels.com/loot.php?item=${itemID}&timefilter=${timefilter ? timefilter : "all"}>`;
                 } else
                     retStr = `${itemName} either hasn't been seen enough, or something broke.`;
-                channel.send(retStr);
+                channel.send(retStr, { split: { prepend: '```', append: '```' } });
             });
             return;
         }
