@@ -1600,6 +1600,14 @@ function getHelpMessage(tokens) {
         return `I don't know that one, but I do know ${keywords}.`;
 }
 
+
+/**
+ * @typedef {Object} DatabaseEntity
+ * @property {string} id The ID of the entity
+ * @property {string} value The entity's proper name
+ * @property {string} lowerValue A lowercased version of the entity's name
+ */
+
 /**
  * Initialize (or refresh) the known mice lists from @devjacksmith's tools.
  */
@@ -1907,6 +1915,27 @@ function findItem(channel, args, command) {
         getMouseList();
     }
 }
+
+/**
+ * Return a sorted list of approximate matches to the given input and container
+ *
+ * @param {string} input The text to match against
+ * @param {DatabaseEntity[]} values The known values.
+ * returns {number[][]} Up to 10 indices and their search score.
+ */
+function getSearchedEntity(input, values) {
+    if (!input.length || !Array.isArray(values) || !values.length)
+        return [];
+
+    const matches = values.filter(v => v.lowerValue.includes(input)).map(v => {
+        return {entity: v, score: v.lowerValue.indexOf(input)};
+    });
+    matches.sort((a, b) => a.score - b.score).splice(5);
+    console.log(`From input '${input}' found ${matches.length} matches`, matches);
+    return matches.map(m => m.entity);
+}
+
+
 
 /**
  * Interrogate the local 'hunters' data object to find self-registered hunters that match the requested
