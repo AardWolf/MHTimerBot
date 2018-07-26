@@ -6,7 +6,7 @@ const { DateTime, Duration, Interval } = require('luxon');
 const Discord = require('discord.js');
 
 // Import type-hinting definitions
-const { Client, Guild, Message, RichEmbed, TextChannel, User } = require('discord.js');
+const { Client, Guild, Message, MessageReaction, RichEmbed, TextChannel, User } = require('discord.js');
 
 const Timer = require('./timerClass.js');
 // Access local URIs, like files.
@@ -54,6 +54,17 @@ const last_timestamps = {
 const dataTimers = {};
 /** @type {Map <string, {active: boolean, channels: TextChannel[], inactiveChannels: TextChannel[]}>} */
 const timer_config = new Map();
+const emojis = [
+    { id: "1%E2%83%A3", text: ':one:' },
+    { id: "2%E2%83%A3", text: ':two:' },
+    { id: "3%E2%83%A3", text: ':three:' },
+    { id: "4%E2%83%A3", text: ':four:' },
+    { id: "5%E2%83%A3", text: ':five:' },
+    { id: "6%E2%83%A3", text: ':six:' },
+    { id: "7%E2%83%A3", text: ':seven:' },
+    { id: "8%E2%83%A3", text: ':eight:' },
+    { id: "9%E2%83%A3", text: ':nine:' },
+    { id: "%F0%9F%94%9F", text: ':keycap_ten:' }];
 
 //https://stackoverflow.com/questions/12008120/console-log-timestamps-in-chrome
 console.logCopy = console.log.bind(console);
@@ -1643,7 +1654,7 @@ function getMouseList() {
 }
 
 /**
- * Query @devjacksmith's database for information about the desired mouse.
+ * Check the input args for a known mouse that can be looked up.
  * If no result is found, retries with an item search.
  *
  * @param {TextChannel} channel the channel on which to respond.
@@ -1796,7 +1807,7 @@ function getItemList() {
 }
 
 /**
- * Query @devjacksmith's database for information about the desired item.
+ * Check the input args for a known item that can be looked up.
  * If no result is found, retries with a mouse search.
  *
  * @param {TextChannel} channel the channel on which to respond.
@@ -1942,8 +1953,8 @@ function getSearchedEntity(input, values) {
         // Sort lexicographically if the scores are equal.
         return r ? r : a.entity.value.localeCompare(b.entity.value, { sensitivity: "base" });
     })
-    // Keep only the top 5 results.
-    matches.splice(5);
+    // Keep only the top 10 results.
+    matches.splice(10);
     return matches.map(m => m.entity);
 }
 
