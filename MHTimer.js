@@ -1654,6 +1654,7 @@ function findMouse(channel, args, command) {
     //NOTE: RH location is https://mhhunthelper.agiletravels.com/tracker.json
     let url = 'https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=mouse';
     let retStr = `'${args}' not found`;
+    let isDM = ['dm', 'group'].includes(channel.type);
 
     // Deep copy the input args, in case we modify them.
     const orig_args = JSON.parse(JSON.stringify(args));
@@ -1686,7 +1687,7 @@ function findMouse(channel, args, command) {
             `result` : `results`} for '${args}'. Here's the top result:`);
 
     matches.forEach((mouse, i) => {
-        if (i) return;
+        if (i && !isDM) return;
         let id = mouse.id,
             name = mouse.value,
             query = url + `&item_id=${id}`;
@@ -1720,8 +1721,7 @@ function findMouse(channel, args, command) {
                 // Sort that by Attraction Rate, descending.
                 attractions.sort((a, b) => (b.rate - a.rate));
                 // Keep only the top 10 results, unless this is a DM.
-                if (channel.type !== 'dm')
-                    attractions.splice(10);
+                attractions.splice(isDM ? 10 : 100);
 
                 // Column Formatting specification.
                 /** @type {Object <string, ColumnFormatOptions>} */
@@ -1807,6 +1807,7 @@ function findItem(channel, args, command) {
     //NOTE: RH location is https://mhhunthelper.agiletravels.com/tracker.json
     let url = 'https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=loot';
     let retStr = `'${args}' not found`;
+    let isDM = ['dm', 'group'].includes(channel.type);
 
     // Deep copy the input args, in case we modify them.
     const orig_args = JSON.parse(JSON.stringify(args));
@@ -1849,7 +1850,7 @@ function findItem(channel, args, command) {
             `result` : `results`} for '${args}'. Here's the top result:`);
 
     matches.forEach((item, i) => {
-        if (i) return;
+        if (i && !isDM) return;
         let id = item.id,
             name = item.value,
             query = url + `&item_id=${id}`;
@@ -1882,8 +1883,7 @@ function findItem(channel, args, command) {
                 // Sort the setups by the drop rate.
                 attractions.sort((a, b) => b.rate - a.rate);
                 // Keep only the top 10 results, unless this is a DM.
-                if (channel.type !== 'dm')
-                    attractions.splice(10);
+                attractions.splice(isDM ? 10 : 100);
 
                 // Column Formatting specification.
                 /** @type {Object <string, ColumnFormatOptions>} */
