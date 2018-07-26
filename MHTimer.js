@@ -1662,6 +1662,91 @@ function getMouseList() {
  * @param {string} command the command switch used to initiate the request.
  */
 function findMouse(channel, args, command) {
+    /**
+     * Query @devjacksmith's database for information about the valid mouse.
+     * @param {boolean} canSpam Whether the long or short response should be sent back.
+     * @param {any} url Endpoint to query (after adding querystring param '&item_id')
+     * @param {DatabaseEntity} mouse The valid mouse to query for
+     * @returns {Promise<string>} The result of the lookup.
+     */
+    function _getQueryResult(canSpam, url, mouse) {
+        // TODO: fetch each value once, cache, and serve cached to the user(s).
+        let id = mouse.id,
+            name = mouse.value,
+            query = url + `&item_id=${id}`;
+        return new Promise((resolve, reject) => {
+            request({
+                url: query,
+                json: true
+            }, (error, response, body) => {
+                const attractions = [];
+                if (!error && response.statusCode === 200 && Array.isArray(body)) {
+                    // body is an array of objects with: location, stage, total_hunts, rate, cheese
+                    // Sort it by "rate" but only if hunts > 100
+                    body.filter(setup => setup.total_hunts > 99).forEach(setup => {
+                        attractions.push(
+                            {
+                                location: setup.location,
+                                stage: setup.stage ? setup.stage : " N/A ",
+                                total_hunts: integerComma(setup.total_hunts),
+                                rate: setup.rate * 1.0 / 100,
+                                cheese: setup.cheese
+                            });
+                    });
+                } else {
+                    console.log("Mice: Lookup failed for some reason:\n", error, response ? response.toJSON() : "No response", body);
+                    resolve(`Could not process results for '${args}', AKA ${name}`);
+                    return;
+                }
+
+                // If there was a result, create a nice-looking table from the data.
+                let retStr = "";
+                if (attractions.length) {
+                    // Sort that by Attraction Rate, descending.
+                    attractions.sort((a, b) => (b.rate - a.rate));
+                    // Keep only the top 10 results, unless this is a DM.
+                    attractions.splice(!canSpam ? 10 : 100);
+
+                    // Column Formatting specification.
+                    /** @type {Object <string, ColumnFormatOptions>} */
+                    const columnFormatting = {};
+
+                    // Specify the column order.
+                    const order = ["location", "stage", "cheese", "rate", "total_hunts"];
+                    // Inspect the attractions array to determine if we need to include the stage column.
+                    if (attractions.every(row => row.stage === " N/A "))
+                        order.splice(order.indexOf("stage"), 1);
+
+                    // Build the header row.
+                    const labels = { location: "Location", stage: "Stage", total_hunts: "Hunts", rate: "AR", cheese: "Cheese" }
+                    const headers = order.map(key => {
+                        columnFormatting[key] = {
+                            columnWidth: labels[key].length,
+                            alignRight: !isNaN(parseInt(attractions[0][key], 10))
+                        };
+                        return { 'key': key, 'label': labels[key] };
+                    })
+
+                    // Give the numeric column proper formatting.
+                    // TODO: toLocaleString - can it replace integerComma too?
+                    columnFormatting['rate'] = {
+                        alignRight: true,
+                        isFixedWidth: true,
+                        columnWidth: 7,
+                        suffix: "%"
+                    };
+
+                    retStr = `${name} (mouse) can be found the following ways:\n\`\`\``;
+                    retStr += prettyPrintArrayAsString(attractions, columnFormatting, headers, "=");
+                    retStr += `\`\`\`\nHTML version at: <https://mhhunthelper.agiletravels.com/?mouse=${id}>`;
+                }
+                else
+                    retStr = `${name} either hasn't been seen enough, or something broke.`;
+                resolve(retStr);
+            });
+        });
+    }
+
     //NOTE: RH location is https://mhhunthelper.agiletravels.com/tracker.json
     let url = 'https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=mouse';
     let retStr = `'${args}' not found`;
@@ -1815,6 +1900,88 @@ function getItemList() {
  * @param {string} command the command switch used to initiate the request.
  */
 function findItem(channel, args, command) {
+    /**
+     * Query @devjacksmith's database for information about the valid item.
+     * @param {boolean} canSpam Whether the long or short response should be sent back.
+     * @param {any} url Endpoint to query (after adding querystring param '&item_id')
+     * @param {DatabaseEntity} item The valid item to query for
+     * @returns {Promise<string>} The result of the lookup.
+     */
+    function _getQueryResult(canSpam, url, item) {
+        // TODO: fetch each value once, cache, and serve cached to the user(s).
+        let id = item.id,
+            name = item.value,
+            query = url + `&item_id=${id}`;
+        return new Promise((resolve, reject) => {
+            request({
+                url: query,
+                json: true
+            }, (error, response, body) => {
+                const attractions = [];
+                if (!error && response.statusCode == 200 && Array.isArray(body)) {
+                    // body is an array of objects with: location, stage, total_hunts, rate, cheese
+                    // 2018-06-18 rate -> rate_per_catch; total_hunts -> total_catches
+                    // Sort by "rate" but only if hunts >= 100
+                    body.filter(setup => setup.total_catches > 99).forEach(setup => {
+                        attractions.push(
+                            {
+                                location: setup.location,
+                                stage: setup.stage === null ? " N/A " : setup.stage,
+                                total_hunts: integerComma(setup.total_catches),
+                                rate: setup.rate_per_catch * 1.0 / 1000, // Divide by 1000? should this be 100?
+                                cheese: setup.cheese
+                            });
+                    });
+                } else {
+                    console.log("Loot: Lookup failed for some reason", error, response ? response.toJSON() : "No response", body);
+                    resolve(`Could not process results for '${args}', AKA ${name}`);
+                    return;
+                }
+                let retStr = "";
+                if (attractions.length) {
+                    // Sort the setups by the drop rate.
+                    attractions.sort((a, b) => b.rate - a.rate);
+                    // Keep only the top 10 results, unless this is a DM.
+                    attractions.splice(!canSpam ? 10 : 100);
+
+                    // Column Formatting specification.
+                    /** @type {Object <string, ColumnFormatOptions>} */
+                    const columnFormatting = {};
+
+                    // Specify the column order.
+                    const order = ["location", "stage", "cheese", "rate", "total_hunts"];
+                    // Inspect the setups array to determine if we need to include the stage column.
+                    if (attractions.every(row => row.stage === " N/A "))
+                        order.splice(order.indexOf("stage"), 1);
+
+                    // Build the header row.
+                    const labels = { location: "Location", stage: "Stage", total_hunts: "Catches", rate: "DR", cheese: "Cheese" }
+                    const headers = order.map(key => {
+                        columnFormatting[key] = {
+                            columnWidth: labels[key].length,
+                            alignRight: !isNaN(parseInt(attractions[0][key], 10))
+                        };
+                        return { 'key': key, 'label': labels[key] };
+                    })
+
+                    // Give the numeric column proper formatting.
+                    columnFormatting['rate'] = {
+                        alignRight: true,
+                        isFixedWidth: true,
+                        numDecimals: 3,
+                        columnWidth: 7,
+                    };
+
+                    retStr = `${name} (loot) can be found the following ways:\n\`\`\``;
+                    retStr += prettyPrintArrayAsString(attractions, columnFormatting, headers, "=");
+                    retStr += `\`\`\`\nHTML version at: <https://mhhunthelper.agiletravels.com/loot.php?item=${id}&timefilter=${timefilter ? timefilter : "all"}>`;
+                } else
+                    retStr = `${name} either hasn't been seen enough, or something broke.`;
+                resolve(retStr);
+            });
+        });
+    }
+
     //NOTE: RH location is https://mhhunthelper.agiletravels.com/tracker.json
     let url = 'https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=loot';
     let retStr = `'${args}' not found`;
