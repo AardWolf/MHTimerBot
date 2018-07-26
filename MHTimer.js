@@ -1749,7 +1749,6 @@ function findMouse(channel, args, command) {
 
     //NOTE: RH location is https://mhhunthelper.agiletravels.com/tracker.json
     let url = 'https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=mouse';
-    let retStr = `'${args}' not found`;
     let isDM = ['dm', 'group'].includes(channel.type);
 
     // Deep copy the input args, in case we modify them.
@@ -1768,95 +1767,56 @@ function findMouse(channel, args, command) {
     if (nicknames.get("mice")[args])
         args = nicknames.get("mice")[args];
 
-    const matches = getSearchedEntity(args, mice);
+    const matches = getSearchedEntity(args, mice).map((m, i) => ({ emojiId: emojis[i].id, match: m }));
     if (!matches.length) {
         // If this was a mouse search, find try finding an item.
         if (command === 'find')
             findItem(channel, orig_args, command);
         else {
-            channel.send(retStr);
+            channel.send(`'${orig_args}' not found.`);
             getItemList();
         }
     }
-    else
-        channel.send(`I found ${matches.length} good ${matches.length === 1 ?
-            `result` : `results`} for '${args}'. Here's the top result:`);
+    else if (matches.length === 1) {
+        // Send the single result directly.
+        _getQueryResult(isDM, url, matches[0].match)
+            .then(result => channel.send(`I found one good result for '${args}':\n${result}`, { split: { prepend: '```', append: '```' } }));
+    }
+    else {
+        // Create reactions, and when the user uses the corresponding reaction, PM the data.
+        let retStr = matches.reduce((acc, entity, i) => {
+            let row = `\n\t${emojis[i].text}:\t${entity.match.value}`;
+            return acc + row;
+        }, `I found ${matches.length} good results for '${args}':`);
+        retStr += `\n\nFor any reaction you select, I'll ${isDM ? 'send' : 'PM'} you that information.`;
+        let sent = channel.send(retStr);
 
-    matches.forEach((mouse, i) => {
-        if (i && !isDM) return;
-        let id = mouse.id,
-            name = mouse.value,
-            query = url + `&item_id=${id}`;
-        request({
-            url: query,
-            json: true
-        }, (error, response, body) => {
-            const attractions = [];
-            if (!error && response.statusCode === 200 && Array.isArray(body)) {
-                // body is an array of objects with: location, stage, total_hunts, rate, cheese
-                // Sort it by "rate" but only if hunts > 100
-                body.filter(setup => setup.total_hunts > 99).forEach(setup => {
-                    attractions.push(
-                        {
-                            location: setup.location,
-                            stage: setup.stage ? setup.stage : " N/A ",
-                            total_hunts: integerComma(setup.total_hunts),
-                            rate: setup.rate * 1.0 / 100,
-                            cheese: setup.cheese
-                        });
-                });
-            } else {
-                console.log("Mice: Lookup failed for some reason:\n", error, response.toJSON(), body);
-                channel.send(`Could not process results for '${args}', AKA ${name}`);
-                return;
-            }
+        // To ensure a sensible order of emojis, we have to await the previous react's resolution.
+        sent.then(async msg => {
+            /** @type MessageReaction[] */
+            let mrxns = [];
+            for (let m of matches)
+                mrxns.push(await msg.react(m.emojiId).catch(err => console.log(err)));
+            return mrxns;
+        }).then(msgRxns => {
+            // Set a 5-minute listener on the message for these reactions.
+            let msg = msgRxns[0].message,
+                allowed = msgRxns.map(mr => mr.emoji.name),
+                filter = (reaction, user) => allowed.includes(reaction.emoji.name) && !user.bot,
+                rc = msg.createReactionCollector(filter, { time: 5 * 60 * 1000 });
+            rc.on('collect', mr => {
+                // Fetch the response and send it to the user.
+                let match = matches.filter(m => m.emojiId === mr.emoji.identifier)[0];
+                if (match) _getQueryResult(true, url, match.match)
+                    .then(result => mr.users.last().send(result, { split: { prepend: '```', append: '```' } }));
+            }).on('end', () => rc.message.clearReactions().catch(() => rc.message.delete()));
+        }).catch(err => console.log('Reactions: error setting reactions:\n', err));
 
-            // If there was a result, create a nice-looking table from the data.
-            let retStr = "";
-            if (attractions.length) {
-                // Sort that by Attraction Rate, descending.
-                attractions.sort((a, b) => (b.rate - a.rate));
-                // Keep only the top 10 results, unless this is a DM.
-                attractions.splice(isDM ? 10 : 100);
-
-                // Column Formatting specification.
-                /** @type {Object <string, ColumnFormatOptions>} */
-                const columnFormatting = {};
-
-                // Specify the column order.
-                const order = ["location", "stage", "cheese", "rate", "total_hunts"];
-                // Inspect the attractions array to determine if we need to include the stage column.
-                if (attractions.every(row => row.stage === " N/A "))
-                    order.splice(order.indexOf("stage"), 1);
-
-                // Build the header row.
-                const labels = { location: "Location", stage: "Stage", total_hunts: "Hunts", rate: "AR", cheese: "Cheese" }
-                const headers = order.map(key => {
-                    columnFormatting[key] = {
-                        columnWidth: labels[key].length,
-                        alignRight: !isNaN(parseInt(attractions[0][key], 10))
-                    };
-                    return { 'key': key, 'label': labels[key] };
-                })
-
-                // Give the numeric column proper formatting.
-                // TODO: toLocaleString - can it replace integerComma too?
-                columnFormatting['rate'] = {
-                    alignRight: true,
-                    isFixedWidth: true,
-                    columnWidth: 7,
-                    suffix: "%"
-                };
-
-                retStr = `${name} (mouse) can be found the following ways:\n\`\`\``;
-                retStr += prettyPrintArrayAsString(attractions, columnFormatting, headers, "=");
-                retStr += `\`\`\`\nHTML version at: <https://mhhunthelper.agiletravels.com/?mouse=${id}>`;
-            }
-            else
-                retStr = `${name} either hasn't been seen enough, or something broke.`;
-            channel.send(retStr, { split: { prepend: '```', append: '```' } });
-        });
-    });
+        // Always send one result to the channel.
+        sent.then(() => _getQueryResult(isDM, url, matches[0].match)
+            .then(result => channel.send(result, { split: { prepend: '```', append: '```' } }))
+        );
+    }
 }
 
 /**
@@ -1984,7 +1944,6 @@ function findItem(channel, args, command) {
 
     //NOTE: RH location is https://mhhunthelper.agiletravels.com/tracker.json
     let url = 'https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=loot';
-    let retStr = `'${args}' not found`;
     let isDM = ['dm', 'group'].includes(channel.type);
 
     // Deep copy the input args, in case we modify them.
@@ -2013,92 +1972,56 @@ function findItem(channel, args, command) {
     if (nicknames.get("loot")[args])
         args = nicknames.get("loot")[args];
 
-    const matches = getSearchedEntity(args, items);
+    const matches = getSearchedEntity(args, items).map((m, i) => ({ emojiId: emojis[i].id, match: m}));
     if (!matches.length) {
         // If this was an item search, try finding a mouse.
         if (command === 'ifind')
             findMouse(channel, orig_args, command);
         else {
-            channel.send(retStr);
+            channel.send(`'${orig_args}' not found.`);
             getMouseList();
         }
     }
-    else
-        channel.send(`I found ${matches.length} good ${matches.length === 1 ?
-            `result` : `results`} for '${args}'. Here's the top result:`);
+    else if (matches.length === 1) {
+        // Send the single result directly.
+        _getQueryResult(isDM, url, matches[0].match)
+            .then(result => channel.send(`I found one good result for '${args}':\n${result}`, { split: { prepend: '```', append: '```' } }));
+    }
+    else {
+        // Create reactions, and when the user uses the corresponding reaction, PM the data.
+        let retStr = matches.reduce((acc, entity, i) => {
+            let row = `\n\t${emojis[i].text}:\t${entity.match.value}`;
+            return acc + row;
+        }, `I found ${matches.length} good results for '${args}':`);
+        retStr += `\n\nFor any reaction you select, I'll ${isDM ? 'send' : 'PM'} you that information.`;
+        let sent = channel.send(retStr);
 
-    matches.forEach((item, i) => {
-        if (i && !isDM) return;
-        let id = item.id,
-            name = item.value,
-            query = url + `&item_id=${id}`;
-        request({
-            url: query,
-            json: true
-        }, (error, response, body) => {
-            const attractions = [];
-            if (!error && response.statusCode == 200 && Array.isArray(body)) {
-                // body is an array of objects with: location, stage, total_hunts, rate, cheese
-                // 2018-06-18 rate -> rate_per_catch; total_hunts -> total_catches
-                // Sort by "rate" but only if hunts >= 100
-                body.filter(setup => setup.total_catches > 99).forEach(setup => {
-                    attractions.push(
-                        {
-                            location: setup.location,
-                            stage: setup.stage === null ? " N/A " : setup.stage,
-                            total_hunts: integerComma(setup.total_catches),
-                            rate: setup.rate_per_catch * 1.0 / 1000, // Divide by 1000? should this be 100?
-                            cheese: setup.cheese
-                        });
-                });
-            } else {
-                console.log("Loot: Lookup failed for some reason", error, response.toJSON(), body);
-                channel.send(`Could not process results for '${args}', AKA ${name}`);
-                return;
-            }
-            let retStr = "";
-            if (attractions.length) {
-                // Sort the setups by the drop rate.
-                attractions.sort((a, b) => b.rate - a.rate);
-                // Keep only the top 10 results, unless this is a DM.
-                attractions.splice(isDM ? 10 : 100);
+        // To ensure a sensible order of emojis, we have to await the previous react's resolution.
+        sent.then(async msg => {
+            /** @type MessageReaction[] */
+            let mrxns = [];
+            for (let m of matches)
+                mrxns.push(await msg.react(m.emojiId).catch(err => console.log(err)));
+            return mrxns;
+        }).then(msgRxns => {
+            // Set a 5-minute listener on the message for these reactions.
+            let msg = msgRxns[0].message,
+                allowed = msgRxns.map(mr => mr.emoji.name),
+                filter = (reaction, user) => allowed.includes(reaction.emoji.name) && !user.bot,
+                rc = msg.createReactionCollector(filter, { time: 5 * 60 * 1000 });
+            rc.on('collect', mr => {
+                // Fetch the response and send it to the user.
+                let match = matches.filter(m => m.emojiId === mr.emoji.identifier)[0];
+                if (match) _getQueryResult(true, url, match.match)
+                    .then(result => mr.users.last().send(result, { split: { prepend: '```', append: '```' } }));
+            }).on('end', () => rc.message.clearReactions().catch(() => rc.message.delete()));
+        }).catch(err => console.log('Reactions: error setting reactions:\n', err));
 
-                // Column Formatting specification.
-                /** @type {Object <string, ColumnFormatOptions>} */
-                const columnFormatting = {};
-
-                // Specify the column order.
-                const order = ["location", "stage", "cheese", "rate", "total_hunts"];
-                // Inspect the setups array to determine if we need to include the stage column.
-                if (attractions.every(row => row.stage === " N/A "))
-                    order.splice(order.indexOf("stage"), 1);
-
-                // Build the header row.
-                const labels = { location: "Location", stage: "Stage", total_hunts: "Catches", rate: "DR", cheese: "Cheese" }
-                const headers = order.map(key => {
-                    columnFormatting[key] = {
-                        columnWidth: labels[key].length,
-                        alignRight: !isNaN(parseInt(attractions[0][key], 10))
-                    };
-                    return { 'key': key, 'label': labels[key] };
-                })
-
-                // Give the numeric column proper formatting.
-                columnFormatting['rate'] = {
-                    alignRight: true,
-                    isFixedWidth: true,
-                    numDecimals: 3,
-                    columnWidth: 7,
-                };
-
-                retStr = `${name} (loot) can be found the following ways:\n\`\`\``;
-                retStr += prettyPrintArrayAsString(attractions, columnFormatting, headers, "=");
-                retStr += `\`\`\`\nHTML version at: <https://mhhunthelper.agiletravels.com/loot.php?item=${id}&timefilter=${timefilter ? timefilter : "all"}>`;
-            } else
-                retStr = `${name} either hasn't been seen enough, or something broke.`;
-            channel.send(retStr, { split: { prepend: '```', append: '```' } });
-        });
-    });
+        // Always send one result to the channel.
+        sent.then(() =>_getQueryResult(isDM, url, matches[0].match)
+            .then(result => channel.send(result, { split: { prepend: '```', append: '```' } }))
+        );
+    }
 }
 
 /**
