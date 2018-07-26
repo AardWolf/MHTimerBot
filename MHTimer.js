@@ -1682,9 +1682,11 @@ function findMouse(channel, args, command) {
         }
     }
     else
-        channel.send(`I found ${matches.length} good ${matches.length === 1 ? `result` : `results`} for '${args}'`);
+        channel.send(`I found ${matches.length} good ${matches.length === 1 ?
+            `result` : `results`} for '${args}'. Here's the top result:`);
 
-    matches.forEach(mouse => {
+    matches.forEach((mouse, i) => {
+        if (i) return;
         let id = mouse.id,
             name = mouse.value,
             query = url + `&item_id=${id}`;
@@ -1843,9 +1845,11 @@ function findItem(channel, args, command) {
         }
     }
     else
-        channel.send(`I found ${matches.length} good ${matches.length === 1 ? `result` : `results`} for '${args}'`);
+        channel.send(`I found ${matches.length} good ${matches.length === 1 ?
+            `result` : `results`} for '${args}'. Here's the top result:`);
 
-    matches.forEach(item => {
+    matches.forEach((item, i) => {
+        if (i) return;
         let id = item.id,
             name = item.value,
             query = url + `&item_id=${id}`;
