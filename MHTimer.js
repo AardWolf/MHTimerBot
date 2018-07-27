@@ -1806,7 +1806,7 @@ function findMouse(channel, args, command) {
         }
     }
     else
-        sendInteractiveSearchResult(matches, channel, _getQueryResult, isDM, qsParams, args);
+        sendInteractiveSearchResult(matches, channel, _getQueryResult, isDM, { qsParams: qsParams, uri: 'https://mhhunthelper.agiletravels.com/', type: 'mouse' }, args);
 }
 
 /**
@@ -1962,30 +1962,44 @@ function findItem(channel, args, command) {
         }
     }
     else
-        sendInteractiveSearchResult(matches, channel, _getQueryResult, isDM, qsParams, args);
+        sendInteractiveSearchResult(matches, channel, _getQueryResult, isDM, { qsParams: qsParams, uri: 'https://mhhunthelper.agiletravels.com/loot.php', type: 'item' }, args);
 }
 
 /**
- * Construct a reaction-enabled message for interactive "search result" display. 
+ * Construct and dispatch a reaction-enabled message for interactive "search result" display.
  *
  * @param {DatabaseEntity[]} searchResults An ordered array of objects that resulted from a search.
  * @param {TextChannel} channel The channel on which the client received the find request.
  * @param {Function} dataCallback a Promise-returning function that converts the local entity data into the desired text response.
  * @param {boolean} isDM Whether the response will be to a private message (i.e. if the response can be spammy).
- * @param {Object <string, string>} qsParams Optional querystring parameters that are given to the data callback.
+ * @param {{qsParams: Object <string, string>, uri: string, type: string}} urlInfo Information about the query that returned the given matches, including querystring parameters, uri, and the type of search.
  * @param {string} searchInput a lower-cased representation of the user's input.
  */
-function sendInteractiveSearchResult(searchResults, channel, dataCallback, isDM, qsParams, searchInput) {
+function sendInteractiveSearchResult(searchResults, channel, dataCallback, isDM, urlInfo, searchInput) {
+    // Associate each search result with a "numeric" emoji.
     const matches = searchResults.map((sr, i) => ({ emojiId: emojis[i].id, match: sr }));
-    // Create reactions, and when the user uses the corresponding reaction, PM the data.
-    let retStr = (isDM && matches.length === 1)
+    // Construct a RichEmbed with the search result information, unless this is for a PM with a single response.
+    let embed = new Discord.RichEmbed({
+        title: `Search Results for '${searchInput}'`,
+        thumbnail: { url: `https://cdn.discordapp.com/emojis/359244526688141312.png` }, // :clue:
+        footer: { text: `For any reaction you select, I'll ${isDM ? 'send' : 'PM'} you that information.` },
+    });
+
+    // Precompute the url prefix & suffix for each search result. Assumption: single-valued querystring params.
+    let urlPrefix = `${urlInfo.uri}?${urlInfo.type}=`;
+    let urlSuffix = Object.keys(urlInfo.qsParams).reduce((acc, key) => `${acc}&${key}=${urlInfo.qsParams[key]}`, "");
+    // Generate the description to include the reaction, name, and link to HTML data on @devjacksmith's website.
+    let description = matches.reduce((acc, entity, i) => {
+        let url = `${urlPrefix}${entity.match.id}${urlSuffix}`;
+        let row = `\n\t${emojis[i].text}:\t[${entity.match.value}](${url})`;
+        return acc + row;
+    }, `I found ${matches.length === 1 ? `a single result` : `${matches.length} good results`}:`);
+    embed.setDescription(description);
+
+    let searchResponse = (isDM && matches.length === 1)
         ? `I found a single result for '${searchInput}':`
-        : matches.reduce((acc, entity, i) => {
-            let row = `\n\t${emojis[i].text}:\t${entity.match.value}`;
-            return acc + row;
-        }, `I found ${matches.length === 1 ? `a single result` : `${matches.length} good results`} for '${searchInput}':`)
-            + `\n\nFor any reaction you select, I'll ${isDM ? 'send' : 'PM'} you that information.`;
-    let sent = channel.send(retStr);
+        : embed;
+    let sent = channel.send(searchResponse);
     // To ensure a sensible order of emojis, we have to await the previous react's resolution.
     if (!isDM || matches.length > 1)
         sent.then(async (msg) => {
@@ -2003,14 +2017,15 @@ function sendInteractiveSearchResult(searchResults, channel, dataCallback, isDM,
             rc.on('collect', mr => {
                 // Fetch the response and send it to the user.
                 let match = matches.filter(m => m.emojiId === mr.emoji.identifier)[0];
-                if (match) dataCallback(true, match.match, qsParams).then(
+                if (match) dataCallback(true, match.match, urlInfo.qsParams).then(
                     result => mr.users.last().send(result, { split: { prepend: '```', append: '```' } }),
                     result => mr.users.last().send(result)
                 ).catch(err => console.log(err));
             }).on('end', () => rc.message.clearReactions().catch(() => rc.message.delete()));
         }).catch(err => console.log('Reactions: error setting reactions:\n', err));
+
     // Always send one result to the channel.
-    sent.then(() => dataCallback(isDM, matches[0].match, qsParams).then(
+    sent.then(() => dataCallback(isDM, matches[0].match, urlInfo.qsParams).then(
         result => channel.send(result, { split: { prepend: '```', append: '```' } }),
         result => channel.send(result))
     ).catch(err => console.log(err));
