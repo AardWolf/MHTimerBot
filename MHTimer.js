@@ -1705,7 +1705,7 @@ function getMouseList() {
  */
 function findMouse(channel, args, command) {
     /**
-     * Query @devjacksmith's database for information about the valid mouse.
+     * Request the latest information about the valid mouse.
      * @param {boolean} canSpam Whether the long or short response should be sent back.
      * @param {DatabaseEntity} mouse The valid mouse to query for
      * @param {Object <string, string>} opts Additional querystring parameters for the request, like 'timefilter'
@@ -1774,6 +1774,7 @@ function findMouse(channel, args, command) {
         });
     }
 
+
     //NOTE: RH location is https://mhhunthelper.agiletravels.com/tracker.json
     let qsParams = {};
     let isDM = ['dm', 'group'].includes(channel.type);
@@ -1794,9 +1795,9 @@ function findMouse(channel, args, command) {
     if (nicknames.get("mice")[args])
         args = nicknames.get("mice")[args];
 
-    const matches = getSearchedEntity(args, mice).map((m, i) => ({ emojiId: emojis[i].id, match: m }));
+    const matches = getSearchedEntity(args, mice);
     if (!matches.length) {
-        // If this was a mouse search, find try finding an item.
+        // If this was a mouse search, try finding an item.
         if (command === 'find')
             findItem(channel, orig_args, command);
         else {
@@ -1804,51 +1805,8 @@ function findMouse(channel, args, command) {
             getItemList();
         }
     }
-    else if (matches.length === 1) {
-        // Send the single result directly.
-        _getQueryResult(isDM, matches[0].match, qsParams).then(
-            result => channel.send(`I found one good result for '${args}':\n${result}`, { split: { prepend: '```', append: '```' } }),
-            result => channel.send(result)
-        ).catch(err => console.log(err));
-    }
-    else {
-        // Create reactions, and when the user uses the corresponding reaction, PM the data.
-        let retStr = matches.reduce((acc, entity, i) => {
-            let row = `\n\t${emojis[i].text}:\t${entity.match.value}`;
-            return acc + row;
-        }, `I found ${matches.length} good results for '${args}':`);
-        retStr += `\n\nFor any reaction you select, I'll ${isDM ? 'send' : 'PM'} you that information.`;
-        let sent = channel.send(retStr);
-
-        // To ensure a sensible order of emojis, we have to await the previous react's resolution.
-        sent.then(async msg => {
-            /** @type MessageReaction[] */
-            let mrxns = [];
-            for (let m of matches)
-                mrxns.push(await msg.react(m.emojiId).catch(err => console.log(err)));
-            return mrxns;
-        }).then(msgRxns => {
-            // Set a 5-minute listener on the message for these reactions.
-            let msg = msgRxns[0].message,
-                allowed = msgRxns.map(mr => mr.emoji.name),
-                filter = (reaction, user) => allowed.includes(reaction.emoji.name) && !user.bot,
-                rc = msg.createReactionCollector(filter, { time: 5 * 60 * 1000 });
-            rc.on('collect', mr => {
-                // Fetch the response and send it to the user.
-                let match = matches.filter(m => m.emojiId === mr.emoji.identifier)[0];
-                if (match) _getQueryResult(true, match.match, qsParams).then(
-                    result => mr.users.last().send(result, { split: { prepend: '```', append: '```' } }),
-                    result => mr.users.last().send(result)
-                ).catch(err => console.log(err));
-            }).on('end', () => rc.message.clearReactions().catch(() => rc.message.delete()));
-        }).catch(err => console.log('Reactions: error setting reactions:\n', err));
-
-        // Always send one result to the channel.
-        sent.then(() => _getQueryResult(isDM, matches[0].match, qsParams).then(
-            result => channel.send(result, { split: { prepend: '```', append: '```' } }),
-            result => channel.send(result))
-        ).catch(err => console.log(err));
-    }
+    else
+        sendInteractiveSearchResult(matches, channel, _getQueryResult, isDM, qsParams, args);
 }
 
 /**
@@ -1893,7 +1851,7 @@ function getItemList() {
  */
 function findItem(channel, args, command) {
     /**
-     * Query @devjacksmith's database for information about the valid item.
+     * Request the latest information about the valid item.
      * @param {boolean} canSpam Whether the long or short response should be sent back.
      * @param {DatabaseEntity} item The valid item to query for
      * @param {Object <string, string>} opts Additional querystring parameters for the request, like 'timefilter'
@@ -1993,7 +1951,7 @@ function findItem(channel, args, command) {
     if (nicknames.get("loot")[args])
         args = nicknames.get("loot")[args];
 
-    const matches = getSearchedEntity(args, items).map((m, i) => ({ emojiId: emojis[i].id, match: m}));
+    const matches = getSearchedEntity(args, items);
     if (!matches.length) {
         // If this was an item search, try finding a mouse.
         if (command === 'ifind')
@@ -2003,11 +1961,27 @@ function findItem(channel, args, command) {
             getMouseList();
         }
     }
-    else if (matches.length === 1) {
+    else
+        sendInteractiveSearchResult(matches, channel, _getQueryResult, isDM, qsParams, args);
+}
+
+/**
+ * Construct a reaction-enabled message for interactive "search result" display. 
+ *
+ * @param {DatabaseEntity[]} searchResults An ordered array of objects that resulted from a search.
+ * @param {TextChannel} channel The channel on which the client received the find request.
+ * @param {Function} dataCallback a Promise-returning function that converts the local entity data into the desired text response.
+ * @param {boolean} isDM Whether the response will be to a private message (i.e. if the response can be spammy).
+ * @param {Object <string, string>} qsParams Optional querystring parameters that are given to the data callback.
+ * @param {string} searchInput a lower-cased representation of the user's input.
+ */
+function sendInteractiveSearchResult(searchResults, channel, dataCallback, isDM, qsParams, searchInput) {
+    const matches = searchResults.map((sr, i) => ({ emojiId: emojis[i].id, match: sr }));
+    if (matches.length === 1) {
         // Send the single result directly.
-        _getQueryResult(isDM, matches[0].match, qsParams).then(
-            result => channel.send(`I found one good result for '${args}':\n${result}`, { split: { prepend: '```', append: '```' } }),
-            result => channel.sent(result)
+        dataCallback(isDM, matches[0].match, qsParams).then(
+            result => channel.send(`I found one good result for '${searchInput}':\n${result}`, { split: { prepend: '```', append: '```' } }),
+            result => channel.send(result)
         ).catch(err => console.log(err));
     }
     else {
@@ -2015,12 +1989,11 @@ function findItem(channel, args, command) {
         let retStr = matches.reduce((acc, entity, i) => {
             let row = `\n\t${emojis[i].text}:\t${entity.match.value}`;
             return acc + row;
-        }, `I found ${matches.length} good results for '${args}':`);
+        }, `I found ${matches.length} good results for '${searchInput}':`);
         retStr += `\n\nFor any reaction you select, I'll ${isDM ? 'send' : 'PM'} you that information.`;
         let sent = channel.send(retStr);
-
         // To ensure a sensible order of emojis, we have to await the previous react's resolution.
-        sent.then(async msg => {
+        sent.then(async (msg) => {
             /** @type MessageReaction[] */
             let mrxns = [];
             for (let m of matches)
@@ -2035,15 +2008,14 @@ function findItem(channel, args, command) {
             rc.on('collect', mr => {
                 // Fetch the response and send it to the user.
                 let match = matches.filter(m => m.emojiId === mr.emoji.identifier)[0];
-                if (match) _getQueryResult(true, match.match, qsParams).then(
+                if (match) dataCallback(true, match.match, qsParams).then(
                     result => mr.users.last().send(result, { split: { prepend: '```', append: '```' } }),
                     result => mr.users.last().send(result)
                 ).catch(err => console.log(err));
             }).on('end', () => rc.message.clearReactions().catch(() => rc.message.delete()));
         }).catch(err => console.log('Reactions: error setting reactions:\n', err));
-
         // Always send one result to the channel.
-        sent.then(() => _getQueryResult(isDM, matches[0].match, qsParams).then(
+        sent.then(() => dataCallback(isDM, matches[0].match, qsParams).then(
             result => channel.send(result, { split: { prepend: '```', append: '```' } }),
             result => channel.send(result))
         ).catch(err => console.log(err));
