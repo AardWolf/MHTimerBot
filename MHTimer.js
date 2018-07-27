@@ -1978,34 +1978,37 @@ function findItem(channel, args, command) {
 function sendInteractiveSearchResult(searchResults, channel, dataCallback, isDM, qsParams, searchInput) {
     const matches = searchResults.map((sr, i) => ({ emojiId: emojis[i].id, match: sr }));
     // Create reactions, and when the user uses the corresponding reaction, PM the data.
-    let retStr = matches.reduce((acc, entity, i) => {
-        let row = `\n\t${emojis[i].text}:\t${entity.match.value}`;
-        return acc + row;
-    }, `I found ${matches.length === 1 ? `a single result` : `${matches.length} good results`} for '${searchInput}':`);
-    retStr += `\n\nFor any reaction you select, I'll ${isDM ? 'send' : 'PM'} you that information.`;
+    let retStr = (isDM && matches.length === 1)
+        ? `I found a single result for '${searchInput}':`
+        : matches.reduce((acc, entity, i) => {
+            let row = `\n\t${emojis[i].text}:\t${entity.match.value}`;
+            return acc + row;
+        }, `I found ${matches.length === 1 ? `a single result` : `${matches.length} good results`} for '${searchInput}':`)
+            + `\n\nFor any reaction you select, I'll ${isDM ? 'send' : 'PM'} you that information.`;
     let sent = channel.send(retStr);
     // To ensure a sensible order of emojis, we have to await the previous react's resolution.
-    sent.then(async (msg) => {
-        /** @type MessageReaction[] */
-        let mrxns = [];
-        for (let m of matches)
-            mrxns.push(await msg.react(m.emojiId).catch(err => console.log(err)));
-        return mrxns;
-    }).then(msgRxns => {
-        // Set a 5-minute listener on the message for these reactions.
-        let msg = msgRxns[0].message,
-            allowed = msgRxns.map(mr => mr.emoji.name),
-            filter = (reaction, user) => allowed.includes(reaction.emoji.name) && !user.bot,
-            rc = msg.createReactionCollector(filter, { time: 5 * 60 * 1000 });
-        rc.on('collect', mr => {
-            // Fetch the response and send it to the user.
-            let match = matches.filter(m => m.emojiId === mr.emoji.identifier)[0];
-            if (match) dataCallback(true, match.match, qsParams).then(
-                result => mr.users.last().send(result, { split: { prepend: '```', append: '```' } }),
-                result => mr.users.last().send(result)
-            ).catch(err => console.log(err));
-        }).on('end', () => rc.message.clearReactions().catch(() => rc.message.delete()));
-    }).catch(err => console.log('Reactions: error setting reactions:\n', err));
+    if (!isDM || matches.length > 1)
+        sent.then(async (msg) => {
+            /** @type MessageReaction[] */
+            let mrxns = [];
+            for (let m of matches)
+                mrxns.push(await msg.react(m.emojiId).catch(err => console.log(err)));
+            return mrxns;
+        }).then(msgRxns => {
+            // Set a 5-minute listener on the message for these reactions.
+            let msg = msgRxns[0].message,
+                allowed = msgRxns.map(mr => mr.emoji.name),
+                filter = (reaction, user) => allowed.includes(reaction.emoji.name) && !user.bot,
+                rc = msg.createReactionCollector(filter, { time: 5 * 60 * 1000 });
+            rc.on('collect', mr => {
+                // Fetch the response and send it to the user.
+                let match = matches.filter(m => m.emojiId === mr.emoji.identifier)[0];
+                if (match) dataCallback(true, match.match, qsParams).then(
+                    result => mr.users.last().send(result, { split: { prepend: '```', append: '```' } }),
+                    result => mr.users.last().send(result)
+                ).catch(err => console.log(err));
+            }).on('end', () => rc.message.clearReactions().catch(() => rc.message.delete()));
+        }).catch(err => console.log('Reactions: error setting reactions:\n', err));
     // Always send one result to the channel.
     sent.then(() => dataCallback(isDM, matches[0].match, qsParams).then(
         result => channel.send(result, { split: { prepend: '```', append: '```' } }),
