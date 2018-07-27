@@ -1620,6 +1620,48 @@ function getHelpMessage(tokens) {
  */
 
 /**
+ * Query @devjacksmith's database for information about the given "item"
+ *
+ * @param {'loot'|'mouse'} queryType The type of "item" whose data is requested.
+ * @param {DatabaseEntity} dbEntity Identifying information about the "item"
+ * @param {Object <string, string>} [options] Any additional querystring options that should be set
+ */
+function getQueriedData(queryType, dbEntity, options) {
+    // TODO: fetch each value once, cache, and try to first serve cached content.
+    if (!dbEntity || !dbEntity.id || !dbEntity.value)
+        return Promise.reject({ error: `Could not perform a '${queryType}' query`, response: null });
+    // Check cache
+    /**
+     * Replace with actual cache checking:
+     * let cache_result = Cache.get(queryType, dbEntity.id, options)
+     * if (cache_result)
+     *   return Promise.resolve(cache_result);
+     */
+
+    // No result in cache, requery.
+    return new Promise((resolve, reject) => {
+        let qsOptions = options || {};
+        qsOptions.item_type = queryType;
+        qsOptions.item_id = dbEntity.id;
+        let rq = request({
+            uri: 'https://mhhunthelper.agiletravels.com/searchByItem.php',
+            json: true,
+            qs: qsOptions
+        }, (error, response, body) => {
+            if (!error && response.statusCode === 200 && Array.isArray(body)) {
+                /**
+                 * Replace with actual cache storage:
+                 * Cache.put(queryType, dbEntity.id, options, body);
+                 */
+                resolve(body);
+            }
+            else
+                reject({ error: error, response: response });
+        });
+    });
+}
+
+/**
  * Initialize (or refresh) the known mice lists from @devjacksmith's tools.
  */
 function getMouseList() {
