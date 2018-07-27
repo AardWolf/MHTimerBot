@@ -1662,6 +1662,35 @@ function getQueriedData(queryType, dbEntity, options) {
 }
 
 /**
+ * Process args for flags, like the -e event filter. Returns the args without any processed flags.
+ *
+ * @param {string} args a lowercased string of search criteria that may contain flags that map to querystring parameters
+ * @param {Object <string, string>} qsParams an object which will have any discovered querystring parameters added
+ * @returns {string} args, after stripping out any tokens associated with querystring parameters.
+ */
+function removeQueryStringParams(args, qsParams) {
+    let tokens = args.split(/\s+/);
+    if (tokens.length > 2) {
+        if (tokens[0] === "-e") {
+            // Allow shorthand specifications instead of only the literal `last3days`.
+            // TODO: discover valid shorthands and filters on startup.
+            // TODO: parse flag and argument even if given after the query.
+            switch (tokens[1]) {
+                case '3':
+                case '3d':
+                    tokens[1] = 'last3days';
+                    break;
+            }
+            qsParams.timefilter = tokens[1].toString();
+            tokens.splice(0, 2);
+        }
+        // TODO: other querystring params (once supported).
+        args = tokens.join(" ");
+    }
+    return args;
+}
+
+/**
  * Initialize (or refresh) the known mice lists from @devjacksmith's tools.
  */
 function getMouseList() {
@@ -1765,7 +1794,7 @@ function findMouse(channel, args, command) {
 
             let retStr = `${mouse.value} (mouse) can be found the following ways:\n\`\`\``;
             retStr += prettyPrintArrayAsString(attractions, columnFormatting, headers, "=");
-            retStr += `\`\`\`\nHTML version at: <https://mhhunthelper.agiletravels.com/?mouse=${mouse.id}>`;
+            retStr += `\`\`\`\nHTML version at: <https://mhhunthelper.agiletravels.com/?mouse=${mouse.id}&timefilter=${opts.timefilter ? opts.timefilter : "all"}>`;
             return retStr;
         }, reason => {
             // Querying failed. Received an error object / string, and possibly a response object.
@@ -1775,22 +1804,17 @@ function findMouse(channel, args, command) {
     }
 
 
-    //NOTE: RH location is https://mhhunthelper.agiletravels.com/tracker.json
-    let qsParams = {};
-    let isDM = ['dm', 'group'].includes(channel.type);
+    const isDM = ['dm', 'group'].includes(channel.type);
+    const urlInfo = {
+        qsParams: {},
+        uri: 'https://mhhunthelper.agiletravels.com/',
+        type: 'mouse'
+    };
 
     // Deep copy the input args, in case we modify them.
     const orig_args = JSON.parse(JSON.stringify(args));
+    args = removeQueryStringParams(args, urlInfo.qsParams);
 
-    // Process args for flags, like the -e event filter.
-    let tokens = args.split(/\s+/);
-    if (tokens.length > 2) {
-        if (tokens[0] === "-e") {
-            qsParams.timefilter = tokens[1].toString();
-            tokens.splice(0, 2);
-        }
-        args = tokens.join(" ");
-    }
     // If the input was a nickname, convert it to the queryable value.
     if (nicknames.get("mice")[args])
         args = nicknames.get("mice")[args];
@@ -1806,7 +1830,7 @@ function findMouse(channel, args, command) {
         }
     }
     else
-        sendInteractiveSearchResult(matches, channel, _getQueryResult, isDM, { qsParams: qsParams, uri: 'https://mhhunthelper.agiletravels.com/', type: 'mouse' }, args);
+        sendInteractiveSearchResult(matches, channel, _getQueryResult, isDM, urlInfo, args);
 }
 
 /**
@@ -1911,7 +1935,7 @@ function findItem(channel, args, command) {
 
             let retStr = `${item.value} (loot) can be found the following ways:\n\`\`\``;
             retStr += prettyPrintArrayAsString(attractions, columnFormatting, headers, "=");
-            retStr += `\`\`\`\nHTML version at: <https://mhhunthelper.agiletravels.com/loot.php?item=${item.id}&timefilter=${timefilter ? timefilter : "all"}>`;
+            retStr += `\`\`\`\nHTML version at: <https://mhhunthelper.agiletravels.com/loot.php?item=${item.id}&timefilter=${opts.timefilter ? opts.timefilter : "all"}>`;
             return retStr;
         }, reason => {
             // Querying failed. Received an error object / string, and possibly a response object.
@@ -1921,32 +1945,17 @@ function findItem(channel, args, command) {
     }
 
 
-    //NOTE: RH location is https://mhhunthelper.agiletravels.com/tracker.json
-    let qsParams = {};
-    let isDM = ['dm', 'group'].includes(channel.type);
+    const isDM = ['dm', 'group'].includes(channel.type);
+    const urlInfo = {
+        qsParams: {},
+        uri: 'https://mhhunthelper.agiletravels.com/loot.php',
+        type: 'item'
+    };
 
     // Deep copy the input args, in case we modify them.
     const orig_args = JSON.parse(JSON.stringify(args));
+    args = removeQueryStringParams(args, urlInfo.qsParams);
 
-    // Process args for flags, like the -e event filter.
-    let tokens = args.split(/\s+/);
-    let timefilter = "";
-    if (tokens.length > 2) {
-        if (tokens[0] === "-e") {
-            switch (tokens[1]) {
-                //Add a special case for a weird event time. May update this if new filters get added
-                case '3':
-                case '3d':
-                    tokens[1] = 'last3days';
-                    break;
-            }
-
-            qsParams.timefilter = tokens[1];
-            timefilter = tokens[1];
-            tokens.splice(0, 2);
-        }
-        args = tokens.join(" ");
-    }
     // If the input was a nickname, convert it to the queryable value.
     if (nicknames.get("loot")[args])
         args = nicknames.get("loot")[args];
@@ -1962,7 +1971,7 @@ function findItem(channel, args, command) {
         }
     }
     else
-        sendInteractiveSearchResult(matches, channel, _getQueryResult, isDM, { qsParams: qsParams, uri: 'https://mhhunthelper.agiletravels.com/loot.php', type: 'item' }, args);
+        sendInteractiveSearchResult(matches, channel, _getQueryResult, isDM, urlInfo, args);
 }
 
 /**
