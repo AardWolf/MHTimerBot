@@ -1806,8 +1806,10 @@ function findMouse(channel, args, command) {
     }
     else if (matches.length === 1) {
         // Send the single result directly.
-        _getQueryResult(isDM, url, matches[0].match)
-            .then(result => channel.send(`I found one good result for '${args}':\n${result}`, { split: { prepend: '```', append: '```' } }));
+        _getQueryResult(isDM, matches[0].match, qsParams).then(
+            result => channel.send(`I found one good result for '${args}':\n${result}`, { split: { prepend: '```', append: '```' } }),
+            result => channel.send(result)
+        ).catch(err => console.log(err));
     }
     else {
         // Create reactions, and when the user uses the corresponding reaction, PM the data.
@@ -1834,15 +1836,18 @@ function findMouse(channel, args, command) {
             rc.on('collect', mr => {
                 // Fetch the response and send it to the user.
                 let match = matches.filter(m => m.emojiId === mr.emoji.identifier)[0];
-                if (match) _getQueryResult(true, url, match.match)
-                    .then(result => mr.users.last().send(result, { split: { prepend: '```', append: '```' } }));
+                if (match) _getQueryResult(true, match.match, qsParams).then(
+                    result => mr.users.last().send(result, { split: { prepend: '```', append: '```' } }),
+                    result => mr.users.last().send(result)
+                ).catch(err => console.log(err));
             }).on('end', () => rc.message.clearReactions().catch(() => rc.message.delete()));
         }).catch(err => console.log('Reactions: error setting reactions:\n', err));
 
         // Always send one result to the channel.
-        sent.then(() => _getQueryResult(isDM, url, matches[0].match)
-            .then(result => channel.send(result, { split: { prepend: '```', append: '```' } }))
-        );
+        sent.then(() => _getQueryResult(isDM, matches[0].match, qsParams).then(
+            result => channel.send(result, { split: { prepend: '```', append: '```' } }),
+            result => channel.send(result))
+        ).catch(err => console.log(err));
     }
 }
 
@@ -2000,8 +2005,10 @@ function findItem(channel, args, command) {
     }
     else if (matches.length === 1) {
         // Send the single result directly.
-        _getQueryResult(isDM, url, matches[0].match)
-            .then(result => channel.send(`I found one good result for '${args}':\n${result}`, { split: { prepend: '```', append: '```' } }));
+        _getQueryResult(isDM, matches[0].match, qsParams).then(
+            result => channel.send(`I found one good result for '${args}':\n${result}`, { split: { prepend: '```', append: '```' } }),
+            result => channel.sent(result)
+        ).catch(err => console.log(err));
     }
     else {
         // Create reactions, and when the user uses the corresponding reaction, PM the data.
@@ -2028,15 +2035,18 @@ function findItem(channel, args, command) {
             rc.on('collect', mr => {
                 // Fetch the response and send it to the user.
                 let match = matches.filter(m => m.emojiId === mr.emoji.identifier)[0];
-                if (match) _getQueryResult(true, url, match.match)
-                    .then(result => mr.users.last().send(result, { split: { prepend: '```', append: '```' } }));
+                if (match) _getQueryResult(true, match.match, qsParams).then(
+                    result => mr.users.last().send(result, { split: { prepend: '```', append: '```' } }),
+                    result => mr.users.last().send(result)
+                ).catch(err => console.log(err));
             }).on('end', () => rc.message.clearReactions().catch(() => rc.message.delete()));
         }).catch(err => console.log('Reactions: error setting reactions:\n', err));
 
         // Always send one result to the channel.
-        sent.then(() =>_getQueryResult(isDM, url, matches[0].match)
-            .then(result => channel.send(result, { split: { prepend: '```', append: '```' } }))
-        );
+        sent.then(() => _getQueryResult(isDM, matches[0].match, qsParams).then(
+            result => channel.send(result, { split: { prepend: '```', append: '```' } }),
+            result => channel.send(result))
+        ).catch(err => console.log(err));
     }
 }
 
