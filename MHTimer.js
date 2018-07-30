@@ -1413,7 +1413,7 @@ function addRemind(timerRequest, message) {
     // proper response.
     const others = choices.reduce((s, t) => { s.add(`**${t.getSubArea()}**`); return s; }, new Set());
     responses.push(`Your reminder for **${timer.name}** is set. ${choices.length ?
-        `You'll also get reminders for ${oxfordStringifyValues(others)}. I'll PM you about them ` : `I'll PM you about it `}`)
+        `You'll also get reminders for ${oxfordStringifyValues(others)}. I'll PM you about them` : `I'll PM you about it`}`);
     responses.push((count === 1) ? "once." : (count < 0) ? "until you stop it." : `${count} times.`);
 
     // Inform a new user of the reminder functionality (i.e. PM only).
