@@ -36,7 +36,8 @@ const settings = {},
     items = [],
     hunters = {},
     nicknames = new Map(),
-    nickname_urls = {};
+    nickname_urls = {},
+    relic_hunter = {};
 
 /** @type {Timer[]} */
 const timers_list = [];
@@ -1740,6 +1741,7 @@ function findMouse(channel, args, command) {
      * @param {Object <string, string>} opts Additional querystring parameters for the request, like 'timefilter'
      * @returns {Promise<string>} The result of the lookup.
      */
+     
     function _getQueryResult(canSpam, mouse, opts) {
         return getQueriedData('mouse', mouse, opts).then(body => {
             // Querying succeeded. Received a JSON object (either from cache or HTTP lookup).
@@ -1818,6 +1820,12 @@ function findMouse(channel, args, command) {
     // If the input was a nickname, convert it to the queryable value.
     if (nicknames.get("mice")[args])
         args = nicknames.get("mice")[args];
+
+    // Special case of the relic hunter RGW
+    if (args.toLowerCase() === "relic hunter") {
+        findRH(channel);
+        return;
+    }
 
     const matches = getSearchedEntity(args, mice);
     if (!matches.length) {
@@ -2333,6 +2341,51 @@ function getHuntersByProperty(property, criterion, limit = 5) {
  */
 function integerComma(number) {
     return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+
+/**
+ * Processes a request to find the relic hunter
+ * @param {TextChannel} channel the channel on which to respond.
+ */
+function findRH(channel) {
+    let responseStr = "";
+    
+    if (!relic_hunter.hasOwnProperty("last_seen"))
+        relic_hunter["last_seen"] = DateTime.utc().minus({days: 5}).toMillis()/1000;
+        
+    if (relic_hunter["last_seen"] < DateTime.utc().endOf('day').minus({days: 1}).toMillis()/1000) {
+        console.log(`Last seen: ${relic_hunter["last_seen"]} - midnight this morning: ${DateTime.utc().endOf('day').minus({days: 1}).toMillis()}`);
+        //RH was not seen since beginning of today, grab the info
+        let req = request({
+                uri: 'https://mhhunthelper.agiletravels.com/tracker.json',
+                json: true
+            }, (error, response, body) => {
+                if (!error && response.statusCode === 200) {
+                    console.log(body);
+                    relic_hunter["location"] = body["rh"]["location"];
+                    relic_hunter["last_seen"] = body["rh"]["last_seen"];
+                    console.log(relic_hunter);
+                    responseStr = `Relic Hunter has just been spotted in **${relic_hunter["location"]}** and will be there for the next `;
+                    responseStr += timeLeft(DateTime.utc().endOf('day'));
+                    channel.send(responseStr);
+                }
+                else
+                    console.log(error, response);
+            });
+        // console.log(`I got relic hunter information`, rh_info);
+//        relic_hunter["location"] = rh_info.body["rh"]["location"];
+//        relic_hunter["last_seen"] = rh_info.body["rh"]["last_seen"];
+    } else {
+        responseStr = `Relic Hunter has been spotted in **${relic_hunter["location"]}** and will be there for the next `;
+        responseStr += timeLeft(DateTime.utc().endOf('day'));
+        channel.send(responseStr);
+    }
+    //Check last time RH was seen
+    //Compare to midnight UTC
+      // if now after midnight and last seen before midnight, look it up
+      // stash it
+    // declare stashed value
 }
 
 /**
