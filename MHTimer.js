@@ -36,8 +36,7 @@ const settings = {},
     items = [],
     hunters = {},
     nicknames = new Map(),
-    nickname_urls = {},
-    relic_hunter = {};
+    nickname_urls = {};
 
 /** @type {Timer[]} */
 const timers_list = [];
@@ -2350,46 +2349,22 @@ function integerComma(number) {
  */
 function findRH(channel) {
     let responseStr = "";
-    
-    if (!relic_hunter.hasOwnProperty("last_seen"))
-        relic_hunter["last_seen"] = DateTime.utc().minus({days: 5}).toMillis()/1000;
-        
-    if (relic_hunter["last_seen"] < DateTime.utc().endOf('day').minus({days: 1}).toMillis()/1000) {
-        console.log(`Last seen: ${relic_hunter["last_seen"]} - midnight this morning: ${DateTime.utc().endOf('day').minus({days: 1}).toMillis()}`);
-        //RH was not seen since beginning of today, grab the info
-        let req = request({
-                uri: 'https://mhhunthelper.agiletravels.com/tracker.json',
-                json: true
-            }, (error, response, body) => {
-                if (!error && response.statusCode === 200) {
-                    console.log(body);
-                    relic_hunter["location"] = body["rh"]["location"];
-                    relic_hunter["last_seen"] = body["rh"]["last_seen"];
-                    responseStr = `Relic Hunter has just been spotted in **${relic_hunter["location"]}** and will be there for the next `;
-                    responseStr += timeLeft(DateTime.utc().endOf('day'));
-                    channel.send(responseStr);
-                }
-                else {
-                    console.log(error, response);
-                    channel.send("I was unable to get a good answer on that one.");
-                }
-            });
-        // console.log(`I got relic hunter information`, rh_info);
-//        relic_hunter["location"] = rh_info.body["rh"]["location"];
-//        relic_hunter["last_seen"] = rh_info.body["rh"]["last_seen"];
-    } 
-    else if (relic_hunter["location"]) {
-        responseStr = `Relic Hunter has been spotted in **${relic_hunter["location"]}** and will be there for the next `;
-        responseStr += timeLeft(DateTime.utc().endOf('day'));
-        channel.send(responseStr);
-    } else {
-        channel.send("I don't know!");
-    }
-    //Check last time RH was seen
-    //Compare to midnight UTC
-      // if now after midnight and last seen before midnight, look it up
-      // stash it
-    // declare stashed value
+    //RH was not seen since beginning of today, grab the info
+    let req = request({
+            uri: 'https://mhhunthelper.agiletravels.com/tracker.json',
+            json: true
+        }, (error, response, body) => {
+            if (!error && response.statusCode === 200) {
+                responseStr = `Relic Hunter has been spotted in **${body["rh"]["location"]}** and will be there for the next `;
+                responseStr += timeLeft(DateTime.utc().endOf('day'));
+                channel.send(responseStr);
+            }
+            else {
+                console.log(error, response);
+                channel.send("I was unable to get a good answer on that one.");
+            }
+        });
+    // If we have to use dbgames.info the xpath is: //*[@id="maincontent"]/table/tbody/tr/td[1]/div/div[4]/div[3]/h4/b/a
 }
 
 /**
