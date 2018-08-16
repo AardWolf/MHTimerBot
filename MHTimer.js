@@ -6,7 +6,7 @@ const { DateTime, Duration, Interval } = require('luxon');
 const Discord = require('discord.js');
 
 // Import type-hinting definitions
-const { Client, Guild, Message, RichEmbed, TextChannel, User } = require('discord.js');
+const { Client, Guild, Message, MessageReaction, RichEmbed, TextChannel, User } = require('discord.js');
 
 const Timer = require('./timerClass.js');
 // Access local URIs, like files.
@@ -54,6 +54,17 @@ const last_timestamps = {
 const dataTimers = {};
 /** @type {Map <string, {active: boolean, channels: TextChannel[], inactiveChannels: TextChannel[]}>} */
 const timer_config = new Map();
+const emojis = [
+    { id: "1%E2%83%A3", text: ':one:' },
+    { id: "2%E2%83%A3", text: ':two:' },
+    { id: "3%E2%83%A3", text: ':three:' },
+    { id: "4%E2%83%A3", text: ':four:' },
+    { id: "5%E2%83%A3", text: ':five:' },
+    { id: "6%E2%83%A3", text: ':six:' },
+    { id: "7%E2%83%A3", text: ':seven:' },
+    { id: "8%E2%83%A3", text: ':eight:' },
+    { id: "9%E2%83%A3", text: ':nine:' },
+    { id: "%F0%9F%94%9F", text: ':keycap_ten:' }];
 
 //https://stackoverflow.com/questions/12008120/console-log-timestamps-in-chrome
 console.logCopy = console.log.bind(console);
@@ -1402,7 +1413,7 @@ function addRemind(timerRequest, message) {
     // proper response.
     const others = choices.reduce((s, t) => { s.add(`**${t.getSubArea()}**`); return s; }, new Set());
     responses.push(`Your reminder for **${timer.name}** is set. ${choices.length ?
-        `You'll also get reminders for ${oxfordStringifyValues(others)}. I'll PM you about them ` : `I'll PM you about it `}`)
+        `You'll also get reminders for ${oxfordStringifyValues(others)}. I'll PM you about them` : `I'll PM you about it`}`);
     responses.push((count === 1) ? "once." : (count < 0) ? "until you stop it." : `${count} times.`);
 
     // Inform a new user of the reminder functionality (i.e. PM only).
@@ -1600,6 +1611,85 @@ function getHelpMessage(tokens) {
         return `I don't know that one, but I do know ${keywords}.`;
 }
 
+
+/**
+ * @typedef {Object} DatabaseEntity
+ * @property {string} id The ID of the entity
+ * @property {string} value The entity's proper name
+ * @property {string} lowerValue A lowercased version of the entity's name
+ */
+
+/**
+ * Query @devjacksmith's database for information about the given "item"
+ *
+ * @param {'loot'|'mouse'} queryType The type of "item" whose data is requested.
+ * @param {DatabaseEntity} dbEntity Identifying information about the "item"
+ * @param {Object <string, string>} [options] Any additional querystring options that should be set
+ */
+function getQueriedData(queryType, dbEntity, options) {
+    // TODO: fetch each value once, cache, and try to first serve cached content.
+    if (!dbEntity || !dbEntity.id || !dbEntity.value)
+        return Promise.reject({ error: `Could not perform a '${queryType}' query`, response: null });
+    // Check cache
+    /**
+     * Replace with actual cache checking:
+     * let cache_result = Cache.get(queryType, dbEntity.id, options)
+     * if (cache_result)
+     *   return Promise.resolve(cache_result);
+     */
+
+    // No result in cache, requery.
+    return new Promise((resolve, reject) => {
+        let qsOptions = options || {};
+        qsOptions.item_type = queryType;
+        qsOptions.item_id = dbEntity.id;
+        let rq = request({
+            uri: 'https://mhhunthelper.agiletravels.com/searchByItem.php',
+            json: true,
+            qs: qsOptions
+        }, (error, response, body) => {
+            if (!error && response.statusCode === 200 && Array.isArray(body)) {
+                /**
+                 * Replace with actual cache storage:
+                 * Cache.put(queryType, dbEntity.id, options, body);
+                 */
+                resolve(body);
+            }
+            else
+                reject({ error: error, response: response });
+        });
+    });
+}
+
+/**
+ * Process args for flags, like the -e event filter. Returns the args without any processed flags.
+ *
+ * @param {string} args a lowercased string of search criteria that may contain flags that map to querystring parameters
+ * @param {Object <string, string>} qsParams an object which will have any discovered querystring parameters added
+ * @returns {string} args, after stripping out any tokens associated with querystring parameters.
+ */
+function removeQueryStringParams(args, qsParams) {
+    let tokens = args.split(/\s+/);
+    if (tokens.length > 2) {
+        if (tokens[0] === "-e") {
+            // Allow shorthand specifications instead of only the literal `last3days`.
+            // TODO: discover valid shorthands and filters on startup.
+            // TODO: parse flag and argument even if given after the query.
+            switch (tokens[1]) {
+                case '3':
+                case '3d':
+                    tokens[1] = 'last3days';
+                    break;
+            }
+            qsParams.timefilter = tokens[1].toString();
+            tokens.splice(0, 2);
+        }
+        // TODO: other querystring params (once supported).
+        args = tokens.join(" ");
+    }
+    return args;
+}
+
 /**
  * Initialize (or refresh) the known mice lists from @devjacksmith's tools.
  */
@@ -1635,7 +1725,7 @@ function getMouseList() {
 }
 
 /**
- * Query @devjacksmith's database for information about the desired mouse.
+ * Check the input args for a known mouse that can be looked up.
  * If no result is found, retries with an item search.
  *
  * @param {TextChannel} channel the channel on which to respond.
@@ -1643,113 +1733,104 @@ function getMouseList() {
  * @param {string} command the command switch used to initiate the request.
  */
 function findMouse(channel, args, command) {
-    //NOTE: RH location is https://mhhunthelper.agiletravels.com/tracker.json
-    let url = 'https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=mouse';
-    let retStr = `'${args}' not found`;
+    /**
+     * Request the latest information about the valid mouse.
+     * @param {boolean} canSpam Whether the long or short response should be sent back.
+     * @param {DatabaseEntity} mouse The valid mouse to query for
+     * @param {Object <string, string>} opts Additional querystring parameters for the request, like 'timefilter'
+     * @returns {Promise<string>} The result of the lookup.
+     */
+    function _getQueryResult(canSpam, mouse, opts) {
+        return getQueriedData('mouse', mouse, opts).then(body => {
+            // Querying succeeded. Received a JSON object (either from cache or HTTP lookup).
+            // body is an array of objects with: location, stage, total_hunts, rate, cheese
+            // Sort it by "rate" but only if hunts > 100
+            const attractions = body.filter(setup => setup.total_hunts > 99)
+                .map(setup => {
+                    return {
+                        location: setup.location,
+                        stage: setup.stage ? setup.stage : " N/A ",
+                        total_hunts: integerComma(setup.total_hunts),
+                        rate: setup.rate * 1.0 / 100,
+                        cheese: setup.cheese
+                    };
+                });
+            if (!attractions.length)
+                return `${mouse.value} either hasn't been seen enough, or something broke.`;
+
+            // Sort that by Attraction Rate, descending.
+            attractions.sort((a, b) => b.rate - a.rate);
+            // Keep only the top 10 results, unless this is a DM.
+            attractions.splice(!canSpam ? 10 : 100);
+
+            // Column Formatting specification.
+            /** @type {Object <string, ColumnFormatOptions>} */
+            const columnFormatting = {};
+
+            // Specify the column order.
+            const order = ["location", "stage", "cheese", "rate", "total_hunts"];
+            // Inspect the attractions array to determine if we need to include the stage column.
+            if (attractions.every(row => row.stage === " N/A "))
+                order.splice(order.indexOf("stage"), 1);
+
+            // Build the header row.
+            const labels = { location: "Location", stage: "Stage", total_hunts: "Hunts", rate: "AR", cheese: "Cheese" }
+            const headers = order.map(key => {
+                columnFormatting[key] = {
+                    columnWidth: labels[key].length,
+                    alignRight: !isNaN(parseInt(attractions[0][key], 10))
+                };
+                return { 'key': key, 'label': labels[key] };
+            });
+
+            // Give the numeric column proper formatting.
+            // TODO: toLocaleString - can it replace integerComma too?
+            columnFormatting['rate'] = {
+                alignRight: true,
+                isFixedWidth: true,
+                columnWidth: 7,
+                suffix: "%"
+            };
+
+            let retStr = `${mouse.value} (mouse) can be found the following ways:\n\`\`\``;
+            retStr += prettyPrintArrayAsString(attractions, columnFormatting, headers, "=");
+            retStr += `\`\`\`\nHTML version at: <https://mhhunthelper.agiletravels.com/?mouse=${mouse.id}&timefilter=${opts.timefilter ? opts.timefilter : "all"}>`;
+            return retStr;
+        }, reason => {
+            // Querying failed. Received an error object / string, and possibly a response object.
+            console.log('Mice: Lookup failed for some reason:\n', reason.error, reason.response ? reason.response.toJSON() : "No HTTP response");
+            throw new Error(`Could not process results for '${args}', AKA ${mouse.value}`);
+        });
+    }
+
+
+    const isDM = ['dm', 'group'].includes(channel.type);
+    const urlInfo = {
+        qsParams: {},
+        uri: 'https://mhhunthelper.agiletravels.com/',
+        type: 'mouse'
+    };
 
     // Deep copy the input args, in case we modify them.
     const orig_args = JSON.parse(JSON.stringify(args));
+    args = removeQueryStringParams(args, urlInfo.qsParams);
 
-    // Process args for flags, like the -e event filter.
-    let tokens = args.split(/\s+/);
-    if (tokens.length > 2) {
-        if (tokens[0] === "-e") {
-            url += `&timefilter=${tokens[1]}`;
-            tokens.splice(0, 2);
-        }
-        args = tokens.join(" ");
-    }
     // If the input was a nickname, convert it to the queryable value.
     if (nicknames.get("mice")[args])
         args = nicknames.get("mice")[args];
-    
-    const MATCH_LENGTH = args.length;
-    for (let i = 0, len = mice.length; i < len; ++i)
-        if (mice[i].lowerValue.substring(0, MATCH_LENGTH) === args) {
-            let mouseID = mice[i].id;
-            let mouseName = mice[i].value;
-            url += `&item_id=${mouseID}`;
-            request({
-                url: url,
-                json: true
-            }, (error, response, body) => {
-                const attractions = [];
-                if (!error && response.statusCode === 200 && Array.isArray(body)) {
-                    // body is an array of objects with: location, stage, total_hunts, rate, cheese
-                    // Sort it by "rate" but only if hunts > 100
-                    body.filter(setup => setup.total_hunts > 99).forEach(setup => {
-                        attractions.push(
-                            {
-                                location: setup.location,
-                                stage: setup.stage ? setup.stage : " N/A ",
-                                total_hunts: integerComma(setup.total_hunts),
-                                rate: setup.rate * 1.0 / 100,
-                                cheese: setup.cheese
-                            });
-                    });
-                } else {
-                    console.log("Mice: Lookup failed for some reason:\n", error, response.toJSON(), body);
-                    channel.send(`Could not process results for '${args}', AKA ${mouseName}`);
-                    return;
-                }
 
-                // If there was a result, create a nice-looking table from the data.
-                let retStr = "";
-                if (attractions.length) {
-                    // Sort that by Attraction Rate, descending.
-                    attractions.sort((a, b) => (b.rate - a.rate));
-                    // Keep only the top 10 results, unless this is a DM.
-                    if (channel.type !== 'dm')
-                        attractions.splice(10);
-
-                    // Column Formatting specification.
-                    /** @type {Object <string, ColumnFormatOptions>} */
-                    const columnFormatting = {};
-
-                    // Specify the column order.
-                    const order = ["location", "stage", "cheese", "rate", "total_hunts"];
-                    // Inspect the attractions array to determine if we need to include the stage column.
-                    if (attractions.every(row => row.stage === " N/A "))
-                        order.splice(order.indexOf("stage"), 1);
-
-                    // Build the header row.
-                    const labels = { location: "Location", stage: "Stage", total_hunts: "Hunts", rate: "AR", cheese: "Cheese" }
-                    const headers = order.map(key => {
-                        columnFormatting[key] = {
-                            columnWidth: labels[key].length,
-                            alignRight: !isNaN(parseInt(attractions[0][key], 10))
-                        };
-                        return { 'key': key, 'label': labels[key] };
-                    })
-
-                    // Give the numeric column proper formatting.
-                    // TODO: toLocaleString - can it replace integerComma too?
-                    columnFormatting['rate'] = {
-                        alignRight: true,
-                        isFixedWidth: true,
-                        columnWidth: 7,
-                        suffix: "%"
-                    };
-
-                    retStr = `${mouseName} (mouse) can be found the following ways:\n\`\`\``;
-                    retStr += prettyPrintArrayAsString(attractions, columnFormatting, headers, "=");
-                    retStr += `\`\`\`\nHTML version at: <https://mhhunthelper.agiletravels.com/?mouse=${mouseID}>`;
-                }
-                else
-                    retStr = `${mouseName} either hasn't been seen enough, or something broke.`;
-                channel.send(retStr, { split: { prepend: '```', append: '```'} });
-            });
-            return;
+    const matches = getSearchedEntity(args, mice);
+    if (!matches.length) {
+        // If this was a mouse search, try finding an item.
+        if (command === 'find')
+            findItem(channel, orig_args, command);
+        else {
+            channel.send(`'${orig_args}' not found.`);
+            getItemList();
         }
-
-
-    // No matching mouse was found. If this was a mouse search, find try finding an item.
-    if (command === 'find')
-        findItem(channel, orig_args, command);
-    else {
-        channel.send(retStr);
-        getItemList();
     }
+    else
+        sendInteractiveSearchResult(matches, channel, _getQueryResult, isDM, urlInfo, args);
 }
 
 /**
@@ -1785,7 +1866,7 @@ function getItemList() {
 }
 
 /**
- * Query @devjacksmith's database for information about the desired item.
+ * Check the input args for a known item that can be looked up.
  * If no result is found, retries with a mouse search.
  *
  * @param {TextChannel} channel the channel on which to respond.
@@ -1793,120 +1874,197 @@ function getItemList() {
  * @param {string} command the command switch used to initiate the request.
  */
 function findItem(channel, args, command) {
-    //NOTE: RH location is https://mhhunthelper.agiletravels.com/tracker.json
-    let url = 'https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=loot';
-    let retStr = `'${args}' not found`;
+    /**
+     * Request the latest information about the valid item.
+     * @param {boolean} canSpam Whether the long or short response should be sent back.
+     * @param {DatabaseEntity} item The valid item to query for
+     * @param {Object <string, string>} opts Additional querystring parameters for the request, like 'timefilter'
+     * @returns {Promise<string>} The result of the lookup.
+     */
+    function _getQueryResult(canSpam, item, opts) {
+        return getQueriedData('loot', item, opts).then(body => {
+            // Querying succeeded. Received a JSON object (either from cache or HTTP lookup).
+            // body is an array of objects with: location, stage, total_hunts, rate, cheese
+            // 2018-06-18 rate -> rate_per_catch; total_hunts -> total_catches
+            // Sort by "rate" but only if hunts >= 100
+            const attractions = body.filter(setup => setup.total_catches > 99)
+                .map(setup => {
+                    return {
+                        location: setup.location,
+                        stage: setup.stage === null ? " N/A " : setup.stage,
+                        total_hunts: integerComma(setup.total_catches),
+                        rate: setup.rate_per_catch * 1.0 / 1000, // Divide by 1000? should this be 100?
+                        cheese: setup.cheese
+                    };
+                });
+            if (!attractions.length)
+                return `${item.value} either hasn't been seen enough, or something broke.`;
+
+            // Sort the setups by the drop rate.
+            attractions.sort((a, b) => b.rate - a.rate);
+            // Keep only the top 10 results, unless this is a DM.
+            attractions.splice(!canSpam ? 10 : 100);
+
+            // Column Formatting specification.
+            /** @type {Object <string, ColumnFormatOptions>} */
+            const columnFormatting = {};
+
+            // Specify the column order.
+            const order = ["location", "stage", "cheese", "rate", "total_hunts"];
+            // Inspect the setups array to determine if we need to include the stage column.
+            if (attractions.every(row => row.stage === " N/A "))
+                order.splice(order.indexOf("stage"), 1);
+
+            // Build the header row.
+            const labels = { location: "Location", stage: "Stage", total_hunts: "Catches", rate: "DR", cheese: "Cheese" }
+            const headers = order.map(key => {
+                columnFormatting[key] = {
+                    columnWidth: labels[key].length,
+                    alignRight: !isNaN(parseInt(attractions[0][key], 10))
+                };
+                return { 'key': key, 'label': labels[key] };
+            })
+
+            // Give the numeric column proper formatting.
+            columnFormatting['rate'] = {
+                alignRight: true,
+                isFixedWidth: true,
+                numDecimals: 3,
+                columnWidth: 7,
+            };
+
+            let retStr = `${item.value} (loot) can be found the following ways:\n\`\`\``;
+            retStr += prettyPrintArrayAsString(attractions, columnFormatting, headers, "=");
+            retStr += `\`\`\`\nHTML version at: <https://mhhunthelper.agiletravels.com/loot.php?item=${item.id}&timefilter=${opts.timefilter ? opts.timefilter : "all"}>`;
+            return retStr;
+        }, reason => {
+            // Querying failed. Received an error object / string, and possibly a response object.
+            console.log('Loot: Lookup failed for some reason:\n', reason.error, reason.response ? reason.response.toJSON() : "No HTTP response");
+            throw new Error(`Could not process results for '${args}', AKA ${item.value}`);
+        });
+    }
+
+
+    const isDM = ['dm', 'group'].includes(channel.type);
+    const urlInfo = {
+        qsParams: {},
+        uri: 'https://mhhunthelper.agiletravels.com/loot.php',
+        type: 'item'
+    };
 
     // Deep copy the input args, in case we modify them.
     const orig_args = JSON.parse(JSON.stringify(args));
+    args = removeQueryStringParams(args, urlInfo.qsParams);
 
-    // Process args for flags, like the -e event filter.
-    let tokens = args.split(/\s+/);
-    let timefilter = "";
-    if (tokens.length > 2) {
-        if (tokens[0] === "-e") {
-            switch (tokens[1]) {
-                //Add a special case for a weird event time. May update this if new filters get added
-                case '3':
-                case '3d':
-                    tokens[1] = 'last3days';
-                    break;
-            }
-
-            url += `&timefilter=${tokens[1]}`;
-            timefilter = tokens[1];
-            tokens.splice(0, 2);
-        }
-        args = tokens.join(" ");
-    }
     // If the input was a nickname, convert it to the queryable value.
     if (nicknames.get("loot")[args])
         args = nicknames.get("loot")[args];
 
-    const MATCH_LENGTH = args.length;
-    for (let i = 0, len = items.length; i < len; ++i)
-        if (items[i].lowerValue.substring(0, MATCH_LENGTH) === args) {
-            let itemID = items[i].id;
-            let itemName = items[i].value;
-            url += `&item_id=${itemID}`;
-            request({
-                url: url,
-                json: true
-            }, (error, response, body) => {
-                const attractions = [];
-                if (!error && response.statusCode == 200 && Array.isArray(body)) {
-                    // body is an array of objects with: location, stage, total_hunts, rate, cheese
-                    // 2018-06-18 rate -> rate_per_catch; total_hunts -> total_catches
-                    // Sort by "rate" but only if hunts >= 100
-                    body.filter(setup => setup.total_catches > 99).forEach(setup => {
-                        attractions.push(
-                            {
-                                location: setup.location,
-                                stage: setup.stage === null ? " N/A " : setup.stage,
-                                total_hunts: integerComma(setup.total_catches),
-                                rate: setup.rate_per_catch * 1.0 / 1000, // Divide by 1000? should this be 100?
-                                cheese: setup.cheese
-                            });
-                    });
-                } else {
-                    console.log("Loot: Lookup failed for some reason", error, response.toJSON(), body);
-                    channel.send(`Could not process results for '${args}', AKA ${itemName}`);
-                    return;
-                }
-                let retStr = "";
-                if (attractions.length) {
-                    // Sort the setups by the drop rate.
-                    attractions.sort((a, b) => b.rate - a.rate);
-                    // Keep only the top 10 results, unless this is a DM.
-                    if (channel.type !== 'dm')
-                        attractions.splice(10);
-
-                    // Column Formatting specification.
-                    /** @type {Object <string, ColumnFormatOptions>} */
-                    const columnFormatting = {};
-
-                    // Specify the column order.
-                    const order = ["location", "stage", "cheese", "rate", "total_hunts"];
-                    // Inspect the setups array to determine if we need to include the stage column.
-                    if (attractions.every(row => row.stage === " N/A "))
-                        order.splice(order.indexOf("stage"), 1);
-
-                    // Build the header row.
-                    const labels = { location: "Location", stage: "Stage", total_hunts: "Catches", rate: "DR", cheese: "Cheese" }
-                    const headers = order.map(key => {
-                        columnFormatting[key] = {
-                            columnWidth: labels[key].length,
-                            alignRight: !isNaN(parseInt(attractions[0][key], 10))
-                        };
-                        return { 'key': key, 'label': labels[key] };
-                    })
-
-                    // Give the numeric column proper formatting.
-                    columnFormatting['rate'] = {
-                        alignRight: true,
-                        isFixedWidth: true,
-                        numDecimals: 3,
-                        columnWidth: 7,
-                    };
-
-                    retStr = `${itemName} (loot) can be found the following ways:\n\`\`\``;
-                    retStr += prettyPrintArrayAsString(attractions, columnFormatting, headers, "=");
-                    retStr += `\`\`\`\nHTML version at: <https://mhhunthelper.agiletravels.com/loot.php?item=${itemID}&timefilter=${timefilter ? timefilter : "all"}>`;
-                } else
-                    retStr = `${itemName} either hasn't been seen enough, or something broke.`;
-                channel.send(retStr, { split: { prepend: '```', append: '```' } });
-            });
-            return;
+    const matches = getSearchedEntity(args, items);
+    if (!matches.length) {
+        // If this was an item search, try finding a mouse.
+        if (command === 'ifind')
+            findMouse(channel, orig_args, command);
+        else {
+            channel.send(`'${orig_args}' not found.`);
+            getMouseList();
         }
-
-    // No matching item was found. If this was an item search, try finding a mouse.
-    if (command === 'ifind')
-        findMouse(channel, orig_args, command);
-    else {
-        channel.send(retStr);
-        getMouseList();
     }
+    else
+        sendInteractiveSearchResult(matches, channel, _getQueryResult, isDM, urlInfo, args);
 }
+
+/**
+ * Construct and dispatch a reaction-enabled message for interactive "search result" display.
+ *
+ * @param {DatabaseEntity[]} searchResults An ordered array of objects that resulted from a search.
+ * @param {TextChannel} channel The channel on which the client received the find request.
+ * @param {Function} dataCallback a Promise-returning function that converts the local entity data into the desired text response.
+ * @param {boolean} isDM Whether the response will be to a private message (i.e. if the response can be spammy).
+ * @param {{qsParams: Object <string, string>, uri: string, type: string}} urlInfo Information about the query that returned the given matches, including querystring parameters, uri, and the type of search.
+ * @param {string} searchInput a lower-cased representation of the user's input.
+ */
+function sendInteractiveSearchResult(searchResults, channel, dataCallback, isDM, urlInfo, searchInput) {
+    // Associate each search result with a "numeric" emoji.
+    const matches = searchResults.map((sr, i) => ({ emojiId: emojis[i].id, match: sr }));
+    // Construct a RichEmbed with the search result information, unless this is for a PM with a single response.
+    let embed = new Discord.RichEmbed({
+        title: `Search Results for '${searchInput}'`,
+        thumbnail: { url: `https://cdn.discordapp.com/emojis/359244526688141312.png` }, // :clue:
+        footer: { text: `For any reaction you select, I'll ${isDM ? 'send' : 'PM'} you that information.` },
+    });
+
+    // Precompute the url prefix & suffix for each search result. Assumption: single-valued querystring params.
+    let urlPrefix = `${urlInfo.uri}?${urlInfo.type}=`;
+    let urlSuffix = Object.keys(urlInfo.qsParams).reduce((acc, key) => `${acc}&${key}=${urlInfo.qsParams[key]}`, "");
+    // Generate the description to include the reaction, name, and link to HTML data on @devjacksmith's website.
+    let description = matches.reduce((acc, entity, i) => {
+        let url = `${urlPrefix}${entity.match.id}${urlSuffix}`;
+        let row = `\n\t${emojis[i].text}:\t[${entity.match.value}](${url})`;
+        return acc + row;
+    }, `I found ${matches.length === 1 ? `a single result` : `${matches.length} good results`}:`);
+    embed.setDescription(description);
+
+    let searchResponse = (isDM && matches.length === 1)
+        ? `I found a single result for '${searchInput}':`
+        : embed;
+    let sent = channel.send(searchResponse);
+    // To ensure a sensible order of emojis, we have to await the previous react's resolution.
+    if (!isDM || matches.length > 1)
+        sent.then(async (msg) => {
+            /** @type MessageReaction[] */
+            let mrxns = [];
+            for (let m of matches)
+                mrxns.push(await msg.react(m.emojiId).catch(err => console.log(err)));
+            return mrxns;
+        }).then(msgRxns => {
+            // Set a 5-minute listener on the message for these reactions.
+            let msg = msgRxns[0].message,
+                allowed = msgRxns.map(mr => mr.emoji.name),
+                filter = (reaction, user) => allowed.includes(reaction.emoji.name) && !user.bot,
+                rc = msg.createReactionCollector(filter, { time: 5 * 60 * 1000 });
+            rc.on('collect', mr => {
+                // Fetch the response and send it to the user.
+                let match = matches.filter(m => m.emojiId === mr.emoji.identifier)[0];
+                if (match) dataCallback(true, match.match, urlInfo.qsParams).then(
+                    result => mr.users.last().send(result, { split: { prepend: '```', append: '```' } }),
+                    result => mr.users.last().send(result)
+                ).catch(err => console.log(err));
+            }).on('end', () => rc.message.clearReactions().catch(() => rc.message.delete()));
+        }).catch(err => console.log('Reactions: error setting reactions:\n', err));
+
+    // Always send one result to the channel.
+    sent.then(() => dataCallback(isDM, matches[0].match, urlInfo.qsParams).then(
+        result => channel.send(result, { split: { prepend: '```', append: '```' } }),
+        result => channel.send(result))
+    ).catch(err => console.log(err));
+}
+
+/**
+ * Return a sorted list of approximate matches to the given input and container
+ *
+ * @param {string} input The text to match against
+ * @param {DatabaseEntity[]} values The known values.
+ * returns {number[][]} Up to 10 indices and their search score.
+ */
+function getSearchedEntity(input, values) {
+    if (!input.length || !Array.isArray(values) || !values.length)
+        return [];
+
+    const matches = values.filter(v => v.lowerValue.includes(input)).map(v => {
+        return {entity: v, score: v.lowerValue.indexOf(input)};
+    });
+    matches.sort((a, b) => {
+        let r = a.score - b.score;
+        // Sort lexicographically if the scores are equal.
+        return r ? r : a.entity.value.localeCompare(b.entity.value, { sensitivity: "base" });
+    })
+    // Keep only the top 10 results.
+    matches.splice(10);
+    return matches.map(m => m.entity);
+}
+
+
 
 /**
  * Interrogate the local 'hunters' data object to find self-registered hunters that match the requested
