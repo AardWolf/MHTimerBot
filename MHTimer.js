@@ -2365,21 +2365,25 @@ function findRH(channel) {
                     console.log(body);
                     relic_hunter["location"] = body["rh"]["location"];
                     relic_hunter["last_seen"] = body["rh"]["last_seen"];
-                    console.log(relic_hunter);
                     responseStr = `Relic Hunter has just been spotted in **${relic_hunter["location"]}** and will be there for the next `;
                     responseStr += timeLeft(DateTime.utc().endOf('day'));
                     channel.send(responseStr);
                 }
-                else
+                else {
                     console.log(error, response);
+                    channel.send("I was unable to get a good answer on that one.");
+                }
             });
         // console.log(`I got relic hunter information`, rh_info);
 //        relic_hunter["location"] = rh_info.body["rh"]["location"];
 //        relic_hunter["last_seen"] = rh_info.body["rh"]["last_seen"];
-    } else {
+    } 
+    else if (relic_hunter["location"]) {
         responseStr = `Relic Hunter has been spotted in **${relic_hunter["location"]}** and will be there for the next `;
         responseStr += timeLeft(DateTime.utc().endOf('day'));
         channel.send(responseStr);
+    } else {
+        channel.send("I don't know!");
     }
     //Check last time RH was seen
     //Compare to midnight UTC
