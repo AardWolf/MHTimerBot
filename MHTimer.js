@@ -15,6 +15,8 @@ const fs = require('fs');
 const request = require('request');
 // We need more robust CSV handling
 const csv_parse = require('csv-parse');
+// Relic hunter (and maybe others?) introduced HTML escapes
+const decode = require('unescape');
 
 // Convert callbacks to 'Promise' versions
 const util = require('util');
@@ -35,6 +37,7 @@ const settings = {},
     mice = [],
     items = [],
     hunters = {},
+    relic_hunter = {},
     nicknames = new Map(),
     nickname_urls = {};
 
@@ -210,6 +213,9 @@ function Main() {
             client.on('message', message => {
                 if (message.author.id === client.user.id)
                     return;
+                
+                if (message.webhookID === settings.relic_hunter_webhook) 
+                    updRH(message);
 
                 switch (message.channel.name) {
                     case settings.linkConversionChannel:
@@ -2342,6 +2348,19 @@ function integerComma(number) {
     return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
+/**
+ * Relic Hunter location was announced, save it and note the source
+ * @param {Message} Webhook-generated message announcing RH location
+ */
+function updRH(message) {
+    //Find the location in the text
+    relic_hunter.location = message.cleanContent.substring(
+        message.cleanContent.indexOf('spotted in') + 'spotted in'.length + 3,
+        message.cleanContent.length-2); //Removes the *'s
+    console.log(`Now in ${relic_hunter.location}`);
+    relic_hunter.source = "webhook";
+    
+}
 
 /**
  * Processes a request to find the relic hunter
@@ -2355,7 +2374,12 @@ function findRH(channel) {
             json: true
         }, (error, response, body) => {
             if (!error && response.statusCode === 200) {
-                responseStr = `Relic Hunter has been spotted in **${body["rh"]["location"]}** and will be there for the next `;
+                body["rh"]["location"] = "unknown";
+                if (body["rh"]["location"] === 'unknown') {
+                    if (relic_hunter.location)
+                        body["rh"]["location"] = relic_hunter.location;
+                }
+                responseStr = `Relic Hunter has been spotted in **${decode(body["rh"]["location"])}** and will be there for the next `;
                 responseStr += timeLeft(DateTime.utc().endOf('day'));
                 channel.send(responseStr);
             }
