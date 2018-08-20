@@ -2356,12 +2356,14 @@ function integerComma(number) {
  */
 function updRH(message) {
     //Find the location in the text
-    relic_hunter.location = message.cleanContent.substring(
-        message.cleanContent.indexOf('spotted in') + 'spotted in'.length + 3,
-        message.cleanContent.length-2); //Removes the *'s
-    console.log(`Now in ${relic_hunter.location}`);
-    relic_hunter.source = "webhook";
-    
+    let start_message = message.cleanContent.indexOf('spotted in');
+    if (start_message > 25) {
+        relic_hunter.location = message.cleanContent.substring(
+            message.cleanContent.indexOf('spotted in') + 'spotted in'.length + 3,
+            message.cleanContent.length-2); //Removes the *'s
+        console.log(`Now in ${relic_hunter.location}`);
+        relic_hunter.source = "webhook";
+    }
 }
 
 /**
