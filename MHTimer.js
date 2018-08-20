@@ -2378,7 +2378,6 @@ function findRH(channel) {
             json: true
         }, (error, response, body) => {
             if (!error && response.statusCode === 200) {
-                body["rh"]["location"] = "unknown";
                 if (body["rh"]["location"] === 'unknown') {
                     if (relic_hunter.location)
                         body["rh"]["location"] = relic_hunter.location;
