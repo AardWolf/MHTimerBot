@@ -1,5 +1,6 @@
     {
         "token": "",
+	"bitly_token": "",
         "linkConversionChannel": "larrys-freebies",
         "timedAnnouncementChannels": [
           "timers"
