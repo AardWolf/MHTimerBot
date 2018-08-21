@@ -362,7 +362,7 @@ function loadSettings(path = main_settings_filename) {
             settings.timedAnnouncementChannels = settings.timedAnnouncementChannels.split(",").map(s => s.trim());
         settings.timedAnnouncementChannels = new Set(settings.timedAnnouncementChannels);
         
-        settings.relic_hunter_webhook = settings.relic_hunter_webhook ? settings.relic_hunter_webhook : 283571156236107777;
+        settings.relic_hunter_webhook = settings.relic_hunter_webhook ? settings.relic_hunter_webhook : "283571156236107777";
 
         settings.botPrefix = settings.botPrefix ? settings.botPrefix.trim() : '-mh';
         return true;

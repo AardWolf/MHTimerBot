@@ -5,6 +5,6 @@
         "timedAnnouncementChannels": [
           "timers"
         ],
-	"relic_hunter_webhook" : 283571156236107777,
+	"relic_hunter_webhook" : "283571156236107777",
         "botPrefix": "-mh"
     }
