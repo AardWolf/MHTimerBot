@@ -149,7 +149,7 @@ function Main() {
                 dataTimers['reminders'] = setInterval(() => {
                     pruneExpiredReminders();
                     saveReminders();
-                }, saveInterval)
+                }, saveInterval);
             });
 
             // Create hunters data from the hunters file.
@@ -162,7 +162,7 @@ function Main() {
                 .catch(err => failedLoad(`Hunters: import error:\n`, err));
             hasHunters.then(hasHunters => {
                 console.log(`Hunters: Configuring save every ${saveInterval / (60 * 1000)} min.`);
-                dataTimers['hunters'] = setInterval(saveHunters, saveInterval)
+                dataTimers['hunters'] = setInterval(saveHunters, saveInterval);
             });
 
             // Register known nickname URIs
@@ -176,15 +176,15 @@ function Main() {
             hasNicknames
                 .then(refreshNicknameData)
                 .then(() => {
-                console.log(`Nicknames: Configuring data refresh every ${saveInterval / (60 * 1000)} min.`);
-                dataTimers['nicknames'] = setInterval(refreshNicknameData, saveInterval)
+                    console.log(`Nicknames: Configuring data refresh every ${saveInterval / (60 * 1000)} min.`);
+                    dataTimers['nicknames'] = setInterval(refreshNicknameData, saveInterval);
             });
 
             // Load remote data.
             const remoteData = Promise.resolve()
                 .then(getMouseList)
                 .then(getItemList)
-                .then(getFilterList)
+                .then(getFilterList);
 
             // Configure the bot behavior.
             client.once("ready", () => {
@@ -198,7 +198,7 @@ function Main() {
                     if (candidates.length)
                         Array.prototype.push.apply(channels, candidates);
                     else
-                        console.log(`Timers: No valid channels in ${guild.name} for announcements.`)
+                        console.log(`Timers: No valid channels in ${guild.name} for announcements.`);
                     return channels;
                 }, []);
 
@@ -302,7 +302,7 @@ function quit() {
  *
  * @param {string} filename the name of a file in the current working directory (or a path and the name)
  *                          from which raw data will be read, and then parsed as JSON.
- * @returns {Promise <any>}
+ * @returns {Promise <any>}  Data from the given file, as an object to be consumed by the caller.
  */
 function loadDataFromJSON(filename) {
     return fs_readFile(filename, { encoding: file_encoding })
@@ -319,12 +319,12 @@ function loadDataFromJSON(filename) {
  * @param {string} filename the name of a file in the current working directory (or a path and the name)
  *                          to which data will be serialized as JSON.
  * @param {any} rawData raw object data which can be serialized as JSON, via JSON.stringify()
- * @returns {Promise <boolean>}
+ * @returns {Promise <boolean>} The result of the save request (false negatives possible).
  */
 function saveDataAsJSON(filename, rawData) {
     return fs_writeFile(filename, JSON.stringify(rawData, null, 1), { encoding: file_encoding })
         .then(() => {
-            console.log(`I/O: data written to '${filename}'.`)
+            console.log(`I/O: data written to '${filename}'.`);
             return true;
         }).catch(err => {
             console.log(`I/O: error writing to '${filename}':\n`, err);
@@ -338,7 +338,7 @@ function saveDataAsJSON(filename, rawData) {
  */
 function doSaveAll() {
     return saveHunters()
-        .then(() => saveReminders())
+        .then(() => saveReminders());
 }
 
 
@@ -380,7 +380,7 @@ function loadSettings(path = main_settings_filename) {
  * that can be made into timers.
  *
  * @param {string} [path] The path to a JSON file to read data from. Default is the 'timer_settings_filename'
- * @returns {Promise <TimerSeed[]>}
+ * @returns {Promise <TimerSeed[]>} All local information for creating timers
  */
 function loadTimers(path = timer_settings_filename) {
     return loadDataFromJSON(path).then(data => {
@@ -1116,7 +1116,7 @@ function timeLeft(in_date) {
  * that can be made into reminders.
  *
  * @param {string} [path] The path to a JSON file to read data from. Default is the 'reminder_filename'.
- * @returns {Promise <ReminderSeed[]>}
+ * @returns {Promise <ReminderSeed[]>} Local data that can be used to create reminders.
  */
 function loadReminders(path = reminder_filename) {
     return loadDataFromJSON(path).then(data => {
@@ -1277,7 +1277,7 @@ function doRemind(timer) {
  * the reminder as a RichEmbed via PM.
  * MAYBE: Add ReminderInfo class, let Timers ID one, and have timer definitions provide additional information
  *      to improve the appearance of the reminders.
- * @param {User} user
+ * @param {User} user The Discord user to be reminded
  * @param {TimerReminder} remind
  * @param {Timer} timer
  */
@@ -1627,7 +1627,6 @@ function getHelpMessage(tokens) {
         return `I don't know that one, but I do know ${keywords}.`;
 }
 
-
 /**
  * @typedef {Object} DatabaseEntity
  * @property {string} id The ID of the entity
@@ -1641,6 +1640,7 @@ function getHelpMessage(tokens) {
  * @param {'loot'|'mouse'} queryType The type of "item" whose data is requested.
  * @param {DatabaseEntity} dbEntity Identifying information about the "item"
  * @param {Object <string, string>} [options] Any additional querystring options that should be set
+ * @returns {Promise <any>} Result of the query to @devjacksmiths database
  */
 function getQueriedData(queryType, dbEntity, options) {
     // TODO: fetch each value once, cache, and try to first serve cached content.
@@ -2110,7 +2110,7 @@ function sendInteractiveSearchResult(searchResults, channel, dataCallback, isDM,
  *
  * @param {string} input The text to match against
  * @param {DatabaseEntity[]} values The known values.
- * returns {number[][]} Up to 10 indices and their search score.
+ * @returns {Array <number>[]} Up to 10 indices and their search score.
  */
 function getSearchedEntity(input, values) {
     if (!input.length || !Array.isArray(values) || !values.length)
@@ -2247,7 +2247,7 @@ function setHunterProperty(message, property, value) {
  * Returns the hunter data contained in the given file.
  *
  * @param {string} [path] The path to a JSON file to read data from. Default is the 'hunter_ids_filename'.
- * @returns {Promise <{}>}
+ * @returns {Promise <{}>} Data from the given file, as an object to be consumed by the caller.
  */
 function loadHunterData(path = hunter_ids_filename) {
     return loadDataFromJSON(path).catch(err => {
@@ -2260,7 +2260,7 @@ function loadHunterData(path = hunter_ids_filename) {
  * Update the hunter data object with the key-value pairs from the given object input.
  * Returns true if data was imported. (The data may have been the same as what was known.)
  *
- * @param {Object <string, HunterData>} hunterData
+ * @param {Object <string, HunterData>} hunterData key-value pairs to assign to the global hunter data.
  * @returns {boolean} Whether the input data contained anything to import.
  */
 function addHuntersFromData(hunterData) {
@@ -2290,7 +2290,7 @@ function saveHunters(path = hunter_ids_filename) {
  * Returns the type: url data contained in the given file. (Does not assign it.)
  *
  * @param {string} [path] The path to a JSON file to read data from. Default is the 'nickname_urls_filename'.
- * @returns {Promise <{}>}
+ * @returns {Promise <{}>} Data from the given file, as an object to be consumed by the caller.
  */
 function loadNicknameURLs(path = nickname_urls_filename) {
     return loadDataFromJSON(path).catch(err => {
@@ -2320,14 +2320,14 @@ function refreshNicknameData() {
 function getNicknames(type) {
     if (!nickname_urls[type]) {
         console.log(`Nicknames: Received '${type}' but I don't know its URL.`);
-        return false;
+        return;
     }
     let newData = {};
     // It returns a string as CSV, not JSON.
     // Set up the parser
     let parser = csv_parse({delimiter: ","})
         .on('readable', () => {
-            while(record = parser.read())
+            while (record = parser.read())
                 newData[record[0]] = record[1];
         })
         .on('error', err => console.log(err.message));
@@ -2393,7 +2393,7 @@ function getHuntersByProperty(property, criterion, limit = 5) {
 
 /**
  * Convert the input number into a formatted string, e.g. 1234 -> 1,234
- * @param {number} number
+ * @param {number} number The number to be formatted
  * @returns {string} A comma-formatted string.
  */
 function integerComma(number) {
@@ -2402,7 +2402,7 @@ function integerComma(number) {
 
 /**
  * Relic Hunter location was announced, save it and note the source
- * @param {Message} Webhook-generated message announcing RH location
+ * @param {Message} message Webhook-generated message announcing RH location
  */
 function updRH(message) {
     //Find the location in the text
@@ -2450,7 +2450,7 @@ function findRH(channel) {
  * @param {string[] | Set <string> | Map <string, string> | Object <string, string>} container
  *        An iterable container, of which the contents should be converted into a string.
  * @param {string} [final] The final conjunction ('and' or 'or')
- * @returns {string}
+ * @returns {string} The container contents as an nice string with Oxford comma punctuation.
  */
 function oxfordStringifyValues(container, final = 'and') {
     let printables = [];
@@ -2494,6 +2494,7 @@ function oxfordStringifyValues(container, final = 'and') {
  * @param {{key: string, label: string}[]} headers The headers which will label the columns in the output table, in the order to be arranged. The key property should
  *                                                 match a key in the body and columnFormat objects, and the label should be the desired column header text.
  * @param {string} [headerUnderline] a character to use to draw an "underline", separating the printed header row from the rows of the body.
+ * @returns {string} an internally-aligned string that will print as a nice table in Discord.
  */
 function prettyPrintArrayAsString(body, columnFormat, headers, headerUnderline) {
     // The body should be an array of objects.
