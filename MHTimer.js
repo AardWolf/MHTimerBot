@@ -1701,7 +1701,7 @@ function removeQueryStringParams(args, qsParams) {
                     for (let i = 0, len = filters.length; i < len; ++i) {
                         if (filters[i].start_time && !filters[i].end_time && filters[i].code_name != tokens[1]) {
                             tokens[1] = filters[i].code_name;
-                            i = len;
+                            break;
                         }
                     }
                     // console.log(`Search: Filter of "current" reset to "${tokens[1]}"`);
