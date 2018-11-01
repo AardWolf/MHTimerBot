@@ -1550,6 +1550,10 @@ function getHelpMessage(tokens) {
     const areaInfo = "Areas are Seasonal Garden (**sg**), Forbidden Grove (**fg**), Toxic Spill (**ts**), Balack's Cove (**cove**), and the daily **reset**.";
     const subAreaInfo = "Sub areas are the seasons, open/close, spill ranks, and tide levels";
     const privacyWarning = "\nSetting your location and rank means that when people search for those things, you can be randomly added to the results.";
+    let filterString = ""
+    for (let i = 0, len = filters.length; i < len; ++i)
+        filterString += `\`${filters[i].code_name}\`, `;
+    filterString += " and `current`";
 
     if (tokens[0] === 'next') {
         return [
@@ -1584,7 +1588,8 @@ function getHelpMessage(tokens) {
     else if (tokens[0] === 'find') {
         return [
             `**find**`,
-            `Usage \`${prefix} find <mouse>\` will print the top attractions for the mouse, capped at 10.`,
+            `Usage \`${prefix} find [-e <filter>] <mouse>\` will print the top attractions for the mouse, capped at 10.`,
+            `Use of \`-e <filter>\` is optional and adds a time filter. Known filters are: ${filterString}`,
             "All attraction data is from <https://mhhunthelper.agiletravels.com/>.",
             "Help populate the database for better information!"
         ].join("\n");
@@ -1592,7 +1597,8 @@ function getHelpMessage(tokens) {
     else if (tokens[0] === 'ifind') {
         return [
             `**ifind**`,
-            `Usage \`${prefix} ifind <item>\` will print the top 10 drop rates (per catch) for the item.`,
+            `Usage \`${prefix} ifind [-e <filter>] <item>\` will print the top 10 drop rates (per catch) for the item.`,
+            `Use of \`-e <filter>\` is optional and adds a time filter. Known filters are: ${filterString}`,
             "All drop rate data is from <https://mhhunthelper.agiletravels.com/>.",
             "Help populate the database for better information!"
         ].join("\n");
@@ -1696,7 +1702,7 @@ function removeQueryStringParams(args, qsParams) {
                         if (filters[i].start_time && !filters[i].end_time && filters[i].code_name != tokens[1]) 
                             tokens[1] = filters[i].code_name
                     }
-                    console.log(`Search: Filter of "current" reset to "${tokens[1]}"`);
+                    // console.log(`Search: Filter of "current" reset to "${tokens[1]}"`);
                     break;
             }
             qsParams.timefilter = tokens[1].toString();
