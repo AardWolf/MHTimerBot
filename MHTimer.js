@@ -36,6 +36,7 @@ const file_encoding = 'utf8';
 const settings = {},
     mice = [],
     items = [],
+    filters = [],
     hunters = {},
     relic_hunter = {},
     nicknames = new Map(),
@@ -183,6 +184,7 @@ function Main() {
             const remoteData = Promise.resolve()
                 .then(getMouseList)
                 .then(getItemList)
+                .then(getFilterList)
 
             // Configure the bot behavior.
             client.once("ready", () => {
@@ -362,7 +364,7 @@ function loadSettings(path = main_settings_filename) {
             settings.timedAnnouncementChannels = settings.timedAnnouncementChannels.split(",").map(s => s.trim());
         settings.timedAnnouncementChannels = new Set(settings.timedAnnouncementChannels);
         
-        settings.relic_hunter_webhook = settings.relic_hunter_webhook ? settings.relic_hunter_webhook : 283571156236107777;
+        settings.relic_hunter_webhook = settings.relic_hunter_webhook ? settings.relic_hunter_webhook : "283571156236107777";
 
         settings.botPrefix = settings.botPrefix ? settings.botPrefix.trim() : '-mh';
         return true;
@@ -1548,6 +1550,10 @@ function getHelpMessage(tokens) {
     const areaInfo = "Areas are Seasonal Garden (**sg**), Forbidden Grove (**fg**), Toxic Spill (**ts**), Balack's Cove (**cove**), and the daily **reset**.";
     const subAreaInfo = "Sub areas are the seasons, open/close, spill ranks, and tide levels";
     const privacyWarning = "\nSetting your location and rank means that when people search for those things, you can be randomly added to the results.";
+    let filterString = ""
+    for (let i = 0, len = filters.length; i < len; ++i)
+        filterString += `\`${filters[i].code_name}\`, `;
+    filterString += " and `current`";
 
     if (tokens[0] === 'next') {
         return [
@@ -1582,7 +1588,8 @@ function getHelpMessage(tokens) {
     else if (tokens[0] === 'find') {
         return [
             `**find**`,
-            `Usage \`${prefix} find <mouse>\` will print the top attractions for the mouse, capped at 10.`,
+            `Usage \`${prefix} find [-e <filter>] <mouse>\` will print the top attractions for the mouse, capped at 10.`,
+            `Use of \`-e <filter>\` is optional and adds a time filter. Known filters are: ${filterString}`,
             "All attraction data is from <https://mhhunthelper.agiletravels.com/>.",
             "Help populate the database for better information!"
         ].join("\n");
@@ -1590,7 +1597,8 @@ function getHelpMessage(tokens) {
     else if (tokens[0] === 'ifind') {
         return [
             `**ifind**`,
-            `Usage \`${prefix} ifind <item>\` will print the top 10 drop rates (per catch) for the item.`,
+            `Usage \`${prefix} ifind [-e <filter>] <item>\` will print the top 10 drop rates (per catch) for the item.`,
+            `Use of \`-e <filter>\` is optional and adds a time filter. Known filters are: ${filterString}`,
             "All drop rate data is from <https://mhhunthelper.agiletravels.com/>.",
             "Help populate the database for better information!"
         ].join("\n");
@@ -1683,10 +1691,18 @@ function removeQueryStringParams(args, qsParams) {
             // Allow shorthand specifications instead of only the literal `last3days`.
             // TODO: discover valid shorthands and filters on startup.
             // TODO: parse flag and argument even if given after the query.
-            switch (tokens[1]) {
+            switch (tokens[1].toLowerCase()) {
                 case '3':
                 case '3d':
-                    tokens[1] = 'last3days';
+                    tokens[1] = '3_days';
+                    break;
+                case 'current':
+                    tokens[1] = '3_days';
+                    for (let i = 0, len = filters.length; i < len; ++i) {
+                        if (filters[i].start_time && !filters[i].end_time && filters[i].code_name != tokens[1]) 
+                            tokens[1] = filters[i].code_name
+                    }
+                    // console.log(`Search: Filter of "current" reset to "${tokens[1]}"`);
                     break;
             }
             qsParams.timefilter = tokens[1].toString();
@@ -1876,6 +1892,38 @@ function getItemList() {
             Array.prototype.push.apply(items, body);
             for (let i = 0, len = items.length; i < len; ++i)
                 items[i].lowerValue = items[i].value.toLowerCase();
+        }
+    });
+}
+
+/**
+ * Initialize (or refresh) the known filters from @devjacksmith's tools.
+ */
+function getFilterList() {
+    const now = DateTime.utc();
+    if (last_timestamps.filter_refresh) {
+        let next_refresh = last_timestamps.filter_refresh.plus(refresh_rate);
+        if (now < next_refresh)
+            return;
+    }
+    last_timestamps.filter_refresh = now;
+
+    console.log("Loot: Requesting a new filter list.");
+    const url = "https://mhhunthelper.agiletravels.com/filters.php";
+    request({
+        url: url,
+        json: true
+    }, (error, response, body) => {
+        if (error)
+            console.log(`Filters: request failed with error:\n`, error, response.toJSON());
+        else if (response.statusCode !== 200)
+            console.log(`Filters: request returned response "${response.statusCode}: ${response.statusMessage}"\n`, response.toJSON());
+        else {
+            console.log("Filters: Got a new filter list");
+            filters.length = 0;
+            Array.prototype.push.apply(filters, body);
+            for (let i = 0, len = filters.length; i < len; ++i)
+                filters[i].lowerValue = filters[i].code_name.toLowerCase();
         }
     });
 }
