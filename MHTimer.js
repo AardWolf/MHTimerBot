@@ -1710,7 +1710,7 @@ function removeQueryStringParams(args, qsParams) {
                     tokens[1] = '3_days';
                     break;
                 case 'current':
-                    tokens[1] = '3_days';
+                    tokens[1] = '1_month';
                     for (let i = 0, len = filters.length; i < len; ++i) {
                         if (filters[i].start_time && !filters[i].end_time && filters[i].code_name != tokens[1]) {
                             tokens[1] = filters[i].code_name;
