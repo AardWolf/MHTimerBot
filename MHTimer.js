@@ -179,6 +179,19 @@ function Main() {
                 console.log(`Nicknames: Configuring data refresh every ${saveInterval / (60 * 1000)} min.`);
                 dataTimers['nicknames'] = setInterval(refreshNicknameData, saveInterval)
             });
+            
+            // Register filters
+            const hasFilters = Promise.resolve()
+                .then(getFilterList())
+                .then(() => {
+                    return Object.keys(filters).length > 0;
+                })
+                .catch(err => failedLoad(`Filters: import error:\n`, err));
+            hasFilters
+                .then(() => {
+                    console.log(`Filters: Configuring refresh every ${saveInterval / (60 * 1000)} min.`);
+                    dataTimers['filters'] = setInterval(getFilterList, saveInterval)
+                });
 
             // Load remote data.
             const remoteData = Promise.resolve()
