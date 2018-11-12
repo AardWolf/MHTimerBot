@@ -182,6 +182,19 @@ function Main() {
                     console.log(`Nicknames: Configuring data refresh every ${saveInterval / (60 * 1000)} min.`);
                     dataTimers['nicknames'] = setInterval(refreshNicknameData, saveInterval);
             });
+            
+            // Register filters
+            const hasFilters = Promise.resolve()
+                .then(getFilterList())
+                .then(() => {
+                    return Object.keys(filters).length > 0;
+                })
+                .catch(err => failedLoad(`Filters: import error:\n`, err));
+            hasFilters
+                .then(() => {
+                    console.log(`Filters: Configuring refresh every ${saveInterval / (60 * 1000)} min.`);
+                    dataTimers['filters'] = setInterval(getFilterList, saveInterval)
+                });
 
             // Load remote data.
             const remoteData = Promise.resolve()
@@ -1700,7 +1713,7 @@ function removeQueryStringParams(args, qsParams) {
                     break;
                 case 'current':
                     // Default to last 3 days, but if there is an ongoing event, use that instead.
-                    tokens[1] = '3_days';
+                    tokens[1] = '1_month';
                     for (let filter of filters) {
                         if (filter.start_time && !filter.end_time && filter.code_name !== tokens[1]) {
                             tokens[1] = filter.code_name;
