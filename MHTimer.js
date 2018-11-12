@@ -179,6 +179,19 @@ function Main() {
                 console.log(`Nicknames: Configuring data refresh every ${saveInterval / (60 * 1000)} min.`);
                 dataTimers['nicknames'] = setInterval(refreshNicknameData, saveInterval)
             });
+            
+            // Register filters
+            const hasFilters = Promise.resolve()
+                .then(getFilterList())
+                .then(() => {
+                    return Object.keys(filters).length > 0;
+                })
+                .catch(err => failedLoad(`Filters: import error:\n`, err));
+            hasFilters
+                .then(() => {
+                    console.log(`Filters: Configuring refresh every ${saveInterval / (60 * 1000)} min.`);
+                    dataTimers['filters'] = setInterval(getFilterList, saveInterval)
+                });
 
             // Load remote data.
             const remoteData = Promise.resolve()
@@ -1697,10 +1710,12 @@ function removeQueryStringParams(args, qsParams) {
                     tokens[1] = '3_days';
                     break;
                 case 'current':
-                    tokens[1] = '3_days';
+                    tokens[1] = '1_month';
                     for (let i = 0, len = filters.length; i < len; ++i) {
-                        if (filters[i].start_time && !filters[i].end_time && filters[i].code_name != tokens[1]) 
-                            tokens[1] = filters[i].code_name
+                        if (filters[i].start_time && !filters[i].end_time && filters[i].code_name != tokens[1]) {
+                            tokens[1] = filters[i].code_name;
+                            break;
+                        }
                     }
                     // console.log(`Search: Filter of "current" reset to "${tokens[1]}"`);
                     break;
