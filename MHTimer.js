@@ -52,6 +52,9 @@ const refresh_rate = Duration.fromObject({ minutes: 5 });
 const last_timestamps = {
     reminder_save: DateTime.utc(),
     hunter_save: DateTime.utc(),
+    item_refresh: null,
+    mouse_refresh: null,
+    filter_refresh: null
 };
 
 /** @type {Object <string, NodeJS.Timer>} */
@@ -149,7 +152,7 @@ function Main() {
                 dataTimers['reminders'] = setInterval(() => {
                     pruneExpiredReminders();
                     saveReminders();
-                }, saveInterval)
+                }, saveInterval);
             });
 
             // Create hunters data from the hunters file.
@@ -162,7 +165,7 @@ function Main() {
                 .catch(err => failedLoad(`Hunters: import error:\n`, err));
             hasHunters.then(hasHunters => {
                 console.log(`Hunters: Configuring save every ${saveInterval / (60 * 1000)} min.`);
-                dataTimers['hunters'] = setInterval(saveHunters, saveInterval)
+                dataTimers['hunters'] = setInterval(saveHunters, saveInterval);
             });
 
             // Register known nickname URIs
@@ -176,8 +179,8 @@ function Main() {
             hasNicknames
                 .then(refreshNicknameData)
                 .then(() => {
-                console.log(`Nicknames: Configuring data refresh every ${saveInterval / (60 * 1000)} min.`);
-                dataTimers['nicknames'] = setInterval(refreshNicknameData, saveInterval)
+                    console.log(`Nicknames: Configuring data refresh every ${saveInterval / (60 * 1000)} min.`);
+                    dataTimers['nicknames'] = setInterval(refreshNicknameData, saveInterval);
             });
             
             // Register filters
@@ -197,7 +200,7 @@ function Main() {
             const remoteData = Promise.resolve()
                 .then(getMouseList)
                 .then(getItemList)
-                .then(getFilterList)
+                .then(getFilterList);
 
             // Configure the bot behavior.
             client.once("ready", () => {
@@ -211,7 +214,7 @@ function Main() {
                     if (candidates.length)
                         Array.prototype.push.apply(channels, candidates);
                     else
-                        console.log(`Timers: No valid channels in ${guild.name} for announcements.`)
+                        console.log(`Timers: No valid channels in ${guild.name} for announcements.`);
                     return channels;
                 }, []);
 
@@ -315,7 +318,7 @@ function quit() {
  *
  * @param {string} filename the name of a file in the current working directory (or a path and the name)
  *                          from which raw data will be read, and then parsed as JSON.
- * @returns {Promise <any>}
+ * @returns {Promise <any>}  Data from the given file, as an object to be consumed by the caller.
  */
 function loadDataFromJSON(filename) {
     return fs_readFile(filename, { encoding: file_encoding })
@@ -332,12 +335,12 @@ function loadDataFromJSON(filename) {
  * @param {string} filename the name of a file in the current working directory (or a path and the name)
  *                          to which data will be serialized as JSON.
  * @param {any} rawData raw object data which can be serialized as JSON, via JSON.stringify()
- * @returns {Promise <boolean>}
+ * @returns {Promise <boolean>} The result of the save request (false negatives possible).
  */
 function saveDataAsJSON(filename, rawData) {
     return fs_writeFile(filename, JSON.stringify(rawData, null, 1), { encoding: file_encoding })
         .then(() => {
-            console.log(`I/O: data written to '${filename}'.`)
+            console.log(`I/O: data written to '${filename}'.`);
             return true;
         }).catch(err => {
             console.log(`I/O: error writing to '${filename}':\n`, err);
@@ -348,10 +351,11 @@ function saveDataAsJSON(filename, rawData) {
 /**
  * Any object which stores user-entered data should be periodically saved, or at minimum saved before
  * the bot shuts down, to minimize data loss.
+ * @returns {boolean} Whether volatile data was serialized, or perhaps not serialized.
  */
 function doSaveAll() {
     return saveHunters()
-        .then(() => saveReminders())
+        .then(() => saveReminders());
 }
 
 
@@ -393,7 +397,7 @@ function loadSettings(path = main_settings_filename) {
  * that can be made into timers.
  *
  * @param {string} [path] The path to a JSON file to read data from. Default is the 'timer_settings_filename'
- * @returns {Promise <TimerSeed[]>}
+ * @returns {Promise <TimerSeed[]>} All local information for creating timers
  */
 function loadTimers(path = timer_settings_filename) {
     return loadDataFromJSON(path).then(data => {
@@ -676,7 +680,7 @@ function parseUserMessage(message) {
                     let commandSyntax = [
                         `I'm not sure what to do with that. Try:`,
                         `\`${prefix} whois [#### | <mention>]`` to look up specific hunters`,
-                        `\`${prefix} whois [in <location> | a <rank>]\` to find up to 5 random new friends`,
+                        `\`${prefix} whois [in <location> | a <rank>]\` to find up to 5 random new friends`
                     ];
                     message.channel.send(commandSyntax.join("\n\t"));
                     return;
@@ -717,7 +721,7 @@ function convertRewardLink(message) {
         method: 'GET',
         followRedirect: false
     }, (error, response, body) => {
-        if (!error && response.statusCode == 301) {
+        if (!error && response.statusCode === 301) {
             const facebookURL = response.headers.location;
             const mousehuntURL = facebookURL.replace('https://apps.facebook.com/mousehunt', 'https://www.mousehuntgame.com');
             const queryProperties = { access_token: settings.bitly_token, longUrl: mousehuntURL };
@@ -726,7 +730,7 @@ function convertRewardLink(message) {
                 url: 'https://api-ssl.bitly.com/v3/shorten',
                 qs: queryProperties
             }, (error, response, body) => {
-                if (!error && response.statusCode == 200) {
+                if (!error && response.statusCode === 200) {
                     const responseJSON = JSON.parse(response.body);
                     console.log("Links: MH reward link converted for non-facebook users");
                     message.channel.send(responseJSON.data.url + " <-- Non-Facebook Link");
@@ -774,7 +778,7 @@ function splitString(input) {
  * Returns a ReminderRequest of unknown state (may have some or all properties set).
  *
  * @param {string[]} tokens a set of tokens which may match known Timer areas or sub-areas.
- * @returns {ReminderRequest}
+ * @returns {ReminderRequest} an object that may have some or all of the needed properties to create a Reminder
  */
 function timerAliases(tokens) {
     const newReminder = {
@@ -886,8 +890,8 @@ function parseTokenForArea(token, newReminder) {
  * Attempt to match the input string to known Timer sub-areas. If successful, updates the given reminder.
  * Overwrites any previously-specified area.
  *
- * @param {string} token
- * @param {ReminderRequest} newReminder
+ * @param {string} token an input string from the user's message.
+ * @param {ReminderRequest} newReminder the seed for a new reminder that will be updated.
  * @returns {boolean} if the token parsed to a sub-area.
  */
 function parseTokenForSubArea(token, newReminder) {
@@ -1000,9 +1004,9 @@ function parseTokenForSubArea(token, newReminder) {
  * Attempt to match the input string to a positive integer. If successful, updates the given reminder.
  * Overwrites any previously-specified count.
  *
- * @param {string} token
- * @param {ReminderRequest} newReminder
- * @returns {boolean} if the token parsed to a integer
+ * @param {string} token an input string from the user's message.
+ * @param {ReminderRequest} newReminder the seed for a new reminder that will be updated.
+ * @returns {boolean} if the token parsed to a valid count.
  */
 function parseTokenForCount(token, newReminder) {
     switch (token) {
@@ -1020,6 +1024,7 @@ function parseTokenForCount(token, newReminder) {
         case 'thrice':
         case 'three':
             newReminder.count = 3;
+            break;
 
         case 'always':
         case 'forever':
@@ -1042,7 +1047,7 @@ function parseTokenForCount(token, newReminder) {
         default:
             if (!isNaN(parseInt(token, 10))) {
                 let val = parseInt(token, 10);
-                if (val == Infinity || val < 0)
+                if (val === Infinity || val < 0)
                     val = -1;
                 newReminder.count = val;
                 break;
@@ -1073,9 +1078,9 @@ function nextTimer(validTimerData) {
     const sched_syntax = `${settings.botPrefix} remind ${area}${sub ? ` ${sub}` : ""}`;
     return (new Discord.RichEmbed()
         .setDescription(nextTimer.getDemand()
-            + "\n" + timeLeft(nextTimer.getNext())
+            + `\n${timeLeft(nextTimer.getNext())}`
             // Putting here makes it look nicer and fit in portrait mode
-            + "\nTo schedule this reminder: `" + sched_syntax + "`"
+            + `\nTo schedule this reminder: \`${sched_syntax}\``
         )
         .setTimestamp(nextTimer.getNext().toJSDate())
         .setFooter("at") // There has to be something in here or there is no footer
@@ -1129,7 +1134,7 @@ function timeLeft(in_date) {
  * that can be made into reminders.
  *
  * @param {string} [path] The path to a JSON file to read data from. Default is the 'reminder_filename'.
- * @returns {Promise <ReminderSeed[]>}
+ * @returns {Promise <ReminderSeed[]>} Local data that can be used to create reminders.
  */
 function loadReminders(path = reminder_filename) {
     return loadDataFromJSON(path).then(data => {
@@ -1290,9 +1295,9 @@ function doRemind(timer) {
  * the reminder as a RichEmbed via PM.
  * MAYBE: Add ReminderInfo class, let Timers ID one, and have timer definitions provide additional information
  *      to improve the appearance of the reminders.
- * @param {User} user
- * @param {TimerReminder} remind
- * @param {Timer} timer
+ * @param {User} user The Discord user to be reminded
+ * @param {TimerReminder} remind the user's specific data w.r.t. the Timer that activated
+ * @param {Timer} timer the Timer that activated
  */
 function sendRemind(user, remind, timer) {
     // Don't remind invalid users.
@@ -1527,7 +1532,7 @@ function buildSchedule(timer_request) {
     let return_str = `I have ${upcoming_timers.length} timers coming up in the next ${req_hours.as('hours')} hours`;
     if (upcoming_timers.length > max_timers) {
         return_str += `. Here are the next ${max_timers} of them`;
-        upcoming_timers.splice(max_timers, upcoming_timers.length)
+        upcoming_timers.splice(max_timers, upcoming_timers.length);
     }
     return_str += upcoming_timers.length ? ":\n" : ".";
 
@@ -1563,10 +1568,7 @@ function getHelpMessage(tokens) {
     const areaInfo = "Areas are Seasonal Garden (**sg**), Forbidden Grove (**fg**), Toxic Spill (**ts**), Balack's Cove (**cove**), and the daily **reset**.";
     const subAreaInfo = "Sub areas are the seasons, open/close, spill ranks, and tide levels";
     const privacyWarning = "\nSetting your location and rank means that when people search for those things, you can be randomly added to the results.";
-    let filterString = ""
-    for (let i = 0, len = filters.length; i < len; ++i)
-        filterString += `\`${filters[i].code_name}\`, `;
-    filterString += " and `current`";
+    const dbFilters = filters.reduce((acc, filter) => `${acc}\`${filter.code_name}\`, `, "") + "and `current`";
 
     if (tokens[0] === 'next') {
         return [
@@ -1602,7 +1604,7 @@ function getHelpMessage(tokens) {
         return [
             `**find**`,
             `Usage \`${prefix} find [-e <filter>] <mouse>\` will print the top attractions for the mouse, capped at 10.`,
-            `Use of \`-e <filter>\` is optional and adds a time filter. Known filters are: ${filterString}`,
+            `Use of \`-e <filter>\` is optional and adds a time filter. Known filters are: ${dbFilters}`,
             "All attraction data is from <https://mhhunthelper.agiletravels.com/>.",
             "Help populate the database for better information!"
         ].join("\n");
@@ -1611,7 +1613,7 @@ function getHelpMessage(tokens) {
         return [
             `**ifind**`,
             `Usage \`${prefix} ifind [-e <filter>] <item>\` will print the top 10 drop rates (per catch) for the item.`,
-            `Use of \`-e <filter>\` is optional and adds a time filter. Known filters are: ${filterString}`,
+            `Use of \`-e <filter>\` is optional and adds a time filter. Known filters are: ${dbFilters}`,
             "All drop rate data is from <https://mhhunthelper.agiletravels.com/>.",
             "Help populate the database for better information!"
         ].join("\n");
@@ -1640,7 +1642,6 @@ function getHelpMessage(tokens) {
         return `I don't know that one, but I do know ${keywords}.`;
 }
 
-
 /**
  * @typedef {Object} DatabaseEntity
  * @property {string} id The ID of the entity
@@ -1654,6 +1655,7 @@ function getHelpMessage(tokens) {
  * @param {'loot'|'mouse'} queryType The type of "item" whose data is requested.
  * @param {DatabaseEntity} dbEntity Identifying information about the "item"
  * @param {Object <string, string>} [options] Any additional querystring options that should be set
+ * @returns {Promise <any>} Result of the query to @devjacksmiths database
  */
 function getQueriedData(queryType, dbEntity, options) {
     // TODO: fetch each value once, cache, and try to first serve cached content.
@@ -1702,7 +1704,7 @@ function removeQueryStringParams(args, qsParams) {
     if (tokens.length > 2) {
         if (tokens[0] === "-e") {
             // Allow shorthand specifications instead of only the literal `last3days`.
-            // TODO: discover valid shorthands and filters on startup.
+            // TODO: discover valid shorthands on startup.
             // TODO: parse flag and argument even if given after the query.
             switch (tokens[1].toLowerCase()) {
                 case '3':
@@ -1710,14 +1712,14 @@ function removeQueryStringParams(args, qsParams) {
                     tokens[1] = '3_days';
                     break;
                 case 'current':
+                    // Default to last 3 days, but if there is an ongoing event, use that instead.
                     tokens[1] = '1_month';
-                    for (let i = 0, len = filters.length; i < len; ++i) {
-                        if (filters[i].start_time && !filters[i].end_time && filters[i].code_name != tokens[1]) {
-                            tokens[1] = filters[i].code_name;
+                    for (let filter of filters) {
+                        if (filter.start_time && !filter.end_time && filter.code_name !== tokens[1]) {
+                            tokens[1] = filter.code_name;
                             break;
                         }
                     }
-                    // console.log(`Search: Filter of "current" reset to "${tokens[1]}"`);
                     break;
             }
             qsParams.timefilter = tokens[1].toString();
@@ -1757,8 +1759,7 @@ function getMouseList() {
             console.log("Mice: Got a new mouse list.");
             mice.length = 0;
             Array.prototype.push.apply(mice, body);
-            for (let i = 0, len = mice.length; i < len; ++i)
-                mice[i].lowerValue = mice[i].value.toLowerCase();
+            mice.forEach(mouse => mouse.lowerValue = mouse.value.toLowerCase());
         }
     });
 }
@@ -1814,7 +1815,7 @@ function findMouse(channel, args, command) {
                 order.splice(order.indexOf("stage"), 1);
 
             // Build the header row.
-            const labels = { location: "Location", stage: "Stage", total_hunts: "Hunts", rate: "AR", cheese: "Cheese" }
+            const labels = { location: "Location", stage: "Stage", total_hunts: "Hunts", rate: "AR", cheese: "Cheese" };
             const headers = order.map(key => {
                 columnFormatting[key] = {
                     columnWidth: labels[key].length,
@@ -1905,8 +1906,7 @@ function getItemList() {
             console.log("Loot: Got a new loot list");
             items.length = 0;
             Array.prototype.push.apply(items, body);
-            for (let i = 0, len = items.length; i < len; ++i)
-                items[i].lowerValue = items[i].value.toLowerCase();
+            items.forEach(item => item.lowerValue = item.value.toLowerCase());
         }
     });
 }
@@ -1937,8 +1937,7 @@ function getFilterList() {
             console.log("Filters: Got a new filter list");
             filters.length = 0;
             Array.prototype.push.apply(filters, body);
-            for (let i = 0, len = filters.length; i < len; ++i)
-                filters[i].lowerValue = filters[i].code_name.toLowerCase();
+            filters.forEach(filter => filter.lowerValue = filter.code_name.toLowerCase());
         }
     });
 }
@@ -1994,7 +1993,7 @@ function findItem(channel, args, command) {
                 order.splice(order.indexOf("stage"), 1);
 
             // Build the header row.
-            const labels = { location: "Location", stage: "Stage", total_hunts: "Catches", rate: "DR", cheese: "Cheese" }
+            const labels = { location: "Location", stage: "Stage", total_hunts: "Catches", rate: "DR", cheese: "Cheese" };
             const headers = order.map(key => {
                 columnFormatting[key] = {
                     columnWidth: labels[key].length,
@@ -2008,7 +2007,7 @@ function findItem(channel, args, command) {
                 alignRight: true,
                 isFixedWidth: true,
                 numDecimals: 3,
-                columnWidth: 7,
+                columnWidth: 7
             };
 
             let retStr = `${item.value} (loot) can be found the following ways:\n\`\`\``;
@@ -2069,7 +2068,7 @@ function sendInteractiveSearchResult(searchResults, channel, dataCallback, isDM,
     let embed = new Discord.RichEmbed({
         title: `Search Results for '${searchInput}'`,
         thumbnail: { url: `https://cdn.discordapp.com/emojis/359244526688141312.png` }, // :clue:
-        footer: { text: `For any reaction you select, I'll ${isDM ? 'send' : 'PM'} you that information.` },
+        footer: { text: `For any reaction you select, I'll ${isDM ? 'send' : 'PM'} you that information.` }
     });
 
     // Precompute the url prefix & suffix for each search result. Assumption: single-valued querystring params.
@@ -2123,7 +2122,7 @@ function sendInteractiveSearchResult(searchResults, channel, dataCallback, isDM,
  *
  * @param {string} input The text to match against
  * @param {DatabaseEntity[]} values The known values.
- * returns {number[][]} Up to 10 indices and their search score.
+ * @returns {Array <number>[]} Up to 10 indices and their search score.
  */
 function getSearchedEntity(input, values) {
     if (!input.length || !Array.isArray(values) || !values.length)
@@ -2136,7 +2135,7 @@ function getSearchedEntity(input, values) {
         let r = a.score - b.score;
         // Sort lexicographically if the scores are equal.
         return r ? r : a.entity.value.localeCompare(b.entity.value, { sensitivity: "base" });
-    })
+    });
     // Keep only the top 10 results.
     matches.splice(10);
     return matches.map(m => m.entity);
@@ -2260,7 +2259,7 @@ function setHunterProperty(message, property, value) {
  * Returns the hunter data contained in the given file.
  *
  * @param {string} [path] The path to a JSON file to read data from. Default is the 'hunter_ids_filename'.
- * @returns {Promise <{}>}
+ * @returns {Promise <{}>} Data from the given file, as an object to be consumed by the caller.
  */
 function loadHunterData(path = hunter_ids_filename) {
     return loadDataFromJSON(path).catch(err => {
@@ -2273,7 +2272,7 @@ function loadHunterData(path = hunter_ids_filename) {
  * Update the hunter data object with the key-value pairs from the given object input.
  * Returns true if data was imported. (The data may have been the same as what was known.)
  *
- * @param {Object <string, HunterData>} hunterData
+ * @param {Object <string, HunterData>} hunterData key-value pairs to assign to the global hunter data.
  * @returns {boolean} Whether the input data contained anything to import.
  */
 function addHuntersFromData(hunterData) {
@@ -2303,7 +2302,7 @@ function saveHunters(path = hunter_ids_filename) {
  * Returns the type: url data contained in the given file. (Does not assign it.)
  *
  * @param {string} [path] The path to a JSON file to read data from. Default is the 'nickname_urls_filename'.
- * @returns {Promise <{}>}
+ * @returns {Promise <{}>} Data from the given file, as an object to be consumed by the caller.
  */
 function loadNicknameURLs(path = nickname_urls_filename) {
     return loadDataFromJSON(path).catch(err => {
@@ -2333,14 +2332,14 @@ function refreshNicknameData() {
 function getNicknames(type) {
     if (!nickname_urls[type]) {
         console.log(`Nicknames: Received '${type}' but I don't know its URL.`);
-        return false;
+        return;
     }
     let newData = {};
     // It returns a string as CSV, not JSON.
     // Set up the parser
     let parser = csv_parse({delimiter: ","})
         .on('readable', () => {
-            while(record = parser.read())
+            while (record = parser.read())
                 newData[record[0]] = record[1];
         })
         .on('error', err => console.log(err.message));
@@ -2385,7 +2384,7 @@ function getHunterByID(input, type) {
  */
 function getHunterByDiscordID(discordId) {
     if (hunters[discordId])
-        return hunters[discordId]["hid"]
+        return hunters[discordId]["hid"];
 }
 
 /**
@@ -2399,14 +2398,14 @@ function getHunterByDiscordID(discordId) {
 function getHuntersByProperty(property, criterion, limit = 5) {
     const valid = Object.keys(hunters)
         .filter(key => hunters[key][property] === criterion)
-        .map(key => (hunters[key].hid));
+        .map(key => hunters[key].hid);
 
     return valid.sort(() => 0.5 - Math.random()).slice(0, limit);
 }
 
 /**
  * Convert the input number into a formatted string, e.g. 1234 -> 1,234
- * @param {number} number
+ * @param {number} number The number to be formatted
  * @returns {string} A comma-formatted string.
  */
 function integerComma(number) {
@@ -2415,7 +2414,7 @@ function integerComma(number) {
 
 /**
  * Relic Hunter location was announced, save it and note the source
- * @param {Message} Webhook-generated message announcing RH location
+ * @param {Message} message Webhook-generated message announcing RH location
  */
 function updRH(message) {
     //Find the location in the text
@@ -2463,7 +2462,7 @@ function findRH(channel) {
  * @param {string[] | Set <string> | Map <string, string> | Object <string, string>} container
  *        An iterable container, of which the contents should be converted into a string.
  * @param {string} [final] The final conjunction ('and' or 'or')
- * @returns {string}
+ * @returns {string} The container contents as an nice string with Oxford comma punctuation.
  */
 function oxfordStringifyValues(container, final = 'and') {
     let printables = [];
@@ -2507,6 +2506,7 @@ function oxfordStringifyValues(container, final = 'and') {
  * @param {{key: string, label: string}[]} headers The headers which will label the columns in the output table, in the order to be arranged. The key property should
  *                                                 match a key in the body and columnFormat objects, and the label should be the desired column header text.
  * @param {string} [headerUnderline] a character to use to draw an "underline", separating the printed header row from the rows of the body.
+ * @returns {string} an internally-aligned string that will print as a nice table in Discord.
  */
 function prettyPrintArrayAsString(body, columnFormat, headers, headerUnderline) {
     // The body should be an array of objects.
