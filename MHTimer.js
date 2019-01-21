@@ -1835,7 +1835,7 @@ function findMouse(channel, args, command) {
 
             let retStr = `${mouse.value} (mouse) can be found the following ways:\n\`\`\``;
             retStr += prettyPrintArrayAsString(attractions, columnFormatting, headers, "=");
-            retStr += `\`\`\`\nHTML version at: <https://mhhunthelper.agiletravels.com/?mouse=${mouse.id}&timefilter=${opts.timefilter ? opts.timefilter : "all"}>`;
+            retStr += `\`\`\`\nHTML version at: <https://mhhunthelper.agiletravels.com/?mouse=${mouse.id}&timefilter=${opts.timefilter ? opts.timefilter : "all_time"}>`;
             return retStr;
         }, reason => {
             // Querying failed. Received an error object / string, and possibly a response object.
@@ -2012,7 +2012,7 @@ function findItem(channel, args, command) {
 
             let retStr = `${item.value} (loot) can be found the following ways:\n\`\`\``;
             retStr += prettyPrintArrayAsString(attractions, columnFormatting, headers, "=");
-            retStr += `\`\`\`\nHTML version at: <https://mhhunthelper.agiletravels.com/loot.php?item=${item.id}&timefilter=${opts.timefilter ? opts.timefilter : "all"}>`;
+            retStr += `\`\`\`\nHTML version at: <https://mhhunthelper.agiletravels.com/loot.php?item=${item.id}&timefilter=${opts.timefilter ? opts.timefilter : "all_time"}>`;
             return retStr;
         }, reason => {
             // Querying failed. Received an error object / string, and possibly a response object.
