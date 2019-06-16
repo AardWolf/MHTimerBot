@@ -766,13 +766,13 @@ async function convertRewardLink(message) {
      */
     function getBitlyLink(url) {
         return new Promise(resolve => {
-            request({
-                url: 'https://api-ssl.bitly.com/v3/shorten',
-                qs: { access_token: settings.bitly_token, longUrl: url }
+            request.post({
+                auth: { bearer: settings.bitly_token },
+                url: 'https://api-ssl.bitly.com/v4/shorten',
+                json: { long_url: url }
             }, (error, response, body) => {
-                if (!error && response.statusCode === 200) {
-                    const responseJSON = JSON.parse(response.body);
-                    resolve(responseJSON.data.url);
+                if (!error && response.statusCode === 200 && 'link' in body) {
+                    resolve(body.link);
                 } else {
                     // TODO: API rate limit error handling? Could delegate to caller.
                     console.log("Links: Bitly shortener failed for some reason", error, response.toJSON(), body);
