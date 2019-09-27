@@ -20,8 +20,8 @@
   "area": "reset",
   "seed_time": "2017-07-10T00:00:00.000Z",
   "repeat_time": 86400000,
-  "announce_string": "Gift Reset / Relic Hunter Moves / Shields Expire - it's midnight UTC",
-  "demand_string": "Gift Reset / Relic Hunter Moves / Shields Expire at midnight UTC"
+  "announce_string": "Gift Reset / Relic Hunter Moves - it's midnight UTC",
+  "demand_string": "Gift Reset / Relic Hunter Moves at midnight UTC"
  },
  {
   "area": "cove",
@@ -36,24 +36,27 @@
   "sub_area": "mid",
   "seed_time": "2017-07-21T12:00:00.000Z",
   "repeat_time": 67200000,
-  "announce_string": "**Balack's Cove** Mid Tide (Flooding) for 1 hour",
-  "demand_string": "**Balack's Cove** Mid Tide (Flooding) starts"
+  "announce_string": "**Balack's Cove** In 5 minutes Mid Tide (Flooding) for 1 hour",
+  "demand_string": "**Balack's Cove** Mid Tide (Flooding) starts",
+  "announce_offset": 300000
  },
  {
   "area": "cove",
   "sub_area": "high",
   "seed_time": "2017-07-21T13:00:00.000Z",
   "repeat_time": 67200000,
-  "announce_string": "**Balack's Cove** High Tide (Ebbing and Flooding) for 40 minutes",
-  "demand_string": "**Balack's Cove** High Tide (Ebbing and Flooding) starts"
+  "announce_string": "**Balack's Cove** In 5 minutes High Tide (Ebbing and Flooding) for 40 minutes",
+  "demand_string": "**Balack's Cove** High Tide (Ebbing and Flooding) starts",
+  "announce_offset": 300000
  },
  {
   "area": "cove",
   "sub_area": "mid",
   "seed_time": "2017-07-21T13:40:00.000Z",
   "repeat_time": 67200000,
-  "announce_string": "**Balack's Cove** Mid Tide (Ebbing) for 1 hour",
-  "demand_string": "**Balack's Cove** Mid Tide (Ebbing) starts"
+  "announce_string": "**Balack's Cove** In 5 minutes Mid Tide (Ebbing) for 1 hour",
+  "demand_string": "**Balack's Cove** Mid Tide (Ebbing) starts",
+  "announce_offset": 300000
  },
  {
   "area": "sg",
