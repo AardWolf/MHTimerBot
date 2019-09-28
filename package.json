@@ -11,7 +11,7 @@
   "version": "0.4.0",
   "dependencies": {
     "csv-parse": "^4.4.7",
-    "discord.js": "^11.3.2",
+    "discord.js": "^11.5.1",
     "luxon": "^1.19.3",
     "request": "^2.88.0",
     "unescape": "^1.0.1"

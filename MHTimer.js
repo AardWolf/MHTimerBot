@@ -732,7 +732,7 @@ async function convertRewardLink(message) {
     if (newLinks.length > 1) {
         // Print both old and new link on same line:
         response = 'Facebook Link --> Non-Facebook Link:\n';
-        response += newLinks.map(linkData => `${linkData.fb} --> ${linkData.mh}`).join('\n');
+        response += newLinks.map(linkData => `<${linkData.fb}> --> <${linkData.mh}>`).join('\n');
     }
 
     message.channel.send(response);
