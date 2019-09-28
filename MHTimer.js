@@ -127,7 +127,7 @@ function Main() {
                 return false;
             }
             // Settings loaded successfully, so initiate loading of other resources.
-            let saveInterval = refresh_rate.as('milliseconds');
+            const saveInterval = refresh_rate.as('milliseconds');
 
             // Create timers list from the timers file.
             const hasTimers = loadTimers()
@@ -193,7 +193,7 @@ function Main() {
             hasFilters
                 .then(() => {
                     console.log(`Filters: Configuring refresh every ${saveInterval / (60 * 1000)} min.`);
-                    dataTimers['filters'] = setInterval(getFilterList, saveInterval)
+                    dataTimers['filters'] = setInterval(getFilterList, saveInterval);
                 });
 
             // Load remote data.
@@ -707,41 +707,80 @@ function parseUserMessage(message) {
  * Convert a HitGrab shortlink into a BitLy shortlink that does not send the clicker to Facebook.
  * If successful, sends the converted link to the same channel that received the input message.
  *
- * @param {Message} message a Discord message containing a htgb.co URL.
+ * @param {Message} message a Discord message containing at least one htgb.co URL.
  */
-function convertRewardLink(message) {
+async function convertRewardLink(message) {
     if (!settings.bitly_token) {
         console.log(`Links: Received link to convert, but don't have a valid 'bitly_token' specified in settings: ${settings}.`);
         return;
     }
 
-    // Get the redirect url from htgb.co
-    request({
-        url: message.content.split(" ")[0],
-        method: 'GET',
-        followRedirect: false
-    }, (error, response, body) => {
-        if (!error && response.statusCode === 301) {
-            const facebookURL = response.headers.location;
-            const mousehuntURL = facebookURL.replace('https://apps.facebook.com/mousehunt', 'https://www.mousehuntgame.com');
-            const queryProperties = { access_token: settings.bitly_token, longUrl: mousehuntURL };
-            // Use Bitly to shorten the non-facebook reward link because people link pretty things
+    const links = message.content.split(/\s|\n/).map(t => t.trim()).filter(text => /^(http[s]?:\/\/htgb\.co\/).*/g.test(text));
+    const newLinks = (await Promise.all(links.map(async link => {
+        const target = await getHGTarget(link);
+        if (target) {
+            const shortLink = await getBitlyLink(target)
+            return shortLink ? { fb: link, mh: shortLink } : "";
+        } else {
+            return "";
+        }
+    }))).filter(nl => !!nl);
+    if (!newLinks.length)
+        return;
+
+    let response = `${newLinks[0].mh} <-- Non-Facebook Link`;
+    if (newLinks.length > 1) {
+        // Print both old and new link on same line:
+        response = 'Facebook Link --> Non-Facebook Link:\n';
+        response += newLinks.map(linkData => `${linkData.fb} --> ${linkData.mh}`).join('\n');
+    }
+
+    message.channel.send(response);
+
+    /** Get the redirect url from htgb.co
+     * @param {string} url A htgb.co link to be shortened.
+     * @returns {Promise<string>} A mousehuntgame.com link that should be converted.
+     */
+    function getHGTarget(url) {
+        return new Promise(resolve => {
             request({
-                url: 'https://api-ssl.bitly.com/v3/shorten',
-                qs: queryProperties
+                url,
+                method: 'GET',
+                followRedirect: false
             }, (error, response, body) => {
-                if (!error && response.statusCode === 200) {
-                    const responseJSON = JSON.parse(response.body);
-                    console.log("Links: MH reward link converted for non-facebook users");
-                    message.channel.send(responseJSON.data.url + " <-- Non-Facebook Link");
+                if (!error && response.statusCode === 301) {
+                    const facebookURL = response.headers.location;
+                    resolve(facebookURL.replace('https://apps.facebook.com/mousehunt', 'https://www.mousehuntgame.com'));
                 } else {
-                    console.log("Links: Bitly shortener failed for some reason", error, response.toJSON(), body);
+                    console.log("Links: GET to htgb.co failed for some reason:\n", error, response.toJSON(), body);
+                    resolve('');
                 }
             });
-        } else {
-            console.log("Links: GET to htgb.co failed for some reason:\n", error, response.toJSON(), body);
-        }
-    });
+        });
+    }
+
+    /**
+     * Shorten the given link using the Bit.ly API.
+     * @param {string} url The link to be shortened.
+     * @returns {Promise<string>} A bit.ly link with the same resolved address, except to a non-Facebook site.
+     */
+    function getBitlyLink(url) {
+        return new Promise(resolve => {
+            request.post({
+                auth: { bearer: settings.bitly_token },
+                url: 'https://api-ssl.bitly.com/v4/shorten',
+                json: { long_url: url }
+            }, (error, response, body) => {
+                if (!error && response.statusCode === 200 && 'link' in body) {
+                    resolve(body.link);
+                } else {
+                    // TODO: API rate limit error handling? Could delegate to caller.
+                    console.log("Links: Bitly shortener failed for some reason", error, response.toJSON(), body);
+                    resolve('');
+                }
+            });
+        });
+    }
 }
 
 /**
