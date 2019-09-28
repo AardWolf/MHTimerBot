@@ -237,7 +237,7 @@ function Main() {
 
                 switch (message.channel.name) {
                     case settings.linkConversionChannel:
-                        if (/^(http[s]?:\/\/htgb\.co\/).*/g.test(message.content.toLowerCase()))
+                        if (/(http[s]?:\/\/htgb\.co\/)/g.test(message.content.toLowerCase()))
                             convertRewardLink(message);
                         break;
                     default:
@@ -715,7 +715,7 @@ async function convertRewardLink(message) {
         return;
     }
 
-    const links = message.content.split(/\s|\n/).map(t => t.trim()).filter(text => /^(http[s]?:\/\/htgb\.co\/).*/g.test(text));
+    const links = message.content.replace(/[<>]/gm,'').split(/\s|\n/).map(t => t.trim()).filter(text => /^(http[s]?:\/\/htgb\.co\/).*/g.test(text));
     const newLinks = (await Promise.all(links.map(async link => {
         const target = await getHGTarget(link);
         if (target) {
