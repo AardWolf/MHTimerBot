@@ -10,10 +10,10 @@
   },
   "version": "0.4.0",
   "dependencies": {
-    "csv-parse": "^2.5.0",
+    "csv-parse": "^4.4.7",
     "discord.js": "^11.3.2",
-    "luxon": "^1.2.1",
-    "request": "^2.85.0",
+    "luxon": "^1.19.3",
+    "request": "^2.88.0",
     "unescape": "^1.0.1"
   }
 }
