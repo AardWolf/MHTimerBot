@@ -231,8 +231,8 @@ function Main() {
             client.on('message', message => {
                 if (message.author.id === client.user.id)
                     return;
-                
-                if (message.webhookID === settings.relic_hunter_webhook) 
+
+                if (message.webhookID === settings.relic_hunter_webhook)
                     updRH(message);
 
                 switch (message.channel.name) {
@@ -711,7 +711,7 @@ function parseUserMessage(message) {
  */
 async function convertRewardLink(message) {
     if (!settings.bitly_token) {
-        console.log(`Links: Received link to convert, but don't have a valid 'bitly_token' specified in settings: ${settings}.`);
+        console.warn(`Links: Received link to convert, but don't have a valid 'bitly_token' specified in settings: ${settings}.`);
         return;
     }
 
@@ -728,7 +728,7 @@ async function convertRewardLink(message) {
     if (!newLinks.length)
         return;
 
-    let response = `${newLinks[0].mh} <-- Non-Facebook Link`;
+    let response = `<${newLinks[0].mh}> <-- Non-Facebook Link`;
     if (newLinks.length > 1) {
         // Print both old and new link on same line:
         response = 'Facebook Link --> Non-Facebook Link:\n';
@@ -752,7 +752,7 @@ async function convertRewardLink(message) {
                     const facebookURL = response.headers.location;
                     resolve(facebookURL.replace('https://apps.facebook.com/mousehunt', 'https://www.mousehuntgame.com'));
                 } else {
-                    console.log("Links: GET to htgb.co failed for some reason:\n", error, response.toJSON(), body);
+                    reportRequestError("Links: GET to htgb.co failed:", error, response, body);
                     resolve('');
                 }
             });
@@ -775,7 +775,7 @@ async function convertRewardLink(message) {
                     resolve(body.link);
                 } else {
                     // TODO: API rate limit error handling? Could delegate to caller.
-                    console.log("Links: Bitly shortener failed for some reason", error, response.toJSON(), body);
+                    reportRequestError("Links: Bitly shortener failed:", error, response, body);
                     resolve('');
                 }
             });
@@ -1710,10 +1710,10 @@ function getQueriedData(queryType, dbEntity, options) {
 
     // No result in cache, requery.
     return new Promise((resolve, reject) => {
-        let qsOptions = options || {};
+        const qsOptions = options || {};
         qsOptions.item_type = queryType;
         qsOptions.item_id = dbEntity.id;
-        let rq = request({
+        request({
             uri: 'https://mhhunthelper.agiletravels.com/searchByItem.php',
             json: true,
             qs: qsOptions
@@ -1791,7 +1791,7 @@ function getMouseList() {
         json: true
     }, (error, response, body) => {
         if (error)
-            console.log(`Mice: request failed with error:\n`, error, response.toJSON());
+            reportRequestError(`Mice: request failed:`, error, response, body);
         else if (response.statusCode !== 200)
             console.log(`Mice: request returned response "${response.statusCode}: ${response.statusMessage}"\n`, response.toJSON());
         else {
@@ -1819,7 +1819,6 @@ function findMouse(channel, args, command) {
      * @param {Object <string, string>} opts Additional querystring parameters for the request, like 'timefilter'
      * @returns {Promise<string>} The result of the lookup.
      */
-     
     function _getQueryResult(canSpam, mouse, opts) {
         return getQueriedData('mouse', mouse, opts).then(body => {
             // Querying succeeded. Received a JSON object (either from cache or HTTP lookup).
@@ -1938,7 +1937,7 @@ function getItemList() {
         json: true
     }, (error, response, body) => {
         if (error)
-            console.log(`Loot: request failed with error:\n`, error, response.toJSON());
+            reportRequestError(`Loot: request failed:`, error, response, body);
         else if (response.statusCode !== 200)
             console.log(`Loot: request returned response "${response.statusCode}: ${response.statusMessage}"\n`, response.toJSON());
         else {
@@ -1969,7 +1968,7 @@ function getFilterList() {
         json: true
     }, (error, response, body) => {
         if (error)
-            console.log(`Filters: request failed with error:\n`, error, response.toJSON());
+            reportRequestError(`Filters: request failed:`, error, response, body);
         else if (response.statusCode !== 200)
             console.log(`Filters: request returned response "${response.statusCode}: ${response.statusMessage}"\n`, response.toJSON());
         else {
@@ -2387,7 +2386,7 @@ function getNicknames(type) {
         url: nickname_urls[type]
     }, (error, response, body) => {
         if (error)
-            console.log(`Nicknames: request failed with error:\n`, error, response.toJSON());
+            reportRequestError(`Nicknames: request failed:`, error, response, body);
         else if (response.statusCode !== 200)
             console.log(`Nicknames: request returned response "${response.statusCode}: ${response.statusMessage}"\n`, response.toJSON());
         else {
@@ -2488,7 +2487,7 @@ function findRH(channel) {
                 channel.send(responseStr);
             }
             else {
-                console.log(error, response);
+                reportRequestError(`RelicHunter query failed:`, error, response, body);
                 channel.send("I was unable to get a good answer on that one.");
             }
         });
@@ -2523,6 +2522,20 @@ function oxfordStringifyValues(container, final = 'and') {
         return `${printables[0]} ${final} ${printables[1]}`;
 
     return printables.slice(0, -1).join(', ') + `, ${final} ${printables.slice(-1)}`;
+}
+
+
+/**
+ * @param {string} context Explanatory context for the error message
+ * @param {string} error an Error stack trace
+ * @param {Object} [response] Request response object (possibly `undefined`)
+ * @param {any} [body] Body of the response (probably `undefined` in error cases)
+ */
+function reportRequestError(context, error, response, body) {
+    // Assign defaults
+    response = response ? response.toJSON() : '';
+    body = body || '';
+    console.error(context, error, response, body);
 }
 
 
