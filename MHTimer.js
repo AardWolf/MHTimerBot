@@ -771,7 +771,7 @@ async function convertRewardLink(message) {
                 url: 'https://api-ssl.bitly.com/v4/shorten',
                 json: { long_url: url }
             }, (error, response, body) => {
-                if (!error && response.statusCode === 200 && 'link' in body) {
+                if (!error && [200, 201].includes(response.statusCode) && 'link' in body) {
                     resolve(body.link);
                 } else {
                     // TODO: API rate limit error handling? Could delegate to caller.
