@@ -182,7 +182,7 @@ function Main() {
                     console.log(`Nicknames: Configuring data refresh every ${saveInterval / (60 * 1000)} min.`);
                     dataTimers['nicknames'] = setInterval(refreshNicknameData, saveInterval);
             });
-            
+
             // Register filters
             const hasFilters = Promise.resolve()
                 .then(getFilterList())
@@ -380,7 +380,7 @@ function loadSettings(path = main_settings_filename) {
         if (!Array.isArray(settings.timedAnnouncementChannels))
             settings.timedAnnouncementChannels = settings.timedAnnouncementChannels.split(",").map(s => s.trim());
         settings.timedAnnouncementChannels = new Set(settings.timedAnnouncementChannels);
-        
+
         settings.relic_hunter_webhook = settings.relic_hunter_webhook ? settings.relic_hunter_webhook : "283571156236107777";
 
         settings.botPrefix = settings.botPrefix ? settings.botPrefix.trim() : '-mh';
@@ -433,7 +433,7 @@ function createTimersFromList(timerData) {
 /**
  * Create the timeout (and interval) that will activate this particular timer, in order to send
  * its default announcement and its default reminders.
- * 
+ *
  * @param {Timer} timer The timer to schedule.
  * @param {TextChannel[]} channels the channels on which this timer will initially perform announcements.
  */
@@ -2353,7 +2353,6 @@ function loadNicknameURLs(path = nickname_urls_filename) {
  * Load all nicknames from all sources.
  */
 function refreshNicknameData() {
-    nicknames.clear();
     for (let key in nickname_urls)
         getNicknames(key);
 }
@@ -2393,6 +2392,7 @@ function getNicknames(type) {
             // Pass the response to the CSV parser (after removing the header row).
             parser.write(body.split(/[\r\n]+/).splice(1).join("\n").toLowerCase());
         }
+        // Create a new (or replace the existing) nickname definition for this type.
         nicknames.set(type, newData);
         parser.end(() => console.log(`Nicknames: ${Object.keys(newData).length} of type '${type}' loaded.`));
     });
