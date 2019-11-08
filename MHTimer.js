@@ -669,7 +669,7 @@ function parseUserMessage(message) {
                     }
                     searchType = "location";
                 }
-                else if (["rank", "title", "a"].indexOf(searchType) !== -1) {
+                else if (["rank", "title", "a", "an"].indexOf(searchType) !== -1) {
                     if (nicknames.get("ranks")[search]) {
                         search = nicknames.get("ranks")[search];
                     }
