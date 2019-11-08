@@ -679,8 +679,8 @@ function parseUserMessage(message) {
                     let prefix = settings.botPrefix;
                     let commandSyntax = [
                         `I'm not sure what to do with that. Try:`,
-                        `\`${prefix} whois [#### | <mention>]`` to look up specific hunters`,
-                        `\`${prefix} whois [in <location> | a <rank>]\` to find up to 5 random new friends`
+                        `\`${settings.botPrefix} whois [#### | <mention>]`` to look up specific hunters`,
+                        `\`${settings.botPrefix} whois [in <location> | a <rank>]\` to find up to 5 random new friends`
                     ];
                     message.channel.send(commandSyntax.join("\n\t"));
                     return;
