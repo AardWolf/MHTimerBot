@@ -384,6 +384,8 @@ function loadSettings(path = main_settings_filename) {
         settings.relic_hunter_webhook = settings.relic_hunter_webhook ? settings.relic_hunter_webhook : "283571156236107777";
 
         settings.botPrefix = settings.botPrefix ? settings.botPrefix.trim() : '-mh';
+
+        settings.owner = settings.owner ? settings.owner : "0"; // So things don't fail if it's unset
         return true;
     }).catch(err => {
         console.log(`Settings: error while reading settings from '${path}':\n`, err);
@@ -427,6 +429,7 @@ function createTimersFromList(timerData) {
         }
         timers_list.push(timer);
     }
+    rescheduleResetRH();
     return timers_list.length !== knownTimers;
 }
 
@@ -693,6 +696,20 @@ function parseUserMessage(message) {
             }
             break;
 
+        case 'reset':
+            if (message.author.id === settings.owner) {
+                if (!tokens.length) {
+                    message.channel.send("I don't know what to reset.");
+                }
+                let sub_command = tokens.shift();
+                switch (sub_command) {
+                    case 'rh':
+                    case 'relic_hunter':
+                    default:
+                        resetRH();
+                }
+                break;
+            }
         case 'help':
         case 'arrg':
         case 'aarg':
@@ -2451,6 +2468,26 @@ function integerComma(number) {
 }
 
 /**
+ * Reset the Relic Hunter location so reminders know to update people
+ */
+function resetRH() {
+    // console.log(`Relic hunter location was ${relic_hunter.location} from ${relic_hunter.source}`);
+    relic_hunter.location = '';
+    relic_hunter.source = 'reset';
+    rescheduleResetRH();
+    // console.log('Relic hunter location was reset');
+    return 1;
+}
+
+/**
+ * Continue resetting Relic Hunter location
+ */
+
+function rescheduleResetRH() {
+    setTimeout(resetRH, Interval.fromDateTimes(DateTime.utc().plus({milliseconds: 10}),DateTime.utc().endOf('day')).length('milliseconds') );
+}
+
+/**
  * Relic Hunter location was announced, save it and note the source
  * @param {Message} message Webhook-generated message announcing RH location
  */
@@ -2462,7 +2499,8 @@ function updRH(message) {
             message.cleanContent.indexOf('spotted in') + 'spotted in'.length + 3,
             message.cleanContent.length-2); //Removes the *'s
         console.log(`Now in ${relic_hunter.location}`);
-        relic_hunter.source = "webhook";
+        relic_hunter.source = 'webhook';
+        // Can PM users with RH reminders here - rh_remind
     }
 }
 
@@ -2473,7 +2511,8 @@ function updRH(message) {
 function findRH(channel) {
     let responseStr = "";
     //RH was not seen since beginning of today, grab the info
-    let req = request({
+    if (relic_hunter.source != 'MHCT') {
+        let req = request({
             uri: 'https://mhhunthelper.agiletravels.com/tracker.json',
             json: true
         }, (error, response, body) => {
@@ -2484,13 +2523,22 @@ function findRH(channel) {
                 }
                 responseStr = `Relic Hunter has been spotted in **${decode(body["rh"]["location"])}** and will be there for the next `;
                 responseStr += timeLeft(DateTime.utc().endOf('day'));
+                // NOTE: setting a higher scope variable inside this async code means it's not immediately set
+                relic_hunter.source = 'MHCT';
+                relic_hunter.location = decode(body["rh"]["location"]);
                 channel.send(responseStr);
-            }
-            else {
+            } else {
                 reportRequestError(`RelicHunter query failed:`, error, response, body);
                 channel.send("I was unable to get a good answer on that one.");
             }
         });
+    }
+    else {
+        // Assume we have a correct location then
+        responseStr = `Relic Hunter has been spotted in **${relic_hunter.location}** and will be there for the next `;
+        responseStr += timeLeft(DateTime.utc().endOf('day'));
+        channel.send(responseStr);
+    }
     // If we have to use dbgames.info the xpath is: //*[@id="maincontent"]/table/tbody/tr/td[1]/div/div[4]/div[3]/h4/b/a
 }
 
