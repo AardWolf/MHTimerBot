@@ -2471,11 +2471,11 @@ function integerComma(number) {
  * Reset the Relic Hunter location so reminders know to update people
  */
 function resetRH() {
-    // console.log(`Relic hunter location was ${relic_hunter.location} from ${relic_hunter.source}`);
+    console.log(`Relic hunter location was ${relic_hunter.location} from ${relic_hunter.source}`);
     relic_hunter.location = '';
     relic_hunter.source = 'reset';
     rescheduleResetRH();
-    // console.log('Relic hunter location was reset');
+    console.log('Relic hunter location was reset');
     return 1;
 }
 
@@ -2525,7 +2525,12 @@ function findRH(channel) {
                 responseStr += timeLeft(DateTime.utc().endOf('day'));
                 // NOTE: setting a higher scope variable inside this async code means it's not immediately set
                 relic_hunter.source = 'MHCT';
-                relic_hunter.location = decode(body["rh"]["location"]);
+                console.log(`Relic hunter source updated to MHCT`);
+                if (relic_hunter.location != decode(body["rh"]["location"])) {
+                    console.log(`Relic hunter location updated from ${relic_hunter.location} to ${decode(body["rh"]["location"])}`);
+                    relic_hunter.location = decode(body["rh"]["location"]);
+                    // Schedule a timer to do relic hunter reminders here IF the location changed
+                }
                 channel.send(responseStr);
             } else {
                 reportRequestError(`RelicHunter query failed:`, error, response, body);
