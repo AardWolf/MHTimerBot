@@ -220,6 +220,7 @@ function Main() {
 
                 // Use one timeout per timer to manage default reminders and announcements.
                 timers_list.forEach(timer => scheduleTimer(timer, announcables));
+                resetRH(); // Default relic hunter to appropriate nothingness
                 console.log(`Timers: Initialized ${timer_config.size} timers on channels ${announcables}.`);
 
                 // If we disconnect and then reconnect, do not bother rescheduling the already-scheduled timers.
@@ -441,6 +442,8 @@ function createTimersFromList(timerData) {
  * @param {TextChannel[]} channels the channels on which this timer will initially perform announcements.
  */
 function scheduleTimer(timer, channels) {
+    if (timer.isSilent())
+        return
     let msUntilActivation = timer.getNext().diffNow().minus(timer.getAdvanceNotice()).as('milliseconds');
     timer.storeTimeout('scheduling',
         setTimeout(t => {
@@ -913,12 +916,17 @@ function parseTokenForArea(token, newReminder) {
             newReminder.area = 'fg';
             break;
 
-        // Game Reset / Relic Hunter movement aliases
+        // Game Reset
         case 'reset':
         case 'game':
-        case 'rh':
         case 'midnight':
             newReminder.area = 'reset';
+            break;
+
+        case 'rh':
+        case 'rhm':
+        case 'relic':
+            newReminder.area = 'relic_hunter';
             break;
 
         // Balack's Cove aliases
@@ -1366,6 +1374,9 @@ function sendRemind(user, remind, timer) {
     // TODO: better timer title info - no markdown formatting in the title.
     const output = new Discord.RichEmbed({ title: timer.getAnnouncement() });
 
+    if (timer.getArea() === "relic_hunter")
+        output.addField('Current Location', `She's in **${relic_hunter.location}**`, true);
+
     // Describe the remaining reminders.
     if (remind.fail > 10)
         remind.count = 1;
@@ -1574,7 +1585,7 @@ function buildSchedule(timer_request) {
     /** @type {{time: DateTime, message: string}[]} */
     const upcoming_timers = [];
     const max_timers = 24;
-    (!area ? timers_list : timers_list.filter(t => t.getArea() === area))
+    (!area ? timers_list : timers_list.filter(t => t.getArea() === area && !t.isSilent()))
         .forEach(timer => {
             let message = timer.getDemand();
             for (let time of timer.upcoming(until))
@@ -2472,7 +2483,7 @@ function integerComma(number) {
  */
 function resetRH() {
     console.log(`Relic hunter location was ${relic_hunter.location} from ${relic_hunter.source}`);
-    relic_hunter.location = '';
+    relic_hunter.location = 'unknown';
     relic_hunter.source = 'reset';
     rescheduleResetRH();
     console.log('Relic hunter location was reset');
@@ -2484,7 +2495,23 @@ function resetRH() {
  */
 
 function rescheduleResetRH() {
-    setTimeout(resetRH, Interval.fromDateTimes(DateTime.utc().plus({milliseconds: 10}),DateTime.utc().endOf('day')).length('milliseconds') );
+    if (relic_hunter.timeout)
+        clearTimeout(relic_hunter.timeout);
+
+    relic_hunter.timeout = setTimeout(resetRH, Interval.fromDateTimes(DateTime.utc().plus({milliseconds: 10}),DateTime.utc().endOf('day')).length('milliseconds') );
+}
+
+/**
+ * Notify about relic hunter changing location
+ */
+function remindRH(new_location) {
+    //Logic to look for people with the reminder goes here
+    //Call doRemind with the relic_hunter timer
+    //HERE
+    if (new_location != 'unknown') {
+        console.log(`Reminding about relic hunter in ${new_location}`);
+        doRemind(timers_list.filter(t => t.getArea() === "relic_hunter")[0]);
+    }
 }
 
 /**
@@ -2495,9 +2522,13 @@ function updRH(message) {
     //Find the location in the text
     let start_message = message.cleanContent.indexOf('spotted in');
     if (start_message > 25) {
-        relic_hunter.location = message.cleanContent.substring(
+        let new_location = message.cleanContent.substring(
             message.cleanContent.indexOf('spotted in') + 'spotted in'.length + 3,
             message.cleanContent.length-2); //Removes the *'s
+        if (relic_hunter.location != new_location) {
+            relic_hunter.location = new_location
+            setImmediate(remindRH, new_location);
+        }
         console.log(`Now in ${relic_hunter.location}`);
         relic_hunter.source = 'webhook';
         // Can PM users with RH reminders here - rh_remind
@@ -2529,6 +2560,7 @@ function findRH(channel) {
                 if (relic_hunter.location != decode(body["rh"]["location"])) {
                     console.log(`Relic hunter location updated from ${relic_hunter.location} to ${decode(body["rh"]["location"])}`);
                     relic_hunter.location = decode(body["rh"]["location"]);
+                    setImmediate(remindRH, relic_hunter.location);
                     // Schedule a timer to do relic hunter reminders here IF the location changed
                 }
                 channel.send(responseStr);
