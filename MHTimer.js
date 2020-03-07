@@ -188,7 +188,7 @@ function Main() {
 
             // Register filters
             const hasFilters = Promise.resolve()
-                .then(getFilterList())
+                .then(getFilterList)
                 .then(() => {
                     return Object.keys(filters).length > 0;
                 })
@@ -202,8 +202,7 @@ function Main() {
             // Load remote data.
             const remoteData = Promise.resolve()
                 .then(getMouseList)
-                .then(getItemList)
-                .then(getFilterList);
+                .then(getItemList);
 
             // Configure the bot behavior.
             client.once("ready", () => {
@@ -268,9 +267,11 @@ function Main() {
             // Configuration complete. Using Promise.all() requires these tasks to complete
             // prior to bot login.
             return Promise.all([
-                hasTimers,
-                hasReminders,
+                hasFilters,
+                hasHunters,
                 hasNicknames,
+                hasReminders,
+                hasTimers,
                 remoteData
             ]);
         })
