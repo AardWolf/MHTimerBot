@@ -2449,27 +2449,32 @@ function updRH(message) {
  * @param {TextChannel} channel the channel on which to respond.
  */
 async function findRH(channel) {
-    // RH was not seen since beginning of today, grab the info
-    const url = 'https://mhhunthelper.agiletravels.com/tracker.json';
-    const mhctMessage = await (fetch(url).then(async (response) => {
-        if (response.status !== 200) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-        const { rh = { location: 'unknown' } } = await response.json();
-        if (rh.location === 'unknown') {
-            if (relic_hunter.location) {
-                rh.location = relic_hunter.location;
+    const asLocationMessage = (location) => {
+        let message = `Relic Hunter has been spotted in **${location}** and will be there for the next `;
+        return message += timeLeft(DateTime.utc().endOf('day'));
+    };
+    let errorMessage = '';
+    // This block assumes that the relic_hunter.location field gets reset to "unknown" at daily reset:
+    if (relic_hunter.location === 'unknown') {
+        // RH location hasn't been reported or read yet: grab the info from MCHT.
+        const url = 'https://mhhunthelper.agiletravels.com/tracker.json';
+        errorMessage = await (fetch(url).then(async (response) => {
+            if (response.status !== 200) {
+                throw new Error(`HTTP ${response.status}`);
             }
-        }
-        let message = `Relic Hunter has been spotted in **${decode(rh.location)}** and will be there for the next `;
-        message += timeLeft(DateTime.utc().endOf('day'));
-        return message;
-    }).catch(err => {
-        console.log('RelicHunter: request failed with error:', err);
-        return 'I was unable to get a good answer on that one.';
-    }));
-    // TODO: update above to return empty string on error / unknown, and query other resources for the information in that case.
-    channel.send(mhctMessage);
+            const { rh } = await response.json();
+            if (rh.location === 'unknown') {
+                return "She hasn't been spotted yet!";
+            }
+            relic_hunter.location = decode(rh.location);
+            relic_hunter.source = 'MHCT';
+        }).catch(err => {
+            console.log('RelicHunter: request failed with error:', err);
+            return 'I was unable to get a good answer on that one.';
+        }));
+    }
+    // We either set the error message to a truthy value in the request, or have a relic hunter location.
+    channel.send(errorMessage || asLocationMessage(relic_hunter.location));
 
     // If we have to use dbgames.info the xpath is: //*[@id="maincontent"]/table/tbody/tr/td[1]/div/div[4]/div[3]/h4/b/a
 }
