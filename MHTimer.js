@@ -13,6 +13,9 @@ const Timer = require('./timerClass.js');
 const fs = require('fs');
 // Access external URIs, like @devjacksmith 's tools.
 const request = require('request');
+const fetch = require('node-fetch');
+const { URLSearchParams } = require('url');
+
 // We need more robust CSV handling
 const csv_parse = require('csv-parse');
 // Relic hunter (and maybe others?) introduced HTML escapes
@@ -719,7 +722,7 @@ async function convertRewardLink(message) {
     const newLinks = (await Promise.all(links.map(async link => {
         const target = await getHGTarget(link);
         if (target) {
-            const shortLink = await getBitlyLink(target)
+            const shortLink = await getBitlyLink(target);
             return shortLink ? { fb: link, mh: shortLink } : "";
         } else {
             return "";
@@ -742,21 +745,15 @@ async function convertRewardLink(message) {
      * @returns {Promise<string>} A mousehuntgame.com link that should be converted.
      */
     function getHGTarget(url) {
-        return new Promise(resolve => {
-            request({
-                url,
-                method: 'GET',
-                followRedirect: false
-            }, (error, response, body) => {
-                if (!error && response.statusCode === 301) {
-                    const facebookURL = response.headers.location;
-                    resolve(facebookURL.replace('https://apps.facebook.com/mousehunt', 'https://www.mousehuntgame.com'));
-                } else {
-                    reportRequestError("Links: GET to htgb.co failed:", error, response, body);
-                    resolve('');
-                }
-            });
-        });
+        return fetch(url, { redirect: 'manual' }).then((response) => {
+            if (response.status === 301) {
+                const facebookURL = response.headers.get('location');
+                return facebookURL.replace('https://apps.facebook.com/mousehunt', 'https://www.mousehuntgame.com');
+            } else {
+                throw `HTTP ${response.status}`;
+            }
+        }).catch((err) => console.log('Links: GET to htgb.co failed with error', err))
+        .then(result => result || '');
     }
 
     /**
@@ -765,21 +762,24 @@ async function convertRewardLink(message) {
      * @returns {Promise<string>} A bit.ly link with the same resolved address, except to a non-Facebook site.
      */
     function getBitlyLink(url) {
-        return new Promise(resolve => {
-            request.post({
-                auth: { bearer: settings.bitly_token },
-                url: 'https://api-ssl.bitly.com/v4/shorten',
-                json: { long_url: url }
-            }, (error, response, body) => {
-                if (!error && [200, 201].includes(response.statusCode) && 'link' in body) {
-                    resolve(body.link);
-                } else {
-                    // TODO: API rate limit error handling? Could delegate to caller.
-                    reportRequestError("Links: Bitly shortener failed:", error, response, body);
-                    resolve('');
-                }
-            });
-        });
+        const options = {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${settings.bitly_token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ long_url: url }),
+        };
+        return fetch('https://api-ssl.bitly.com/v4/shorten', options).then(async (response) => {
+            if ([200, 201].includes(response.status)) {
+                const { link } = await response.json();
+                return link;
+            } else {
+                // TODO: API rate limit error handling? Could delegate to caller. Probably not an issue with this bot.
+                throw `HTTP ${response.status}`;
+            }
+        }).catch((err) => console.log('Links: Bitly shortener failed with error:', err))
+        .then(result => result || '');
     }
 }
 
@@ -1709,26 +1709,22 @@ function getQueriedData(queryType, dbEntity, options) {
      */
 
     // No result in cache, requery.
-    return new Promise((resolve, reject) => {
-        const qsOptions = options || {};
-        qsOptions.item_type = queryType;
-        qsOptions.item_id = dbEntity.id;
-        request({
-            uri: 'https://mhhunthelper.agiletravels.com/searchByItem.php',
-            json: true,
-            qs: qsOptions
-        }, (error, response, body) => {
-            if (!error && response.statusCode === 200 && Array.isArray(body)) {
+    const qsOptions = new URLSearchParams(options);
+    qsOptions.append('item_type', queryType);
+    qsOptions.append('item_id', dbEntity.id);
+
+    return fetch('https://mhhunthelper.agiletravels.com/searchByItem.php', { body: qsOptions })
+        .then((response) => {
+            if (response.ok) {
                 /**
                  * Replace with actual cache storage:
                  * Cache.put(queryType, dbEntity.id, options, body);
                  */
-                resolve(body);
+                return response.json();
+            } else {
+                throw { error: `HTTP ${response.status}`, response };
             }
-            else
-                reject({ error: error, response: response });
         });
-    });
 }
 
 /**
@@ -1786,21 +1782,16 @@ function getMouseList() {
     // Query @devjacksmith's tools for mouse lists.
     console.log("Mice: Requesting a new mouse list.");
     const url = "https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=mouse&item_id=all";
-    request({
-        url: url,
-        json: true
-    }, (error, response, body) => {
-        if (error)
-            reportRequestError(`Mice: request failed:`, error, response, body);
-        else if (response.statusCode !== 200)
-            console.log(`Mice: request returned response "${response.statusCode}: ${response.statusMessage}"\n`, response.toJSON());
-        else {
-            console.log("Mice: Got a new mouse list.");
+    fetch(url).then(response => (response.status === 200) ? response.json() : '').then((body) => {
+        if (body) {
+            console.log('Mice: Got a new mouse list.');
             mice.length = 0;
             Array.prototype.push.apply(mice, body);
             mice.forEach(mouse => mouse.lowerValue = mouse.value.toLowerCase());
+        } else {
+            console.log('Mice: request returned non-200 response');
         }
-    });
+    }).catch(err => console.log('Mice: request returned error:', err));
 }
 
 /**
@@ -1932,21 +1923,16 @@ function getItemList() {
 
     console.log("Loot: Requesting a new loot list.");
     const url = "https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=loot&item_id=all";
-    request({
-        url: url,
-        json: true
-    }, (error, response, body) => {
-        if (error)
-            reportRequestError(`Loot: request failed:`, error, response, body);
-        else if (response.statusCode !== 200)
-            console.log(`Loot: request returned response "${response.statusCode}: ${response.statusMessage}"\n`, response.toJSON());
-        else {
-            console.log("Loot: Got a new loot list");
+    fetch(url).then(response => (response.status === 200) ? response.json() : '').then((body) => {
+        if (body) {
+            console.log('Loot: Got a new loot list.');
             items.length = 0;
             Array.prototype.push.apply(items, body);
             items.forEach(item => item.lowerValue = item.value.toLowerCase());
+        } else {
+            console.log('Loot: request returned non-200 response');
         }
-    });
+    }).catch(err => console.log('Mice: request returned error:', err));
 }
 
 /**
@@ -1961,23 +1947,18 @@ function getFilterList() {
     }
     last_timestamps.filter_refresh = now;
 
-    console.log("Loot: Requesting a new filter list.");
+    console.log("Filters: Requesting a new filter list.");
     const url = "https://mhhunthelper.agiletravels.com/filters.php";
-    request({
-        url: url,
-        json: true
-    }, (error, response, body) => {
-        if (error)
-            reportRequestError(`Filters: request failed:`, error, response, body);
-        else if (response.statusCode !== 200)
-            console.log(`Filters: request returned response "${response.statusCode}: ${response.statusMessage}"\n`, response.toJSON());
-        else {
+    fetch(url).then(response => (response.status === 200) ? response.json() : '').then((body) => {
+        if (body) {
             console.log("Filters: Got a new filter list");
             filters.length = 0;
             Array.prototype.push.apply(filters, body);
             filters.forEach(filter => filter.lowerValue = filter.code_name.toLowerCase());
+        } else {
+            console.log('Filters: request returned non-200 response');
         }
-    });
+    }).catch(err => console.log('Filters: request returned error:', err));
 }
 
 /**
@@ -2371,31 +2352,27 @@ function getNicknames(type) {
         console.log(`Nicknames: Received '${type}' but I don't know its URL.`);
         return;
     }
-    let newData = {};
+    const newData = {};
     // It returns a string as CSV, not JSON.
     // Set up the parser
-    let parser = csv_parse({delimiter: ","})
+    const parser = csv_parse({ delimiter: ',' })
         .on('readable', () => {
             while (record = parser.read())
                 newData[record[0]] = record[1];
         })
         .on('error', err => console.log(err.message));
 
-    request({
-        url: nickname_urls[type]
-    }, (error, response, body) => {
-        if (error)
-            reportRequestError(`Nicknames: request failed:`, error, response, body);
-        else if (response.statusCode !== 200)
-            console.log(`Nicknames: request returned response "${response.statusCode}: ${response.statusMessage}"\n`, response.toJSON());
-        else {
-            // Pass the response to the CSV parser (after removing the header row).
-            parser.write(body.split(/[\r\n]+/).splice(1).join("\n").toLowerCase());
+    fetch(nickname_urls[type]).then(async (response) => {
+        if (response.status !== 200) {
+            throw new Error(`HTTP ${response.status}`);
         }
+        const body = await response.text();
+        // Pass the response to the CSV parser (after removing the header row).
+        parser.write(body.split(/[\r\n]+/).splice(1).join("\n").toLowerCase());
         // Create a new (or replace the existing) nickname definition for this type.
         nicknames.set(type, newData);
         parser.end(() => console.log(`Nicknames: ${Object.keys(newData).length} of type '${type}' loaded.`));
-    });
+    }).catch(err => console.log(`Nicknames: request for type '${type}' failed with error:`, err));
 }
 
 /**
@@ -2470,27 +2447,29 @@ function updRH(message) {
  * Processes a request to find the relic hunter
  * @param {TextChannel} channel the channel on which to respond.
  */
-function findRH(channel) {
-    let responseStr = "";
-    //RH was not seen since beginning of today, grab the info
-    let req = request({
-            uri: 'https://mhhunthelper.agiletravels.com/tracker.json',
-            json: true
-        }, (error, response, body) => {
-            if (!error && response.statusCode === 200) {
-                if (body["rh"]["location"] === 'unknown') {
-                    if (relic_hunter.location)
-                        body["rh"]["location"] = relic_hunter.location;
-                }
-                responseStr = `Relic Hunter has been spotted in **${decode(body["rh"]["location"])}** and will be there for the next `;
-                responseStr += timeLeft(DateTime.utc().endOf('day'));
-                channel.send(responseStr);
+async function findRH(channel) {
+    // RH was not seen since beginning of today, grab the info
+    const url = 'https://mhhunthelper.agiletravels.com/tracker.json';
+    const mhctMessage = await (fetch(url).then(async (response) => {
+        if (response.status !== 200) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        const { rh = { location: 'unknown' } } = await response.json();
+        if (rh.location === 'unknown') {
+            if (relic_hunter.location) {
+                rh.location = relic_hunter.location;
             }
-            else {
-                reportRequestError(`RelicHunter query failed:`, error, response, body);
-                channel.send("I was unable to get a good answer on that one.");
-            }
-        });
+        }
+        let message = `Relic Hunter has been spotted in **${decode(rh.location)}** and will be there for the next `;
+        message += timeLeft(DateTime.utc().endOf('day'));
+        return message;
+    }).catch(err => {
+        console.log('RelicHunter: request failed with error:', err);
+        return 'I was unable to get a good answer on that one.';
+    }));
+    // TODO: update above to return empty string on error / unknown, and query other resources for the information in that case.
+    channel.send(mhctMessage);
+
     // If we have to use dbgames.info the xpath is: //*[@id="maincontent"]/table/tbody/tr/td[1]/div/div[4]/div[3]/h4/b/a
 }
 
