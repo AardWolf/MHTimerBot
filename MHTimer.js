@@ -2462,7 +2462,7 @@ function updRH(message) {
  */
 async function findRH(channel) {
     const asLocationMessage = (location) => {
-        let message = `Relic Hunter has been spotted in **${location}** and will be there for the next `;
+        let message = `Relic Hunter has been spotted in **${location}** and might leave `;
         return message += timeLeft(DateTime.utc().endOf('day'));
     };
     let errorMessage = '';
