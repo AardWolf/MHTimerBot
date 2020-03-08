@@ -41,7 +41,11 @@ const settings = {},
     items = [],
     filters = [],
     hunters = {},
-    relic_hunter = {},
+    relic_hunter = {
+        location: 'unknown',
+        source: '',
+        last_seen: DateTime.fromMillis(0),
+    },
     nicknames = new Map(),
     nickname_urls = {};
 
@@ -2429,18 +2433,26 @@ function integerComma(number) {
 }
 
 /**
- * Relic Hunter location was announced, save it and note the source
+ * Relic Hunter location was announced, save it and note the source.
+ * The report message is something like "spotted in **location**"
  * @param {Message} message Webhook-generated message announcing RH location
  */
 function updRH(message) {
-    //Find the location in the text
-    let start_message = message.cleanContent.indexOf('spotted in');
-    if (start_message > 25) {
-        relic_hunter.location = message.cleanContent.substring(
-            message.cleanContent.indexOf('spotted in') + 'spotted in'.length + 3,
-            message.cleanContent.length-2); //Removes the *'s
-        console.log(`Now in ${relic_hunter.location}`);
-        relic_hunter.source = "webhook";
+    // Find the location in the text.
+    const text = message.cleanContent;
+    const locationRE = /spotted in \*\*(.+)\*\*/;
+    if (locationRE.test(text)) {
+        const new_location = locationRE.exec(locationRE)[1];
+        if (relic_hunter.location !== new_location) {
+            relic_hunter.location = new_location;
+            relic_hunter.source = 'webhook';
+            relic_hunter.last_seen = DateTime.utc();
+            console.log(`Relic Hunter: Webhook set location to "${new_location}"`);
+        } else {
+            console.log(`Relic Hunter: skipped location update (already set by ${relic_hunter.source}).`);
+        }
+    } else {
+        console.log('Relic Hunter: failed to extract location from webhook message:', text);
     }
 }
 
@@ -2454,8 +2466,9 @@ async function findRH(channel) {
         return message += timeLeft(DateTime.utc().endOf('day'));
     };
     let errorMessage = '';
-    // This block assumes that the relic_hunter.location field gets reset to "unknown" at daily reset:
-    if (relic_hunter.location === 'unknown') {
+    if (relic_hunter.location === 'unknown'
+            || !DateTime.utc().hasSame(relic_hunter.last_seen, 'day')) // TODO: need to test this
+    {
         // RH location hasn't been reported or read yet: grab the info from MCHT.
         const url = 'https://mhhunthelper.agiletravels.com/tracker.json';
         errorMessage = await (fetch(url).then(async (response) => {
@@ -2468,12 +2481,14 @@ async function findRH(channel) {
             }
             relic_hunter.location = decode(rh.location);
             relic_hunter.source = 'MHCT';
+            relic_hunter.last_seen = DateTime.utc(); // TODO: rh.last_seen has what format?
         }).catch(err => {
             console.log('RelicHunter: request failed with error:', err);
             return 'I was unable to get a good answer on that one.';
         }));
     }
-    // We either set the error message to a truthy value in the request, or have a relic hunter location.
+    // We either set the error message to a truthy value in the awaited request,
+    // or have a relic hunter location set by MHCT or the webhook.
     channel.send(errorMessage || asLocationMessage(relic_hunter.location));
 
     // If we have to use dbgames.info the xpath is: //*[@id="maincontent"]/table/tbody/tr/td[1]/div/div[4]/div[3]/h4/b/a
