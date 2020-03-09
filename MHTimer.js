@@ -221,6 +221,10 @@ function Main() {
                 // Use one timeout per timer to manage default reminders and announcements.
                 timers_list.forEach(timer => scheduleTimer(timer, announcables));
                 resetRH(); // Default relic hunter to appropriate nothingness
+                // But then get starting values with notifying people just because of a restart
+                (async function() {
+                    await getRHLocation();
+                })();
                 console.log(`Timers: Initialized ${timer_config.size} timers on channels ${announcables}.`);
 
                 // If we disconnect and then reconnect, do not bother rescheduling the already-scheduled timers.
@@ -386,7 +390,7 @@ function loadSettings(path = main_settings_filename) {
 
         settings.botPrefix = settings.botPrefix ? settings.botPrefix.trim() : '-mh';
 
-        settings.owner = settings.owner ? settings.owner : "0"; // So things don't fail if it's unset
+        settings.owner = settings.owner || "0"; // So things don't fail if it's unset
         return true;
     }).catch(err => {
         console.log(`Settings: error while reading settings from '${path}':\n`, err);
@@ -1928,7 +1932,8 @@ function findMouse(channel, args, command) {
 
     // Special case of the relic hunter RGW
     if (args.toLowerCase() === "relic hunter") {
-        findRH(channel);
+        console.log('Looking for RH');
+        findRH(channel).then();
         return;
     }
 
@@ -2485,6 +2490,7 @@ function resetRH() {
     console.log(`Relic hunter location was ${relic_hunter.location} from ${relic_hunter.source}`);
     relic_hunter.location = 'unknown';
     relic_hunter.source = 'reset';
+    getRHLocation().then();
     rescheduleResetRH();
     console.log('Relic hunter location was reset');
     return 1;
@@ -2506,11 +2512,9 @@ function rescheduleResetRH() {
  */
 function remindRH(new_location) {
     //Logic to look for people with the reminder goes here
-    //Call doRemind with the relic_hunter timer
-    //HERE
     if (new_location != 'unknown') {
         console.log(`Reminding about relic hunter in ${new_location}`);
-        doRemind(timers_list.filter(t => t.getArea() === "relic_hunter")[0]);
+        doRemind(timers_list.find(t => t.getArea() === "relic_hunter"));
     }
 }
 
@@ -2536,48 +2540,103 @@ function updRH(message) {
 }
 
 /**
- * Processes a request to find the relic hunter
- * @param {TextChannel} channel the channel on which to respond.
+ * Especially at startup, find the relic hunter's location
+ * TODO: This might replace the reset function
  */
-function findRH(channel) {
-    let responseStr = "";
-    //RH was not seen since beginning of today, grab the info
-    if (relic_hunter.source != 'MHCT') {
+async function getRHLocation() {
+    let starting_location = relic_hunter.location;
+    console.log(`Relic hunter was in ${relic_hunter.location}`);
+    if (starting_location === 'unknown') {
+        await DBGamesRHLookup();
+        if (relic_hunter.location != starting_location) {
+            //We got what is probably the right location but let's see what MHCT has
+            await MHCTRHLookup();
+        }
+    }
+    else if (relic_hunter.source === 'DBGames') {
+        await MHCTRHLookup();
+    }
+    console.log(`Relic hunter is in ${relic_hunter.location}`);
+}
+
+/**
+ * Looks up Relic Hunter Location from DBGames via Google Sheets
+ * @returns {Promise<unknown>}
+ * @constructor
+ */
+function DBGamesRHLookup() {
+    return new Promise(function(resolve, reject){
+        request('https://docs.google.com/spreadsheets/d/e/2PACX-1vSsqAjocBWcN5dDLXuOBfnBhyrTaO7ZeIEAFlDnQ4r6zqcvtuLKMDBQCh5I8-3M9irS4-17OPfvgKtY/pub?gid=1975888453&single=true&output=csv',
+            (error, response, body) => {
+                if (!error && response.statusCode === 200) {
+                    if (relic_hunter.location === 'unknown' && body) {
+                        console.log(`Relic hunter location updated from ${relic_hunter.location} to ${body}`);
+                        relic_hunter.source = 'DBGames';
+                        relic_hunter.location = body;
+                    }
+                    resolve();
+                } else {
+                    console.log(`RelicHunter query failed:`, error, response, body);
+                    reject();
+                }
+            });
+    });
+}
+
+/**
+ * Looks up the relic hunter location from MHCT
+ */
+function MHCTRHLookup() {
+    return new Promise(function(resolve, reject){
         let req = request({
             uri: 'https://mhhunthelper.agiletravels.com/tracker.json',
             json: true
         }, (error, response, body) => {
             if (!error && response.statusCode === 200) {
-                if (body["rh"]["location"] === 'unknown') {
-                    if (relic_hunter.location)
-                        body["rh"]["location"] = relic_hunter.location;
-                }
-                responseStr = `Relic Hunter has been spotted in **${decode(body["rh"]["location"])}** and will be there for the next `;
-                responseStr += timeLeft(DateTime.utc().endOf('day'));
-                // NOTE: setting a higher scope variable inside this async code means it's not immediately set
-                relic_hunter.source = 'MHCT';
-                console.log(`Relic hunter source updated to MHCT`);
-                if (relic_hunter.location != decode(body["rh"]["location"])) {
+                if (decode(body["rh"]["location"]) != 'unknown') {
                     console.log(`Relic hunter location updated from ${relic_hunter.location} to ${decode(body["rh"]["location"])}`);
+                    relic_hunter.source = 'MHCT';
                     relic_hunter.location = decode(body["rh"]["location"]);
-                    setImmediate(remindRH, relic_hunter.location);
-                    // Schedule a timer to do relic hunter reminders here IF the location changed
                 }
-                channel.send(responseStr);
+                resolve();
             } else {
-                reportRequestError(`RelicHunter query failed:`, error, response, body);
-                channel.send("I was unable to get a good answer on that one.");
+                console.log(`RelicHunter query failed:`, error, response, body);
+                reject();
             }
         });
+    });
+}
+
+/**
+ * Processes a request to find the relic hunter
+ * @param {TextChannel} channel the channel on which to respond.
+ */
+async function findRH(channel) {
+    let responseStr = "";
+    let original_location = relic_hunter.location;
+    console.log(`Looking for RH, might be in ${original_location}`);
+    //RH was not seen since beginning of today, grab the info
+    if (relic_hunter.source != 'MHCT') {
+        await MHCTRHLookup();
+        responseStr = `Relic Hunter has been spotted in **${relic_hunter.location}** and will be there for the next `;
+        responseStr += timeLeft(DateTime.utc().endOf('day'));
+        console.log(`Tried finding it on MHCT, now it's ${relic_hunter.location}`);
+        if (relic_hunter.location != 'unknown') {
+            channel.send(responseStr);
+            if (relic_hunter.location != original_location) {
+                setImmediate(remindRH, relic_hunter.location);
+            }
+        }
     }
     else {
         // Assume we have a correct location then
         responseStr = `Relic Hunter has been spotted in **${relic_hunter.location}** and will be there for the next `;
         responseStr += timeLeft(DateTime.utc().endOf('day'));
+        console.log(`We should be sending ${responseStr}`);
         channel.send(responseStr);
     }
-    // If we have to use dbgames.info the xpath is: //*[@id="maincontent"]/table/tbody/tr/td[1]/div/div[4]/div[3]/h4/b/a
 }
+
 
 /**
  * Helper function to convert all elements of an iterable container into an oxford-comma-delimited
