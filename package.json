@@ -22,7 +22,7 @@
   ],
   "dependencies": {
     "csv-parse": "^4.8.8",
-    "discord.js": "^11.6.1",
+    "discord.js": "^11.6.2",
     "luxon": "^1.22.0",
     "node-fetch": "^2.6.0",
     "request": "^2.88.2",
