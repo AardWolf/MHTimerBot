@@ -114,6 +114,13 @@ console.log = function()
     }
 };
 
+process.on('SIGINT', () => {
+    client.destroy();
+});
+process.on('SIGTERM', () => {
+    client.destroy();
+});
+
 process.on('uncaughtException', exception => {
     console.log(exception); // to see your exception details in the console
     // if you are on production, maybe you can send the exception details to your
@@ -264,8 +271,8 @@ function Main() {
             client.on('reconnecting', () => console.log('Connection lost, reconnecting to Discord...'));
             // WebSocket disconnected and is no longer trying to reconnect.
             client.on('disconnect', event => {
-                console.log("Close event: " + event.reason);
-                console.log(`Close code: ${event.code} (${event.wasClean ? `not ` : ``}cleanly closed)`);
+                console.log(`Client socket closed: ${event.reason || 'No reason given'}`);
+                console.log(`Socket close code: ${event.code} (${event.wasClean ? `` : `not `}cleanly closed)`);
                 quit();
             });
             // Configuration complete. Using Promise.all() requires these tasks to complete
@@ -283,7 +290,7 @@ function Main() {
         // requested data from remote sources, and configured the bot.
         .then(didConfig => client.login(settings.token))
         .catch(err => {
-            console.log(err);
+            console.log('Unhandled startup error, shutting down:', err);
             client.destroy()
                 .then(() => process.exitCode = 1);
         });
