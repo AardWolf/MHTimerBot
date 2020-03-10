@@ -2569,7 +2569,7 @@ async function getRHLocation() {
  */
 function DBGamesRHLookup() {
     let new_location = 'unknown';
-    return new Promise(function(resolve, reject){
+    return new Promise(function(resolve){
         let req = request({
                 uri: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSsqAjocBWcN5dDLXuOBfnBhyrTaO7ZeIEAFlDnQ4r6zqcvtuLKMDBQCh5I8-3M9irS4-17OPfvgKtY/pub?gid=1975888453&single=true&output=csv'
             }, (error, response, body) => {
@@ -2600,7 +2600,7 @@ async function MHCTRHLookup() {
     if (relic_hunter.source === 'MHCT' && relic_hunter.location !== 'unknown') {
         return;
     }
-    return new Promise(function(resolve, reject){
+    return new Promise(function(resolve){
         let req = request({
             uri: 'https://mhhunthelper.agiletravels.com/tracker.json',
             json: true
