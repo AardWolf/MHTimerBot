@@ -29,7 +29,7 @@
     "repeat_time": 86400000,
     "announce_string": "The Relic Hunter has been located",
     "demand_string": "Relic Hunter has been found",
-    "silent": 1
+    "silent": true
 },
 {
   "area": "cove",

@@ -207,7 +207,7 @@ class Timer {
      * Returns the string to be displayed when the timer activates.
      *
      * @instance
-     * @returns {string} The announcment associated with the timer.
+     * @returns {string} The announcement associated with the timer.
      */
     getAnnouncement() {
         return this._announcement;
