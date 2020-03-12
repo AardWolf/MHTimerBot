@@ -48,7 +48,7 @@ const timers_list = [];
 /** @type {TimerReminder[]} */
 const reminders = [];
 
-const refresh_rate = Duration.fromObject({minutes: 5});
+const refresh_rate = Duration.fromObject({ minutes: 5 });
 /** @type {Object<string, DateTime>} */
 const last_timestamps = {
     reminder_save: DateTime.utc(),
@@ -1933,7 +1933,6 @@ function findMouse(channel, args, command) {
 
     // Special case of the relic hunter RGW
     if (args.toLowerCase() === "relic hunter") {
-        console.log('Looking for RH');
         findRH(channel).then();
         return;
     }
@@ -2503,7 +2502,7 @@ function rescheduleResetRH() {
     if (relic_hunter.timeout)
         clearTimeout(relic_hunter.timeout);
 
-    relic_hunter.timeout = setTimeout(resetRH, Interval.fromDateTimes(DateTime.utc().plus({milliseconds: 10}),DateTime.utc().endOf('day')).length('milliseconds') );
+    relic_hunter.timeout = setTimeout(resetRH, Interval.fromDateTimes(DateTime.utc(),DateTime.utc().endOf('day')).length('milliseconds') );
 }
 
 /**
@@ -2548,12 +2547,12 @@ async function getRHLocation() {
         MHCTRHLookup()
     ]);
     // Precedence goes to MHCT because it would have seen RH
-    let newLocation = newLocations.find(t => t.source === 'MHCT' && t.location !== 'unknown');
+    let newLocation = newLocations.find(t => t && t.source === 'MHCT' && t.location !== 'unknown');
     if (newLocation && newLocation.location) {
         relic_hunter.location = newLocation.location;
         relic_hunter.source = 'MHCT';
     } else {
-        newLocation = newLocations.find(t => t.source === 'DBGames');
+        newLocation = newLocations.find(t => t && t.source === 'DBGames');
         if (newLocation && newLocation.location) {
             relic_hunter.location = newLocation.location;
             relic_hunter.source = 'DBGames';
@@ -2632,13 +2631,13 @@ async function MHCTRHLookup() {
 async function findRH(channel) {
     let responseStr = "";
     let original_location = relic_hunter.location;
-    console.log(`Looking for RH, might be in ${original_location}`);
-    await getRHLocation();
-    //RH was not seen since beginning of today, grab the info
+    if (relic_hunter.source !== 'MHCT') {
+        console.log(`Looking for RH, might be in ${original_location}`);
+        await getRHLocation();
+    }
     responseStr = `Relic Hunter has been spotted in **${relic_hunter.location}** and will be there for the next `;
     let nextMove  = timeLeft(DateTime.utc().endOf('day'));
     responseStr += nextMove;
-    console.log(`Tried finding it on MHCT, now it's ${relic_hunter.location}`);
     if (relic_hunter.location !== 'unknown') {
         channel.send(responseStr);
         if (relic_hunter.location !== original_location) {
