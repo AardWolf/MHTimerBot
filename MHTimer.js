@@ -201,12 +201,9 @@ function Main() {
             const remoteData = Promise.resolve()
                 .then(getMouseList)
                 .then(getItemList)
-                .then(getFilterList);
-            resetRH();
-            // But then get starting values with notifying people just because of a restart
-            (async function() {
-                await getRHLocation();
-            })();
+                .then(getFilterList)
+                .then(resetRH)
+                .then(getRHLocation);
 
             // Configure the bot behavior.
             client.once("ready", () => {
@@ -2595,7 +2592,7 @@ function DBGamesRHLookup() {
 /**
  * Looks up the relic hunter location from MHCT
  */
-async function MHCTRHLookup() {
+function MHCTRHLookup() {
     if (relic_hunter.source === 'MHCT' && relic_hunter.location !== 'unknown') {
         return;
     }
