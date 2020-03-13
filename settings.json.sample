@@ -6,5 +6,6 @@
           "timers"
         ],
         "relic_hunter_webhook" : "283571156236107777",
-        "botPrefix": "-mh"
+        "botPrefix": "-mh",
+        "owner": "0"
     }
