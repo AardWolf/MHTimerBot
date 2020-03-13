@@ -1,15 +1,14 @@
 # MH Timer Bot
 node_modules
-/settings.json
+settings.json
 /project.geany
-/timer_settings.json.bak
-/MHTimer.log*
-/MHTimer.pid
+timer_settings.json.bak
+MHTimer.log*
+MHTimer.pid
 .test_timers.json
 .timers.json
-/reminders.json
-/.reminders.json
-/hunters.json
+reminders.json
+.reminders.json
 hunters.json
 
 
