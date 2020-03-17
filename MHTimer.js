@@ -12,7 +12,6 @@ const Timer = require('./timerClass.js');
 // Access local URIs, like files.
 const fs = require('fs');
 // Access external URIs, like @devjacksmith 's tools.
-const request = require('request');
 const fetch = require('node-fetch');
 const { URLSearchParams } = require('url');
 // We need more robust CSV handling
@@ -42,8 +41,9 @@ const settings = {},
     hunters = {},
     relic_hunter = {
         location: 'unknown',
-        source: '',
+        source: 'startup',
         last_seen: DateTime.fromMillis(0),
+        timeout: null,
     },
     nicknames = new Map(),
     nickname_urls = {};
@@ -113,10 +113,10 @@ console.log = function()
     }
 };
 
-process.on('SIGINT', () => {
+process.once('SIGINT', () => {
     client.destroy();
 });
-process.on('SIGTERM', () => {
+process.once('SIGTERM', () => {
     client.destroy();
 });
 
@@ -141,6 +141,9 @@ function Main() {
             }
             // Settings loaded successfully, so initiate loading of other resources.
             const saveInterval = refresh_rate.as('milliseconds');
+
+            // Schedule the daily Relic Hunter reset.
+            rescheduleResetRH();
 
             // Create timers list from the timers file.
             const hasTimers = loadTimers()
@@ -209,13 +212,12 @@ function Main() {
                     dataTimers['filters'] = setInterval(getFilterList, saveInterval);
                 });
 
-            // Load remote data.
-            const remoteData = Promise.resolve()
-                .then(getMouseList)
-                .then(getItemList)
-                .then(getFilterList)
-                .then(resetRH)
-                .then(getRHLocation);
+            // Start loading remote data.
+            const remoteData = [
+                getMouseList(),
+                getItemList(),
+                getRHLocation(),
+            ];
 
             // Configure the bot behavior.
             client.once("ready", () => {
@@ -248,7 +250,7 @@ function Main() {
                     return;
 
                 if (message.webhookID === settings.relic_hunter_webhook)
-                    updRH(message);
+                    handleRHWebhook(message);
 
                 switch (message.channel.name) {
                     case settings.linkConversionChannel:
@@ -285,12 +287,12 @@ function Main() {
                 hasNicknames,
                 hasReminders,
                 hasTimers,
-                remoteData
+                ...remoteData,
             ]);
         })
         // Finally, log in now that we have loaded all data from disk,
         // requested data from remote sources, and configured the bot.
-        .then(didConfig => client.login(settings.token))
+        .then(() => client.login(settings.token))
         .catch(err => {
             console.log('Unhandled startup error, shutting down:', err);
             client.destroy()
@@ -306,11 +308,11 @@ catch(error) {
 
 function quit() {
     return doSaveAll()
-        .then(didSave => {
-            console.log(`Shutdown: data saves completed`);
-            return didSave;
-        }, err => console.log(`Shutdown: error while saving:\n`, err))
-        .then(didSave => { console.log(`Shutdown: destroying client`); return client.destroy(); })
+        .then(
+            () => console.log(`Shutdown: data saves completed`),
+            (err) => console.log(`Shutdown: error while saving:\n`, err)
+        )
+        .then(() => { console.log(`Shutdown: destroying client`); return client.destroy(); })
         .then(() => {
             console.log(`Shutdown: deactivating data refreshes`);
             for (let timer of Object.values(dataTimers))
@@ -320,8 +322,11 @@ function quit() {
                 timer.stopInterval();
                 timer.stopTimeout();
             }
+            if (relic_hunter.timeout) {
+                clearTimeout(relic_hunter.timeout);
+            }
         })
-        .then(result => process.exitCode = 1)
+        .then(() => process.exitCode = 1)
         .catch(err => {
             console.log(`Shutdown: unhandled error:\n`, err, `\nImmediately exiting.`);
             process.exit();
@@ -398,7 +403,7 @@ function loadSettings(path = main_settings_filename) {
             settings.timedAnnouncementChannels = settings.timedAnnouncementChannels.split(",").map(s => s.trim());
         settings.timedAnnouncementChannels = new Set(settings.timedAnnouncementChannels);
 
-        settings.relic_hunter_webhook = settings.relic_hunter_webhook ? settings.relic_hunter_webhook : "283571156236107777";
+        settings.relic_hunter_webhook = settings.relic_hunter_webhook || "283571156236107777";
 
         settings.botPrefix = settings.botPrefix ? settings.botPrefix.trim() : '-mh';
 
@@ -446,7 +451,6 @@ function createTimersFromList(timerData) {
         }
         timers_list.push(timer);
     }
-    rescheduleResetRH();
     return timers_list.length !== knownTimers;
 }
 
@@ -1326,6 +1330,8 @@ function doAnnounce(timer) {
  * @param {Timer} timer The activated timer.
  */
 function doRemind(timer) {
+    if (!timer) return;
+
     // Cache these values.
     const area = timer.getArea(),
         sub = timer.getSubArea();
@@ -1809,6 +1815,7 @@ function removeQueryStringParams(args, qsParams) {
 
 /**
  * Initialize (or refresh) the known mice lists from @devjacksmith's tools.
+ * @returns {Promise<void>}
  */
 function getMouseList() {
     const now = DateTime.utc();
@@ -1816,14 +1823,14 @@ function getMouseList() {
     if (last_timestamps.mouse_refresh) {
         let next_refresh = last_timestamps.mouse_refresh.plus(refresh_rate);
         if (now < next_refresh)
-            return;
+            return Promise.resolve();
     }
     last_timestamps.mouse_refresh = now;
 
     // Query @devjacksmith's tools for mouse lists.
     console.log("Mice: Requesting a new mouse list.");
     const url = "https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=mouse&item_id=all";
-    fetch(url).then(response => (response.status === 200) ? response.json() : '').then((body) => {
+    return fetch(url).then(response => (response.status === 200) ? response.json() : '').then((body) => {
         if (body) {
             console.log('Mice: Got a new mouse list.');
             mice.length = 0;
@@ -1932,7 +1939,7 @@ function findMouse(channel, args, command) {
 
     // Special case of the relic hunter RGW
     if (args.toLowerCase() === "relic hunter") {
-        findRH(channel).then();
+        findRH(channel);
         return;
     }
 
@@ -1952,19 +1959,20 @@ function findMouse(channel, args, command) {
 
 /**
  * Initialize (or refresh) the known loot lists from @devjacksmith's tools.
+ * @returns {Promise<void>}
  */
 function getItemList() {
     const now = DateTime.utc();
     if (last_timestamps.item_refresh) {
         let next_refresh = last_timestamps.item_refresh.plus(refresh_rate);
         if (now < next_refresh)
-            return;
+            return Promise.resolve();
     }
     last_timestamps.item_refresh = now;
 
     console.log("Loot: Requesting a new loot list.");
     const url = "https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=loot&item_id=all";
-    fetch(url).then(response => (response.status === 200) ? response.json() : '').then((body) => {
+    return fetch(url).then(response => (response.status === 200) ? response.json() : '').then((body) => {
         if (body) {
             console.log('Loot: Got a new loot list.');
             items.length = 0;
@@ -1978,19 +1986,20 @@ function getItemList() {
 
 /**
  * Initialize (or refresh) the known filters from @devjacksmith's tools.
+ * @returns {Promise<void>}
  */
 function getFilterList() {
     const now = DateTime.utc();
     if (last_timestamps.filter_refresh) {
         let next_refresh = last_timestamps.filter_refresh.plus(refresh_rate);
         if (now < next_refresh)
-            return;
+            return Promise.resolve();
     }
     last_timestamps.filter_refresh = now;
 
     console.log("Filters: Requesting a new filter list.");
     const url = "https://mhhunthelper.agiletravels.com/filters.php";
-    fetch(url).then(response => (response.status === 200) ? response.json() : '').then((body) => {
+    return fetch(url).then(response => (response.status === 200) ? response.json() : '').then((body) => {
         if (body) {
             console.log("Filters: Got a new filter list");
             filters.length = 0;
@@ -2469,26 +2478,26 @@ function integerComma(number) {
 }
 
 /**
-
  * Reset the Relic Hunter location so reminders know to update people
  */
 function resetRH() {
-    console.log(`Relic hunter location was ${relic_hunter.location} from ${relic_hunter.source}`);
+    console.log(`Relic hunter: resetting location to "unknown", was ${relic_hunter.source}: ${relic_hunter.location}`);
     relic_hunter.location = 'unknown';
     relic_hunter.source = 'reset';
+    relic_hunter.last_seen = DateTime.fromMillis(0);
+    // Schedule the next reset.
     rescheduleResetRH();
-    console.log('Relic hunter location was reset');
 }
 
 /**
  * Continue resetting Relic Hunter location
  */
-
 function rescheduleResetRH() {
     if (relic_hunter.timeout)
         clearTimeout(relic_hunter.timeout);
 
-    relic_hunter.timeout = setTimeout(resetRH, Interval.fromDateTimes(DateTime.utc(),DateTime.utc().endOf('day')).length('milliseconds') );
+    const now = DateTime.utc();
+    relic_hunter.timeout = setTimeout(resetRH, Interval.fromDateTimes(now, now.endOf('day')).length('milliseconds'));
 }
 
 /**
@@ -2497,7 +2506,7 @@ function rescheduleResetRH() {
 function remindRH(new_location) {
     //Logic to look for people with the reminder goes here
     if (new_location != 'unknown') {
-        console.log(`Reminding about relic hunter in ${new_location}`);
+        console.log(`Relic Hunter: Sending reminders for ${new_location}`);
         doRemind(timers_list.find(t => t.getArea() === "relic_hunter"));
     }
 }
@@ -2506,19 +2515,22 @@ function remindRH(new_location) {
  * Relic Hunter location was announced, save it and note the source
  * @param {Message} message Webhook-generated message announcing RH location
  */
-function updRH(message) {
-    //Find the location in the text
-    let start_message = message.cleanContent.indexOf('spotted in');
-    if (start_message > 25) {
-        let new_location = message.cleanContent.substring(
-            message.cleanContent.indexOf('spotted in') + 'spotted in'.length + 3,
-            message.cleanContent.length-2); //Removes the *'s
-        if (relic_hunter.location != new_location) {
-            relic_hunter.location = new_location
+function handleRHWebhook(message) {
+    // Find the location in the text.
+    const locationRE = /spotted in \*\*(.+)\*\*/;
+    if (locationRE.test(message.cleanContent)) {
+        const new_location = locationRE.exec(message.cleanContent)[1];
+        if (relic_hunter.location !== new_location) {
+            relic_hunter.location = new_location;
+            relic_hunter.source = 'webhook';
+            relic_hunter.last_seen = DateTime.utc();
+            console.log(`Relic Hunter: Webhook set location to "${new_location}"`);
             setImmediate(remindRH, new_location);
+        } else {
+            console.log(`Relic Hunter: skipped location update (already set by ${relic_hunter.source})`);
         }
-        console.log(`Now in ${relic_hunter.location}`);
-        relic_hunter.source = 'webhook';
+    } else {
+        console.log(`Relic Hunter: failed to extract location from webhook message:`, message.cleanContent);
     }
 }
 
@@ -2526,89 +2538,59 @@ function updRH(message) {
  * Especially at startup, find the relic hunter's location
  * TODO: This might replace the reset function
  */
-
 async function getRHLocation() {
-    console.log(`Relic hunter was in ${relic_hunter.location} according to ${relic_hunter.source}`);
-    const newLocations = await Promise.all([
+    console.log(`Relic Hunter: Was in ${relic_hunter.location} according to ${relic_hunter.source}`);
+    const [dbg, mhct] = await Promise.all([
         DBGamesRHLookup(),
         MHCTRHLookup()
     ]);
-    // Precedence goes to MHCT because it would have seen RH
-    let newLocation = newLocations.find(t => t && t.source === 'MHCT' && t.location !== 'unknown');
-    if (newLocation && newLocation.location) {
-        relic_hunter.location = newLocation.location;
-        relic_hunter.source = 'MHCT';
+    // Trust MHCT more, since it would actually observe an RH appearance, rather than decode a hint.
+    if (mhct.location !== 'unknown') {
+        Object.assign(relic_hunter, mhct);
+    } else if (dbg.location !== 'unknown') {
+        Object.assign(relic_hunter, dbg);
     } else {
-        newLocation = newLocations.find(t => t && t.source === 'DBGames');
-        if (newLocation && newLocation.location) {
-            relic_hunter.location = newLocation.location;
-            relic_hunter.source = 'DBGames';
-        }
+        // Both sources returned unknown.
+        resetRH();
     }
-    console.log(`Relic hunter is in ${relic_hunter.location} according to ${relic_hunter.source}`);
+    console.log(`Relic Hunter: location set to "${relic_hunter.location}" with source "${relic_hunter.source}"`);
 }
 
 /**
  * Looks up Relic Hunter Location from DBGames via Google Sheets
- * @returns {Promise<unknown>}
- * @constructor
+ * @returns {Promise<{ location: string, source: 'DBGames' }>}
  */
 function DBGamesRHLookup() {
-    let new_location = 'unknown';
-    return new Promise(function(resolve){
-        let req = request({
-                uri: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSsqAjocBWcN5dDLXuOBfnBhyrTaO7ZeIEAFlDnQ4r6zqcvtuLKMDBQCh5I8-3M9irS4-17OPfvgKtY/pub?gid=1975888453&single=true&output=csv'
-            }, (error, response, body) => {
-                if (!error && response.statusCode === 200 && body) {
-                    console.log(`Relic hunter location updated from ${relic_hunter.location} to ${body}`);
-                    resolve({
-                        source: 'DBGames',
-                        location: body,
-                        last_seen: 0
-                    });
-                } else {
-                    console.log(`RelicHunter query failed:`, error, response, body);
-                    resolve({
-                        source: 'broken',
-                        location: 'unknown',
-                        last_seen: 0
-                    });
-                }
-            });
-    });
-
+    return fetch('https://docs.google.com/spreadsheets/d/e/2PACX-1vSsqAjocBWcN5dDLXuOBfnBhyrTaO7ZeIEAFlDnQ4r6zqcvtuLKMDBQCh5I8-3M9irS4-17OPfvgKtY/pub?gid=1975888453&single=true&output=csv')
+        .then(async (response) => {
+            if (!response.ok) throw `HTTP ${response.status}`;
+            const location = await response.text();
+            console.log('Relic Hunter: DBGames query OK, reported location:', location);
+            return { source: 'DBGames', location, last_seen: DateTime.utc().startOf('day') };
+        })
+        .catch((err) => {
+            console.log(`Relic Hunter: DBGames query failed:`, err);
+            return { source: 'DBGames', location: 'unknown' };
+        });
 }
 
 /**
  * Looks up the relic hunter location from MHCT
+ * @returns {Promise<{ location: string, source: 'MHCT' }>}
  */
 function MHCTRHLookup() {
-    if (relic_hunter.source === 'MHCT' && relic_hunter.location !== 'unknown') {
-        return;
-    }
-    return new Promise(function(resolve){
-        let req = request({
-            uri: 'https://mhhunthelper.agiletravels.com/tracker.json',
-            json: true
-        }, (error, response, body) => {
-            if (!error && response.statusCode === 200) {
-                resolve({
-                        source: 'MHCT',
-                        location: decode(body["rh"]["location"]),
-                        last_seen: decode(body["rh"]["last_seen"])
-                    }
-                );
-            } else {
-                console.log(`RelicHunter query failed:`, error, response, body);
-                resolve({
-                    source: 'broken',
-                    location: 'unknown',
-                    last_seen: 0
-                    }
-                );
-            }
+    return fetch('https://mhhunthelper.agiletravels.com/tracker.json')
+        .then(async (response) => {
+            if (!response.ok) throw `HTTP ${response.status}`;
+            const { rh } = await response.json();
+            console.log('Relic Hunter: MHCT query OK, reported location:', rh.location);
+            // TODO: what's the format of rh.last_seen? when "unknown", has value 0. Assuming milliseconds UTC
+            return { source: 'MHCT', last_seen: DateTime.fromMillis(rh.last_seen), location: rh.location };
+        })
+        .catch((err) => {
+            console.log(`Relic Hunter: MHCT query failed:`, err);
+            return { source: 'MHCT', location: 'unknown' };
         });
-    });
 }
 
 /**
@@ -2616,22 +2598,25 @@ function MHCTRHLookup() {
  * @param {TextChannel} channel the channel on which to respond.
  */
 async function findRH(channel) {
-    let responseStr = "";
+    const asMessage = (location) => {
+        let message = (location !== 'unknown')
+            ? `Relic Hunter has been spotted in **${location}**`
+            : `Relic Hunter has not been spotted yet`;
+        message += ` and moves again ${timeLeft(DateTime.utc().endOf('day'))}`;
+        return message;
+    };
     let original_location = relic_hunter.location;
-    if (relic_hunter.source !== 'MHCT') {
-        console.log(`Looking for RH, might be in ${original_location}`);
+    // If we have MHCT data from today, trust it, otherwise attempt to update our known location.
+    if (relic_hunter.source !== 'MHCT' || !DateTime.utc().hasSame(relic_hunter.last_seen, 'day')) {
+        console.log(`Relic Hunter: location requested, might be "${original_location}"`);
         await getRHLocation();
+        console.log(`Relic Hunter: location update completed, is now "${relic_hunter.location}"`);
     }
-    responseStr = `Relic Hunter has been spotted in **${relic_hunter.location}** and will be there for the next `;
-    let nextMove  = timeLeft(DateTime.utc().endOf('day'));
-    responseStr += nextMove;
-    if (relic_hunter.location !== 'unknown') {
-        channel.send(responseStr);
-        if (relic_hunter.location !== original_location) {
-            setImmediate(remindRH, relic_hunter.location);
-        }
-    } else {
-        channel.send(`Relic Hunter has not been found yet and moves again in ${nextMove}`);
+
+    channel.send(asMessage(relic_hunter.location))
+        .catch((err) => console.log(`Relic Hunter: Could not send response to Find RH request`, err));
+    if (relic_hunter.location !== 'unknown' && relic_hunter.location !== original_location) {
+        setImmediate(remindRH, relic_hunter.location);
     }
 }
 
