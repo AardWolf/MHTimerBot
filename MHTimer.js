@@ -2583,9 +2583,10 @@ function MHCTRHLookup() {
         .then(async (response) => {
             if (!response.ok) throw `HTTP ${response.status}`;
             const { rh } = await response.json();
-            console.log('Relic Hunter: MHCT query OK, reported location:', rh.location);
-            // TODO: what's the format of rh.last_seen? when "unknown", has value 0. Assuming milliseconds UTC
-            return { source: 'MHCT', last_seen: DateTime.fromMillis(rh.last_seen), location: rh.location };
+            console.log(`Relic Hunter: MHCT query OK, location: ${rh.location}, last_seen: ${rh.last_seen}`);
+            let last_seen = Number(rh.last_seen);
+            if (last_seen.NaN) { last_seen = Number(0); }
+            return { source: 'MHCT', last_seen: DateTime.fromSeconds(last_seen), location: rh.location };
         })
         .catch((err) => {
             console.log(`Relic Hunter: MHCT query failed:`, err);
