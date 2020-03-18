@@ -1762,7 +1762,7 @@ function getQueriedData(queryType, dbEntity, options) {
     qsOptions.append('item_type', queryType);
     qsOptions.append('item_id', dbEntity.id);
 
-    return fetch('https://mhhunthelper.agiletravels.com/searchByItem.php', { body: qsOptions })
+    return fetch('https://mhhunthelper.agiletravels.com/searchByItem.php?' + qsOptions.toString())
         .then((response) => {
             if (response.ok) {
                 /**
