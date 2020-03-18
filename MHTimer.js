@@ -1393,8 +1393,10 @@ function sendRemind(user, remind, timer) {
     // TODO: better timer title info - no markdown formatting in the title.
     const output = new Discord.RichEmbed({ title: timer.getAnnouncement() });
 
-    if (timer.getArea() === "relic_hunter")
+    if (timer.getArea() === "relic_hunter") {
         output.addField('Current Location', `She's in **${relic_hunter.location}**`, true);
+        output.setTitle(`RH: ${relic_hunter.location}`);
+    }
 
     // Describe the remaining reminders.
     if (remind.fail > 10)
