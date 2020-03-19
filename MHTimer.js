@@ -12,7 +12,8 @@ const Timer = require('./timerClass.js');
 // Access local URIs, like files.
 const fs = require('fs');
 // Access external URIs, like @devjacksmith 's tools.
-const request = require('request');
+const fetch = require('node-fetch');
+const { URLSearchParams } = require('url');
 // We need more robust CSV handling
 const csv_parse = require('csv-parse');
 // Relic hunter (and maybe others?) introduced HTML escapes
@@ -38,7 +39,12 @@ const settings = {},
     items = [],
     filters = [],
     hunters = {},
-    relic_hunter = {},
+    relic_hunter = {
+        location: 'unknown',
+        source: 'startup',
+        last_seen: DateTime.fromMillis(0),
+        timeout: null,
+    },
     nicknames = new Map(),
     nickname_urls = {};
 
@@ -107,6 +113,13 @@ console.log = function()
     }
 };
 
+process.once('SIGINT', () => {
+    client.destroy();
+});
+process.once('SIGTERM', () => {
+    client.destroy();
+});
+
 process.on('uncaughtException', exception => {
     console.log(exception); // to see your exception details in the console
     // if you are on production, maybe you can send the exception details to your
@@ -128,6 +141,9 @@ function Main() {
             }
             // Settings loaded successfully, so initiate loading of other resources.
             const saveInterval = refresh_rate.as('milliseconds');
+
+            // Schedule the daily Relic Hunter reset.
+            rescheduleResetRH();
 
             // Create timers list from the timers file.
             const hasTimers = loadTimers()
@@ -185,7 +201,7 @@ function Main() {
 
             // Register filters
             const hasFilters = Promise.resolve()
-                .then(getFilterList())
+                .then(getFilterList)
                 .then(() => {
                     return Object.keys(filters).length > 0;
                 })
@@ -196,11 +212,12 @@ function Main() {
                     dataTimers['filters'] = setInterval(getFilterList, saveInterval);
                 });
 
-            // Load remote data.
-            const remoteData = Promise.resolve()
-                .then(getMouseList)
-                .then(getItemList)
-                .then(getFilterList);
+            // Start loading remote data.
+            const remoteData = [
+                getMouseList(),
+                getItemList(),
+                getRHLocation(),
+            ];
 
             // Configure the bot behavior.
             client.once("ready", () => {
@@ -233,7 +250,7 @@ function Main() {
                     return;
 
                 if (message.webhookID === settings.relic_hunter_webhook)
-                    updRH(message);
+                    handleRHWebhook(message);
 
                 switch (message.channel.name) {
                     case settings.linkConversionChannel:
@@ -258,24 +275,26 @@ function Main() {
             client.on('reconnecting', () => console.log('Connection lost, reconnecting to Discord...'));
             // WebSocket disconnected and is no longer trying to reconnect.
             client.on('disconnect', event => {
-                console.log("Close event: " + event.reason);
-                console.log(`Close code: ${event.code} (${event.wasClean ? `not ` : ``}cleanly closed)`);
+                console.log(`Client socket closed: ${event.reason || 'No reason given'}`);
+                console.log(`Socket close code: ${event.code} (${event.wasClean ? `` : `not `}cleanly closed)`);
                 quit();
             });
             // Configuration complete. Using Promise.all() requires these tasks to complete
             // prior to bot login.
             return Promise.all([
-                hasTimers,
-                hasReminders,
+                hasFilters,
+                hasHunters,
                 hasNicknames,
-                remoteData
+                hasReminders,
+                hasTimers,
+                ...remoteData,
             ]);
         })
         // Finally, log in now that we have loaded all data from disk,
         // requested data from remote sources, and configured the bot.
-        .then(didConfig => client.login(settings.token))
+        .then(() => client.login(settings.token))
         .catch(err => {
-            console.log(err);
+            console.log('Unhandled startup error, shutting down:', err);
             client.destroy()
                 .then(() => process.exitCode = 1);
         });
@@ -289,11 +308,11 @@ catch(error) {
 
 function quit() {
     return doSaveAll()
-        .then(didSave => {
-            console.log(`Shutdown: data saves completed`);
-            return didSave;
-        }, err => console.log(`Shutdown: error while saving:\n`, err))
-        .then(didSave => { console.log(`Shutdown: destroying client`); return client.destroy(); })
+        .then(
+            () => console.log(`Shutdown: data saves completed`),
+            (err) => console.log(`Shutdown: error while saving:\n`, err)
+        )
+        .then(() => { console.log(`Shutdown: destroying client`); return client.destroy(); })
         .then(() => {
             console.log(`Shutdown: deactivating data refreshes`);
             for (let timer of Object.values(dataTimers))
@@ -303,8 +322,11 @@ function quit() {
                 timer.stopInterval();
                 timer.stopTimeout();
             }
+            if (relic_hunter.timeout) {
+                clearTimeout(relic_hunter.timeout);
+            }
         })
-        .then(result => process.exitCode = 1)
+        .then(() => process.exitCode = 1)
         .catch(err => {
             console.log(`Shutdown: unhandled error:\n`, err, `\nImmediately exiting.`);
             process.exit();
@@ -381,9 +403,11 @@ function loadSettings(path = main_settings_filename) {
             settings.timedAnnouncementChannels = settings.timedAnnouncementChannels.split(",").map(s => s.trim());
         settings.timedAnnouncementChannels = new Set(settings.timedAnnouncementChannels);
 
-        settings.relic_hunter_webhook = settings.relic_hunter_webhook ? settings.relic_hunter_webhook : "283571156236107777";
+        settings.relic_hunter_webhook = settings.relic_hunter_webhook || "283571156236107777";
 
         settings.botPrefix = settings.botPrefix ? settings.botPrefix.trim() : '-mh';
+
+        settings.owner = settings.owner || "0"; // So things don't fail if it's unset
         return true;
     }).catch(err => {
         console.log(`Settings: error while reading settings from '${path}':\n`, err);
@@ -438,6 +462,8 @@ function createTimersFromList(timerData) {
  * @param {TextChannel[]} channels the channels on which this timer will initially perform announcements.
  */
 function scheduleTimer(timer, channels) {
+    if (timer.isSilent())
+        return
     let msUntilActivation = timer.getNext().diffNow().minus(timer.getAdvanceNotice()).as('milliseconds');
     timer.storeTimeout('scheduling',
         setTimeout(t => {
@@ -693,6 +719,20 @@ function parseUserMessage(message) {
             }
             break;
 
+        case 'reset':
+            if (message.author.id === settings.owner) {
+                if (!tokens.length) {
+                    message.channel.send("I don't know what to reset.");
+                }
+                let sub_command = tokens.shift();
+                switch (sub_command) {
+                    case 'rh':
+                    case 'relic_hunter':
+                    default:
+                        resetRH();
+                }
+                break;
+            }
         case 'help':
         case 'arrg':
         case 'aarg':
@@ -719,7 +759,7 @@ async function convertRewardLink(message) {
     const newLinks = (await Promise.all(links.map(async link => {
         const target = await getHGTarget(link);
         if (target) {
-            const shortLink = await getBitlyLink(target)
+            const shortLink = await getBitlyLink(target);
             return shortLink ? { fb: link, mh: shortLink } : "";
         } else {
             return "";
@@ -742,21 +782,15 @@ async function convertRewardLink(message) {
      * @returns {Promise<string>} A mousehuntgame.com link that should be converted.
      */
     function getHGTarget(url) {
-        return new Promise(resolve => {
-            request({
-                url,
-                method: 'GET',
-                followRedirect: false
-            }, (error, response, body) => {
-                if (!error && response.statusCode === 301) {
-                    const facebookURL = response.headers.location;
-                    resolve(facebookURL.replace('https://apps.facebook.com/mousehunt', 'https://www.mousehuntgame.com'));
-                } else {
-                    reportRequestError("Links: GET to htgb.co failed:", error, response, body);
-                    resolve('');
-                }
-            });
-        });
+        return fetch(url, { redirect: 'manual' }).then((response) => {
+            if (response.status === 301) {
+                const facebookURL = response.headers.get('location');
+                return facebookURL.replace('https://apps.facebook.com/mousehunt', 'https://www.mousehuntgame.com');
+            } else {
+                throw `HTTP ${response.status}`;
+            }
+        }).catch((err) => console.log('Links: GET to htgb.co failed with error', err))
+        .then(result => result || '');
     }
 
     /**
@@ -765,21 +799,24 @@ async function convertRewardLink(message) {
      * @returns {Promise<string>} A bit.ly link with the same resolved address, except to a non-Facebook site.
      */
     function getBitlyLink(url) {
-        return new Promise(resolve => {
-            request.post({
-                auth: { bearer: settings.bitly_token },
-                url: 'https://api-ssl.bitly.com/v4/shorten',
-                json: { long_url: url }
-            }, (error, response, body) => {
-                if (!error && [200, 201].includes(response.statusCode) && 'link' in body) {
-                    resolve(body.link);
-                } else {
-                    // TODO: API rate limit error handling? Could delegate to caller.
-                    reportRequestError("Links: Bitly shortener failed:", error, response, body);
-                    resolve('');
-                }
-            });
-        });
+        const options = {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${settings.bitly_token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ long_url: url }),
+        };
+        return fetch('https://api-ssl.bitly.com/v4/shorten', options).then(async (response) => {
+            if ([200, 201].includes(response.status)) {
+                const { link } = await response.json();
+                return link;
+            } else {
+                // TODO: API rate limit error handling? Could delegate to caller. Probably not an issue with this bot.
+                throw `HTTP ${response.status}`;
+            }
+        }).catch((err) => console.log('Links: Bitly shortener failed with error:', err))
+        .then(result => result || '');
     }
 }
 
@@ -896,12 +933,17 @@ function parseTokenForArea(token, newReminder) {
             newReminder.area = 'fg';
             break;
 
-        // Game Reset / Relic Hunter movement aliases
+        // Game Reset
         case 'reset':
         case 'game':
-        case 'rh':
         case 'midnight':
             newReminder.area = 'reset';
+            break;
+
+        case 'rh':
+        case 'rhm':
+        case 'relic':
+            newReminder.area = 'relic_hunter';
             break;
 
         // Balack's Cove aliases
@@ -1288,6 +1330,8 @@ function doAnnounce(timer) {
  * @param {Timer} timer The activated timer.
  */
 function doRemind(timer) {
+    if (!timer) return;
+
     // Cache these values.
     const area = timer.getArea(),
         sub = timer.getSubArea();
@@ -1348,6 +1392,11 @@ function sendRemind(user, remind, timer) {
         return;
     // TODO: better timer title info - no markdown formatting in the title.
     const output = new Discord.RichEmbed({ title: timer.getAnnouncement() });
+
+    if (timer.getArea() === "relic_hunter") {
+        output.addField('Current Location', `She's in **${relic_hunter.location}**`, true);
+        output.setTitle(`RH: ${relic_hunter.location}`);
+    }
 
     // Describe the remaining reminders.
     if (remind.fail > 10)
@@ -1557,7 +1606,7 @@ function buildSchedule(timer_request) {
     /** @type {{time: DateTime, message: string}[]} */
     const upcoming_timers = [];
     const max_timers = 24;
-    (!area ? timers_list : timers_list.filter(t => t.getArea() === area))
+    (!area ? timers_list : timers_list.filter(t => t.getArea() === area && !t.isSilent()))
         .forEach(timer => {
             let message = timer.getDemand();
             for (let time of timer.upcoming(until))
@@ -1709,26 +1758,22 @@ function getQueriedData(queryType, dbEntity, options) {
      */
 
     // No result in cache, requery.
-    return new Promise((resolve, reject) => {
-        const qsOptions = options || {};
-        qsOptions.item_type = queryType;
-        qsOptions.item_id = dbEntity.id;
-        request({
-            uri: 'https://mhhunthelper.agiletravels.com/searchByItem.php',
-            json: true,
-            qs: qsOptions
-        }, (error, response, body) => {
-            if (!error && response.statusCode === 200 && Array.isArray(body)) {
+    const qsOptions = new URLSearchParams(options);
+    qsOptions.append('item_type', queryType);
+    qsOptions.append('item_id', dbEntity.id);
+
+    return fetch('https://mhhunthelper.agiletravels.com/searchByItem.php?' + qsOptions.toString())
+        .then((response) => {
+            if (response.ok) {
                 /**
                  * Replace with actual cache storage:
                  * Cache.put(queryType, dbEntity.id, options, body);
                  */
-                resolve(body);
+                return response.json();
+            } else {
+                throw { error: `HTTP ${response.status}`, response };
             }
-            else
-                reject({ error: error, response: response });
         });
-    });
 }
 
 /**
@@ -1772,6 +1817,7 @@ function removeQueryStringParams(args, qsParams) {
 
 /**
  * Initialize (or refresh) the known mice lists from @devjacksmith's tools.
+ * @returns {Promise<void>}
  */
 function getMouseList() {
     const now = DateTime.utc();
@@ -1779,28 +1825,23 @@ function getMouseList() {
     if (last_timestamps.mouse_refresh) {
         let next_refresh = last_timestamps.mouse_refresh.plus(refresh_rate);
         if (now < next_refresh)
-            return;
+            return Promise.resolve();
     }
     last_timestamps.mouse_refresh = now;
 
     // Query @devjacksmith's tools for mouse lists.
     console.log("Mice: Requesting a new mouse list.");
     const url = "https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=mouse&item_id=all";
-    request({
-        url: url,
-        json: true
-    }, (error, response, body) => {
-        if (error)
-            reportRequestError(`Mice: request failed:`, error, response, body);
-        else if (response.statusCode !== 200)
-            console.log(`Mice: request returned response "${response.statusCode}: ${response.statusMessage}"\n`, response.toJSON());
-        else {
-            console.log("Mice: Got a new mouse list.");
+    return fetch(url).then(response => (response.status === 200) ? response.json() : '').then((body) => {
+        if (body) {
+            console.log('Mice: Got a new mouse list.');
             mice.length = 0;
             Array.prototype.push.apply(mice, body);
             mice.forEach(mouse => mouse.lowerValue = mouse.value.toLowerCase());
+        } else {
+            console.log('Mice: request returned non-200 response');
         }
-    });
+    }).catch(err => console.log('Mice: request returned error:', err));
 }
 
 /**
@@ -1920,64 +1961,56 @@ function findMouse(channel, args, command) {
 
 /**
  * Initialize (or refresh) the known loot lists from @devjacksmith's tools.
+ * @returns {Promise<void>}
  */
 function getItemList() {
     const now = DateTime.utc();
     if (last_timestamps.item_refresh) {
         let next_refresh = last_timestamps.item_refresh.plus(refresh_rate);
         if (now < next_refresh)
-            return;
+            return Promise.resolve();
     }
     last_timestamps.item_refresh = now;
 
     console.log("Loot: Requesting a new loot list.");
     const url = "https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=loot&item_id=all";
-    request({
-        url: url,
-        json: true
-    }, (error, response, body) => {
-        if (error)
-            reportRequestError(`Loot: request failed:`, error, response, body);
-        else if (response.statusCode !== 200)
-            console.log(`Loot: request returned response "${response.statusCode}: ${response.statusMessage}"\n`, response.toJSON());
-        else {
-            console.log("Loot: Got a new loot list");
+    return fetch(url).then(response => (response.status === 200) ? response.json() : '').then((body) => {
+        if (body) {
+            console.log('Loot: Got a new loot list.');
             items.length = 0;
             Array.prototype.push.apply(items, body);
             items.forEach(item => item.lowerValue = item.value.toLowerCase());
+        } else {
+            console.log('Loot: request returned non-200 response');
         }
-    });
+    }).catch(err => console.log('Mice: request returned error:', err));
 }
 
 /**
  * Initialize (or refresh) the known filters from @devjacksmith's tools.
+ * @returns {Promise<void>}
  */
 function getFilterList() {
     const now = DateTime.utc();
     if (last_timestamps.filter_refresh) {
         let next_refresh = last_timestamps.filter_refresh.plus(refresh_rate);
         if (now < next_refresh)
-            return;
+            return Promise.resolve();
     }
     last_timestamps.filter_refresh = now;
 
-    console.log("Loot: Requesting a new filter list.");
+    console.log("Filters: Requesting a new filter list.");
     const url = "https://mhhunthelper.agiletravels.com/filters.php";
-    request({
-        url: url,
-        json: true
-    }, (error, response, body) => {
-        if (error)
-            reportRequestError(`Filters: request failed:`, error, response, body);
-        else if (response.statusCode !== 200)
-            console.log(`Filters: request returned response "${response.statusCode}: ${response.statusMessage}"\n`, response.toJSON());
-        else {
+    return fetch(url).then(response => (response.status === 200) ? response.json() : '').then((body) => {
+        if (body) {
             console.log("Filters: Got a new filter list");
             filters.length = 0;
             Array.prototype.push.apply(filters, body);
             filters.forEach(filter => filter.lowerValue = filter.code_name.toLowerCase());
+        } else {
+            console.log('Filters: request returned non-200 response');
         }
-    });
+    }).catch(err => console.log('Filters: request returned error:', err));
 }
 
 /**
@@ -2371,31 +2404,27 @@ function getNicknames(type) {
         console.log(`Nicknames: Received '${type}' but I don't know its URL.`);
         return;
     }
-    let newData = {};
+    const newData = {};
     // It returns a string as CSV, not JSON.
     // Set up the parser
-    let parser = csv_parse({delimiter: ","})
+    const parser = csv_parse({ delimiter: ',' })
         .on('readable', () => {
             while (record = parser.read())
                 newData[record[0]] = record[1];
         })
         .on('error', err => console.log(err.message));
 
-    request({
-        url: nickname_urls[type]
-    }, (error, response, body) => {
-        if (error)
-            reportRequestError(`Nicknames: request failed:`, error, response, body);
-        else if (response.statusCode !== 200)
-            console.log(`Nicknames: request returned response "${response.statusCode}: ${response.statusMessage}"\n`, response.toJSON());
-        else {
-            // Pass the response to the CSV parser (after removing the header row).
-            parser.write(body.split(/[\r\n]+/).splice(1).join("\n").toLowerCase());
+    fetch(nickname_urls[type]).then(async (response) => {
+        if (response.status !== 200) {
+            throw new Error(`HTTP ${response.status}`);
         }
+        const body = await response.text();
+        // Pass the response to the CSV parser (after removing the header row).
+        parser.write(body.split(/[\r\n]+/).splice(1).join("\n").toLowerCase());
         // Create a new (or replace the existing) nickname definition for this type.
         nicknames.set(type, newData);
         parser.end(() => console.log(`Nicknames: ${Object.keys(newData).length} of type '${type}' loaded.`));
-    });
+    }).catch(err => console.log(`Nicknames: request for type '${type}' failed with error:`, err));
 }
 
 /**
@@ -2451,48 +2480,149 @@ function integerComma(number) {
 }
 
 /**
+ * Reset the Relic Hunter location so reminders know to update people
+ */
+function resetRH() {
+    console.log(`Relic hunter: resetting location to "unknown", was ${relic_hunter.source}: ${relic_hunter.location}`);
+    relic_hunter.location = 'unknown';
+    relic_hunter.source = 'reset';
+    relic_hunter.last_seen = DateTime.fromMillis(0);
+    // Schedule the next reset.
+    rescheduleResetRH();
+}
+
+/**
+ * Continue resetting Relic Hunter location
+ */
+function rescheduleResetRH() {
+    if (relic_hunter.timeout)
+        clearTimeout(relic_hunter.timeout);
+
+    const now = DateTime.utc();
+    relic_hunter.timeout = setTimeout(resetRH, Interval.fromDateTimes(now, now.endOf('day')).length('milliseconds'));
+}
+
+/**
+ * Notify about relic hunter changing location
+ */
+function remindRH(new_location) {
+    //Logic to look for people with the reminder goes here
+    if (new_location != 'unknown') {
+        console.log(`Relic Hunter: Sending reminders for ${new_location}`);
+        doRemind(timers_list.find(t => t.getArea() === "relic_hunter"));
+    }
+}
+
+/**
  * Relic Hunter location was announced, save it and note the source
  * @param {Message} message Webhook-generated message announcing RH location
  */
-function updRH(message) {
-    //Find the location in the text
-    let start_message = message.cleanContent.indexOf('spotted in');
-    if (start_message > 25) {
-        relic_hunter.location = message.cleanContent.substring(
-            message.cleanContent.indexOf('spotted in') + 'spotted in'.length + 3,
-            message.cleanContent.length-2); //Removes the *'s
-        console.log(`Now in ${relic_hunter.location}`);
-        relic_hunter.source = "webhook";
+function handleRHWebhook(message) {
+    // Find the location in the text.
+    const locationRE = /spotted in \*\*(.+)\*\*/;
+    if (locationRE.test(message.cleanContent)) {
+        const new_location = locationRE.exec(message.cleanContent)[1];
+        if (relic_hunter.location !== new_location) {
+            relic_hunter.location = new_location;
+            relic_hunter.source = 'webhook';
+            relic_hunter.last_seen = DateTime.utc();
+            console.log(`Relic Hunter: Webhook set location to "${new_location}"`);
+            setImmediate(remindRH, new_location);
+        } else {
+            console.log(`Relic Hunter: skipped location update (already set by ${relic_hunter.source})`);
+        }
+    } else {
+        console.log(`Relic Hunter: failed to extract location from webhook message:`, message.cleanContent);
     }
+}
+
+/**
+ * Especially at startup, find the relic hunter's location
+ * TODO: This might replace the reset function
+ */
+async function getRHLocation() {
+    console.log(`Relic Hunter: Was in ${relic_hunter.location} according to ${relic_hunter.source}`);
+    const [dbg, mhct] = await Promise.all([
+        DBGamesRHLookup(),
+        MHCTRHLookup()
+    ]);
+    // Trust MHCT more, since it would actually observe an RH appearance, rather than decode a hint.
+    if (mhct.location !== 'unknown') {
+        Object.assign(relic_hunter, mhct);
+    } else if (dbg.location !== 'unknown') {
+        Object.assign(relic_hunter, dbg);
+    } else {
+        // Both sources returned unknown.
+        resetRH();
+    }
+    console.log(`Relic Hunter: location set to "${relic_hunter.location}" with source "${relic_hunter.source}"`);
+}
+
+/**
+ * Looks up Relic Hunter Location from DBGames via Google Sheets
+ * @returns {Promise<{ location: string, source: 'DBGames' }>}
+ */
+function DBGamesRHLookup() {
+    return fetch('https://docs.google.com/spreadsheets/d/e/2PACX-1vSsqAjocBWcN5dDLXuOBfnBhyrTaO7ZeIEAFlDnQ4r6zqcvtuLKMDBQCh5I8-3M9irS4-17OPfvgKtY/pub?gid=1975888453&single=true&output=csv')
+        .then(async (response) => {
+            if (!response.ok) throw `HTTP ${response.status}`;
+            const location = await response.text();
+            console.log('Relic Hunter: DBGames query OK, reported location:', location);
+            return { source: 'DBGames', location, last_seen: DateTime.utc().startOf('day') };
+        })
+        .catch((err) => {
+            console.log(`Relic Hunter: DBGames query failed:`, err);
+            return { source: 'DBGames', location: 'unknown' };
+        });
+}
+
+/**
+ * Looks up the relic hunter location from MHCT
+ * @returns {Promise<{ location: string, source: 'MHCT' }>}
+ */
+function MHCTRHLookup() {
+    return fetch('https://mhhunthelper.agiletravels.com/tracker.json')
+        .then(async (response) => {
+            if (!response.ok) throw `HTTP ${response.status}`;
+            const { rh } = await response.json();
+            console.log(`Relic Hunter: MHCT query OK, location: ${rh.location}, last_seen: ${rh.last_seen}`);
+            let last_seen = Number(rh.last_seen);
+            if (last_seen.NaN) { last_seen = Number(0); }
+            return { source: 'MHCT', last_seen: DateTime.fromSeconds(last_seen), location: rh.location };
+        })
+        .catch((err) => {
+            console.log(`Relic Hunter: MHCT query failed:`, err);
+            return { source: 'MHCT', location: 'unknown' };
+        });
 }
 
 /**
  * Processes a request to find the relic hunter
  * @param {TextChannel} channel the channel on which to respond.
  */
-function findRH(channel) {
-    let responseStr = "";
-    //RH was not seen since beginning of today, grab the info
-    let req = request({
-            uri: 'https://mhhunthelper.agiletravels.com/tracker.json',
-            json: true
-        }, (error, response, body) => {
-            if (!error && response.statusCode === 200) {
-                if (body["rh"]["location"] === 'unknown') {
-                    if (relic_hunter.location)
-                        body["rh"]["location"] = relic_hunter.location;
-                }
-                responseStr = `Relic Hunter has been spotted in **${decode(body["rh"]["location"])}** and will be there for the next `;
-                responseStr += timeLeft(DateTime.utc().endOf('day'));
-                channel.send(responseStr);
-            }
-            else {
-                reportRequestError(`RelicHunter query failed:`, error, response, body);
-                channel.send("I was unable to get a good answer on that one.");
-            }
-        });
-    // If we have to use dbgames.info the xpath is: //*[@id="maincontent"]/table/tbody/tr/td[1]/div/div[4]/div[3]/h4/b/a
+async function findRH(channel) {
+    const asMessage = (location) => {
+        let message = (location !== 'unknown')
+            ? `Relic Hunter has been spotted in **${location}**`
+            : `Relic Hunter has not been spotted yet`;
+        message += ` and moves again ${timeLeft(DateTime.utc().endOf('day'))}`;
+        return message;
+    };
+    let original_location = relic_hunter.location;
+    // If we have MHCT data from today, trust it, otherwise attempt to update our known location.
+    if (relic_hunter.source !== 'MHCT' || !DateTime.utc().hasSame(relic_hunter.last_seen, 'day')) {
+        console.log(`Relic Hunter: location requested, might be "${original_location}"`);
+        await getRHLocation();
+        console.log(`Relic Hunter: location update completed, is now "${relic_hunter.location}"`);
+    }
+
+    channel.send(asMessage(relic_hunter.location))
+        .catch((err) => console.log(`Relic Hunter: Could not send response to Find RH request`, err));
+    if (relic_hunter.location !== 'unknown' && relic_hunter.location !== original_location) {
+        setImmediate(remindRH, relic_hunter.location);
+    }
 }
+
 
 /**
  * Helper function to convert all elements of an iterable container into an oxford-comma-delimited

@@ -11,6 +11,7 @@ const { DateTime, Duration, Interval } = require('luxon');
  * @property {string} announce_string The message printed when this timer activates, i.e. "X is happening right now"
  * @property {string} demand_string The message printed when this timer is upcoming, i.e. "do this before X happens"
  * @property {number | {}} announce_offset How far in advance of the actual "activation time" the timer should be activated to send reminders, in milliseconds or luxon Duration object format.
+ * @property {Boolean} silent If it's silent it doesn't get announced but otherwise works
 */
 
 /**
@@ -19,7 +20,7 @@ const { DateTime, Duration, Interval } = require('luxon');
  * a message is sent to the MouseHunt Discord's #timers channel, and also to any subscribed Discord users via PM. Optionally, a
  * Timer can offer an advanced notice of the upcoming activation - for example, being alerted that the Forbidden Grove has just
  * closed is far less useful than being notified that it is *about to close*.
- * 
+ *
  * @class Timer
  */
 class Timer {
@@ -33,7 +34,7 @@ class Timer {
         if (!seed)
             throw new TypeError("Timer construction requires an input seed object.");
 
-        // If the input Timer seed is a primitive (e.g. 1), or is missing required properties, bail. 
+        // If the input Timer seed is a primitive (e.g. 1), or is missing required properties, bail.
         const keys = Object.keys(seed);
         const required = ['area', 'seed_time', 'repeat_time'];
         // If a required key is missing, or has a falsy value, then the seed is invalid.
@@ -77,6 +78,9 @@ class Timer {
 
         // If no advance warning is specified, the timer will send reminders only when it activates.
         this._advanceNotice = getAsDuration(seed.announce_offset || 0, true);
+
+        // Default to not silent
+        this._silent = seed.silent;
 
         /** @type {Object <string, NodeJS.Timer>} the NodeJS.Timer object created by NodeJS.setTimeout() */
         this._timeout = {};
@@ -158,6 +162,7 @@ class Timer {
      * @returns {DateTime} a new Date object that indicates the next time this Timer will activate.
      */
     getNext() {
+
         return this.getLastActivation().plus(this._repeatDuration);
     }
 
@@ -202,7 +207,7 @@ class Timer {
      * Returns the string to be displayed when the timer activates.
      *
      * @instance
-     * @returns {string} The announcment associated with the timer.
+     * @returns {string} The announcement associated with the timer.
      */
     getAnnouncement() {
         return this._announcement;
@@ -310,6 +315,16 @@ class Timer {
                 clearInterval(this._interval[key]);
             this._interval = {};
         }
+    }
+
+    /**
+     * Lets the silent property be inspected
+     *
+     * @instance
+     * @returns {Boolean} whether this is a silent timer, meaning it shouldn't be scheduled
+     */
+    isSilent() {
+        return this._silent;
     }
 }
 
