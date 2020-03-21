@@ -16,6 +16,7 @@ const {
     splitString,
     timeLeft,
 } = require('./modules/utils');
+const Logger = require('./modules/logger');
 
 // Access local URIs, like files.
 const fs = require('fs');
@@ -85,40 +86,6 @@ const emojis = [
     { id: "9%E2%83%A3", text: ':nine:' },
     { id: "%F0%9F%94%9F", text: ':keycap_ten:' }];
 
-//https://stackoverflow.com/questions/12008120/console-log-timestamps-in-chrome
-console.logCopy = console.log.bind(console);
-
-console.log = function()
-{
-    // Timestamp to prepend
-    var timestamp = DateTime.utc().toJSON();
-
-    if (arguments.length)
-    {
-        // True array copy so we can call .splice()
-        var args = Array.prototype.slice.call(arguments, 0);
-
-        // If there is a format string then... it must
-        // be a string
-        if (typeof arguments[0] === "string")
-        {
-            // Prepend timestamp to the (possibly format) string
-            args[0] = "[" + timestamp + "] " + arguments[0];
-
-            // Insert the timestamp where it has to be
-            //args.splice(0, 0, "[" + timestamp + "]");
-
-            // Log the whole array
-            this.logCopy.apply(this, args);
-        }
-        else
-        {
-            // "Normal" log
-            this.logCopy(timestamp, args);
-        }
-    }
-};
-
 process.once('SIGINT', () => {
     client.destroy();
 });
@@ -127,10 +94,8 @@ process.once('SIGTERM', () => {
 });
 
 process.on('uncaughtException', exception => {
-    console.log(exception); // to see your exception details in the console
-    // if you are on production, maybe you can send the exception details to your
-    // email as well ?
-    doSaveAll().then(didSave => console.log(`Save status: files ${didSave ? "" : "maybe "}saved.`));
+    Logger.error(exception);
+    doSaveAll().then(didSave => Logger.log(`Save status: files ${didSave ? "" : "maybe "}saved.`));
 });
 
 function Main() {
@@ -142,7 +107,7 @@ function Main() {
                 throw new Error(`Exiting due to failure to acquire local settings data.`);
             }
             function failedLoad(prefix, reason) {
-                console.log(prefix, reason);
+                Logger.log(prefix, reason);
                 return false;
             }
             // Settings loaded successfully, so initiate loading of other resources.
@@ -155,7 +120,7 @@ function Main() {
             const hasTimers = loadTimers()
                 .then(timerData => {
                     createTimersFromList(timerData);
-                    console.log(`Timers: imported ${timerData.length} from file.`);
+                    Logger.log(`Timers: imported ${timerData.length} from file.`);
                     return timers_list.length > 0;
                 })
                 .catch(err => failedLoad(`Timers: import error:\n`, err));
@@ -165,12 +130,12 @@ function Main() {
                 .then(reminderData => {
                     if (createRemindersFromData(reminderData))
                         pruneExpiredReminders();
-                    console.log(`Reminders: imported ${reminderData.length} from file.`);
+                    Logger.log(`Reminders: imported ${reminderData.length} from file.`);
                     return reminders.length > 0;
                 })
                 .catch(err => failedLoad(`Reminders: import error:\n`, err));
             hasReminders.then(hasReminders => {
-                console.log(`Reminders: Configuring save every ${saveInterval / (60 * 1000)} min.`);
+                Logger.log(`Reminders: Configuring save every ${saveInterval / (60 * 1000)} min.`);
                 dataTimers['reminders'] = setInterval(() => {
                     pruneExpiredReminders();
                     saveReminders();
@@ -181,12 +146,12 @@ function Main() {
             const hasHunters = loadHunterData()
                 .then(hunterData => {
                     Object.assign(hunters, hunterData);
-                    console.log(`Hunters: imported ${Object.keys(hunterData).length} from file.`);
+                    Logger.log(`Hunters: imported ${Object.keys(hunterData).length} from file.`);
                     return Object.keys(hunters).length > 0;
                 })
                 .catch(err => failedLoad(`Hunters: import error:\n`, err));
             hasHunters.then(hasHunters => {
-                console.log(`Hunters: Configuring save every ${saveInterval / (60 * 1000)} min.`);
+                Logger.log(`Hunters: Configuring save every ${saveInterval / (60 * 1000)} min.`);
                 dataTimers['hunters'] = setInterval(saveHunters, saveInterval);
             });
 
@@ -194,14 +159,14 @@ function Main() {
             const hasNicknames = loadNicknameURLs()
                 .then(urls => {
                     Object.assign(nickname_urls, urls);
-                    console.log(`Nicknames: imported ${Object.keys(urls).length} sources from file.`);
+                    Logger.log(`Nicknames: imported ${Object.keys(urls).length} sources from file.`);
                     return Object.keys(nickname_urls).length > 0;
                 })
                 .catch(err => failedLoad(`Nicknames: import error:\n`, err));
             hasNicknames
                 .then(refreshNicknameData)
                 .then(() => {
-                    console.log(`Nicknames: Configuring data refresh every ${saveInterval / (60 * 1000)} min.`);
+                    Logger.log(`Nicknames: Configuring data refresh every ${saveInterval / (60 * 1000)} min.`);
                     dataTimers['nicknames'] = setInterval(refreshNicknameData, saveInterval);
             });
 
@@ -214,7 +179,7 @@ function Main() {
                 .catch(err => failedLoad(`Filters: import error:\n`, err));
             hasFilters
                 .then(() => {
-                    console.log(`Filters: Configuring refresh every ${saveInterval / (60 * 1000)} min.`);
+                    Logger.log(`Filters: Configuring refresh every ${saveInterval / (60 * 1000)} min.`);
                     dataTimers['filters'] = setInterval(getFilterList, saveInterval);
                 });
 
@@ -227,7 +192,7 @@ function Main() {
 
             // Configure the bot behavior.
             client.once("ready", () => {
-                console.log("I am alive!");
+                Logger.log("I am alive!");
 
                 // Find all text channels on which to send announcements.
                 const announcables = client.guilds.reduce((channels, guild) => {
@@ -237,16 +202,16 @@ function Main() {
                     if (candidates.length)
                         Array.prototype.push.apply(channels, candidates);
                     else
-                        console.log(`Timers: No valid channels in ${guild.name} for announcements.`);
+                        Logger.warn(`Timers: No valid channels in ${guild.name} for announcements.`);
                     return channels;
                 }, []);
 
                 // Use one timeout per timer to manage default reminders and announcements.
                 timers_list.forEach(timer => scheduleTimer(timer, announcables));
-                console.log(`Timers: Initialized ${timer_config.size} timers on channels ${announcables}.`);
+                Logger.log(`Timers: Initialized ${timer_config.size} timers on channels ${announcables}.`);
 
                 // If we disconnect and then reconnect, do not bother rescheduling the already-scheduled timers.
-                client.on("ready", () => console.log("I am inVINCEeble!"));
+                client.on("ready", () => Logger.log("I am inVINCEeble!"));
             });
 
             // Message handling.
@@ -274,15 +239,15 @@ function Main() {
 
             // WebSocket connection error for the bot client.
             client.on('error', error => {
-                console.log(`Discord Client Error Received: "${error.message}"\n`, error.error);
+                Logger.error(`Discord Client Error Received: "${error.message}"\n`, error.error);
             //    quit(); // Should we? or just let it attempt to reconnect?
             });
 
-            client.on('reconnecting', () => console.log('Connection lost, reconnecting to Discord...'));
+            client.on('reconnecting', () => Logger.log('Connection lost, reconnecting to Discord...'));
             // WebSocket disconnected and is no longer trying to reconnect.
             client.on('disconnect', event => {
-                console.log(`Client socket closed: ${event.reason || 'No reason given'}`);
-                console.log(`Socket close code: ${event.code} (${event.wasClean ? `` : `not `}cleanly closed)`);
+                Logger.log(`Client socket closed: ${event.reason || 'No reason given'}`);
+                Logger.log(`Socket close code: ${event.code} (${event.wasClean ? `` : `not `}cleanly closed)`);
                 quit();
             });
             // Configuration complete. Using Promise.all() requires these tasks to complete
@@ -300,7 +265,7 @@ function Main() {
         // requested data from remote sources, and configured the bot.
         .then(() => client.login(settings.token))
         .catch(err => {
-            console.log('Unhandled startup error, shutting down:', err);
+            Logger.error('Unhandled startup error, shutting down:', err);
             client.destroy()
                 .then(() => process.exitCode = 1);
         });
@@ -309,21 +274,21 @@ try {
   Main();
 }
 catch(error) {
-  console.log(`Error executing Main:\n`, error);
+  Logger.error(`Error executing Main:\n`, error);
 }
 
 function quit() {
     return doSaveAll()
         .then(
-            () => console.log(`Shutdown: data saves completed`),
-            (err) => console.log(`Shutdown: error while saving:\n`, err)
+            () => Logger.log(`Shutdown: data saves completed`),
+            (err) => Logger.error(`Shutdown: error while saving:\n`, err)
         )
-        .then(() => { console.log(`Shutdown: destroying client`); return client.destroy(); })
+        .then(() => { Logger.log(`Shutdown: destroying client`); return client.destroy(); })
         .then(() => {
-            console.log(`Shutdown: deactivating data refreshes`);
+            Logger.log(`Shutdown: deactivating data refreshes`);
             for (let timer of Object.values(dataTimers))
                 clearInterval(timer);
-            console.log(`Shutdown: deactivating timers`);
+            Logger.log(`Shutdown: deactivating timers`);
             for (let timer of timers_list) {
                 timer.stopInterval();
                 timer.stopTimeout();
@@ -334,7 +299,7 @@ function quit() {
         })
         .then(() => process.exitCode = 1)
         .catch(err => {
-            console.log(`Shutdown: unhandled error:\n`, err, `\nImmediately exiting.`);
+            Logger.error(`Shutdown: unhandled error:\n`, err, `\nImmediately exiting.`);
             process.exit();
         });
 }
@@ -351,7 +316,7 @@ function quit() {
 function loadDataFromJSON(filename) {
     return fs_readFile(filename, { encoding: file_encoding })
         .then(data => {
-            console.log(`I/O: data read from '${filename}'.`);
+            Logger.log(`I/O: data read from '${filename}'.`);
             return data;
         }).then(rawData => JSON.parse(rawData));
 }
@@ -368,10 +333,10 @@ function loadDataFromJSON(filename) {
 function saveDataAsJSON(filename, rawData) {
     return fs_writeFile(filename, JSON.stringify(rawData, null, 1), { encoding: file_encoding })
         .then(() => {
-            console.log(`I/O: data written to '${filename}'.`);
+            Logger.log(`I/O: data written to '${filename}'.`);
             return true;
         }).catch(err => {
-            console.log(`I/O: error writing to '${filename}':\n`, err);
+            Logger.error(`I/O: error writing to '${filename}':\n`, err);
             return false;
         });
 }
@@ -416,7 +381,7 @@ function loadSettings(path = main_settings_filename) {
         settings.owner = settings.owner || "0"; // So things don't fail if it's unset
         return true;
     }).catch(err => {
-        console.log(`Settings: error while reading settings from '${path}':\n`, err);
+        Logger.error(`Settings: error while reading settings from '${path}':\n`, err);
         return false;
     });
 }
@@ -433,7 +398,7 @@ function loadTimers(path = timer_settings_filename) {
     return loadDataFromJSON(path).then(data => {
         return Array.isArray(data) ? data : Array.from(data);
     }).catch(err => {
-        console.log(`Timers: error during load from '${path}'. None loaded.\n`, err);
+        Logger.error(`Timers: error during load from '${path}'. None loaded.\n`, err);
         return [];
     });
 }
@@ -452,7 +417,7 @@ function createTimersFromList(timerData) {
         try {
             timer = new Timer(seed);
         } catch (err) {
-            console.log(`Timers: error occured while constructing timer: '${err}'. Received object:\n`, seed);
+            Logger.error(`Timers: error occured while constructing timer: '${err}'. Received object:\n`, seed);
             continue;
         }
         timers_list.push(timer);
@@ -757,7 +722,7 @@ function parseUserMessage(message) {
  */
 async function convertRewardLink(message) {
     if (!settings.bitly_token) {
-        console.warn(`Links: Received link to convert, but don't have a valid 'bitly_token' specified in settings: ${settings}.`);
+        Logger.warn(`Links: Received link to convert, but don't have a valid 'bitly_token' specified in settings: ${settings}.`);
         return;
     }
 
@@ -795,7 +760,7 @@ async function convertRewardLink(message) {
             } else {
                 throw `HTTP ${response.status}`;
             }
-        }).catch((err) => console.log('Links: GET to htgb.co failed with error', err))
+        }).catch((err) => Logger.error('Links: GET to htgb.co failed with error', err))
         .then(result => result || '');
     }
 
@@ -821,7 +786,7 @@ async function convertRewardLink(message) {
                 // TODO: API rate limit error handling? Could delegate to caller. Probably not an issue with this bot.
                 throw `HTTP ${response.status}`;
             }
-        }).catch((err) => console.log('Links: Bitly shortener failed with error:', err))
+        }).catch((err) => Logger.error('Links: Bitly shortener failed with error:', err))
         .then(result => result || '');
     }
 }
@@ -881,7 +846,7 @@ function timerAliases(tokens) {
         // Upon reaching here, the token has no area, sub-area, or count information, or those fields
         // were already set, and thus it was not parsed for them.
         if (newReminder.area && newReminder.sub_area && newReminder.count !== null) {
-            console.log(`MessageHandling: got an extra token '${String(token)}' from user input '${tokens}'.`);
+            Logger.log(`MessageHandling: got an extra token '${String(token)}' from user input '${tokens}'.`);
             break;
         }
     }
@@ -1173,7 +1138,7 @@ function loadReminders(path = reminder_filename) {
     return loadDataFromJSON(path).then(data => {
         return Array.isArray(data) ? data : Array.from(data);
     }).catch(err => {
-        console.log(`Reminders: error during loading from '${path}':\n`, err);
+        Logger.error(`Reminders: error during loading from '${path}':\n`, err);
         return [];
     });
 }
@@ -1221,10 +1186,10 @@ function pruneExpiredReminders() {
             // If the current reminder is expired, splice it and the others away.
             if (i < reminders.length && reminders[i].count === 0) {
                 let discarded = reminders.splice(i, numExpired);
-                console.log(`Reminders: spliced ${discarded.length} that were expired. ${reminders.length} remaining.`);
+                Logger.log(`Reminders: spliced ${discarded.length} that were expired. ${reminders.length} remaining.`);
             }
             else
-                console.log(`Reminders: found ${numExpired} expired, but couldn't splice because reminder at index ${i} was bad:\n`, reminders, `\n`, reminders[i]);
+                Logger.warn(`Reminders: found ${numExpired} expired, but couldn't splice because reminder at index ${i} was bad:\n`, reminders, `\n`, reminders[i]);
         }
     }
 }
@@ -1236,9 +1201,9 @@ function pruneExpiredReminders() {
  * @returns {Promise <boolean>} Whether the save operation completed without error.
  */
 function saveReminders(path = reminder_filename) {
-    //Write out the JSON of the reminders array
+    // Write out the JSON of the reminders array
     return saveDataAsJSON(path, reminders).then(didSave => {
-        console.log(`Reminders: ${didSave ? `Saved` : `Failed to save`} ${reminders.length} to '${path}'.`);
+        Logger.log(`Reminders: ${didSave ? `Saved` : `Failed to save`} ${reminders.length} to '${path}'.`);
         last_timestamps.reminder_save = DateTime.utc();
         return didSave;
     });
@@ -1262,14 +1227,14 @@ function doAnnounce(timer) {
     config.channels.forEach(tc => {
         if (tc.guild.available)
             tc.send(message).catch(err => {
-                console.log(`(${timer.name}): Error during announcement on channel ${tc.name} in ${tc.guild.name}. Client status: ${client.status}\n`, err);
+                Logger.error(`(${timer.name}): Error during announcement on channel ${tc.name} in ${tc.guild.name}. Client status: ${client.status}\n`, err);
                 // Deactivate this channel only if we are connected to Discord. (Status === 'READY')
                 // TODO: actually use the enum instead of a value for the enum (in case it changes):
                 // https://github.com/discordjs/discord.js/blob/d97af9d2e0a8c4cc3cd18b7b93ba6b93fe3772f6/src/util/Constants.js#L158
                 if (client.status === 0) {
                     let index = config.channels.indexOf(tc);
                     Array.prototype.push.apply(config.inactiveChannels, config.channels.splice(index, 1));
-                    console.log(`(${timer.name}): deactivated announcement on channel ${tc.name} in ${tc.guild.name} due to send error during send.`);
+                    Logger.warn(`(${timer.name}): deactivated announcement on channel ${tc.name} in ${tc.guild.name} due to send error during send.`);
                 }
             });
     });
@@ -1319,7 +1284,7 @@ function doRemind(timer) {
             client.fetchUser(uid).then(user => sendRemind(user, reminder, timer))
                 .catch(err => {
                     reminder.fail = (reminder.fail || 0) + 1;
-                    console.log(`Reminders: Error during notification of user <@${uid}>:\n`, err);
+                    Logger.error(`Reminders: Error during notification of user <@${uid}>:\n`, err);
                 });
         }
     });
@@ -1373,7 +1338,7 @@ function sendRemind(user, remind, timer) {
     if (remind.fail) {
         output.setDescription(`(There were ${remind.fail} failures before this got through.)`);
         if (remind.fail > 10)
-            console.log(`Reminders: Removing reminder for ${remind.user} due to too many failures`);
+            Logger.warn(`Reminders: Removing reminder for ${remind.user} due to too many failures`);
     }
 
     // The timestamp could be the activation time, not the notification time. If there is
@@ -1436,7 +1401,7 @@ function addRemind(timerRequest, message) {
     const choices = timers_list
         .filter(t => area === t.getArea() && (!subArea || subArea === t.getSubArea()))
         .sort((a, b) => a.getNext() - b.getNext());
-    console.log(`Timers: found ${choices.length} matching input request:\n`, timerRequest);
+    Logger.log(`Timers: found ${choices.length} matching input request:\n`, timerRequest);
 
     // Assume the desired timer is the soonest one that matched the given criteria.
     let timer = choices.pop();
@@ -1458,7 +1423,7 @@ function addRemind(timerRequest, message) {
             }
 
     if (responses.length) {
-        console.log(`Reminders: updated ${responses.length} for ${message.author.username} to a count of ${count}.`, timerRequest);
+        Logger.log(`Reminders: updated ${responses.length} for ${message.author.username} to a count of ${count}.`, timerRequest);
         message.author.send(`\`\`\`${responses.join("\n")}\`\`\``);
         return;
     }
@@ -1490,7 +1455,7 @@ function addRemind(timerRequest, message) {
 
     // Send notice of the update via PM.
     message.author.send(responses.join(" ")).catch(() =>
-        console.log(`Reminders: notification failure for ${message.author.username}.`)
+        Logger.error(`Reminders: notification failure for ${message.author.username}.`)
     );
 }
 
@@ -1529,7 +1494,7 @@ function listRemind(message) {
     });
 
     pm_channel.send(userReminders.length ? timer_str : "I found no reminders for you, sorry.")
-        .catch(() => console.log(`Reminders: notification failure for ${pm_channel.username}. Possibly blocked.`));
+        .catch(() => Logger.error(`Reminders: notification failure for ${pm_channel.username}. Possibly blocked.`));
 }
 
 /**
@@ -1782,18 +1747,18 @@ function getMouseList() {
     last_timestamps.mouse_refresh = now;
 
     // Query @devjacksmith's tools for mouse lists.
-    console.log("Mice: Requesting a new mouse list.");
+    Logger.log("Mice: Requesting a new mouse list.");
     const url = "https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=mouse&item_id=all";
     return fetch(url).then(response => (response.status === 200) ? response.json() : '').then((body) => {
         if (body) {
-            console.log('Mice: Got a new mouse list.');
+            Logger.log('Mice: Got a new mouse list.');
             mice.length = 0;
             Array.prototype.push.apply(mice, body);
             mice.forEach(mouse => mouse.lowerValue = mouse.value.toLowerCase());
         } else {
-            console.log('Mice: request returned non-200 response');
+            Logger.warn('Mice: request returned non-200 response');
         }
-    }).catch(err => console.log('Mice: request returned error:', err));
+    }).catch(err => Logger.error('Mice: request returned error:', err));
 }
 
 /**
@@ -1870,7 +1835,7 @@ function findMouse(channel, args, command) {
             return retStr;
         }, reason => {
             // Querying failed. Received an error object / string, and possibly a response object.
-            console.log('Mice: Lookup failed for some reason:\n', reason.error, reason.response ? reason.response.toJSON() : "No HTTP response");
+            Logger.error('Mice: Lookup failed for some reason:\n', reason.error, reason.response ? reason.response.toJSON() : "No HTTP response");
             throw new Error(`Could not process results for '${args}', AKA ${mouse.value}`);
         });
     }
@@ -1924,18 +1889,18 @@ function getItemList() {
     }
     last_timestamps.item_refresh = now;
 
-    console.log("Loot: Requesting a new loot list.");
+    Logger.log("Loot: Requesting a new loot list.");
     const url = "https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=loot&item_id=all";
     return fetch(url).then(response => (response.status === 200) ? response.json() : '').then((body) => {
         if (body) {
-            console.log('Loot: Got a new loot list.');
+            Logger.log('Loot: Got a new loot list.');
             items.length = 0;
             Array.prototype.push.apply(items, body);
             items.forEach(item => item.lowerValue = item.value.toLowerCase());
         } else {
-            console.log('Loot: request returned non-200 response');
+            Logger.warn('Loot: request returned non-200 response');
         }
-    }).catch(err => console.log('Mice: request returned error:', err));
+    }).catch(err => Logger.error('Mice: request returned error:', err));
 }
 
 /**
@@ -1951,18 +1916,18 @@ function getFilterList() {
     }
     last_timestamps.filter_refresh = now;
 
-    console.log("Filters: Requesting a new filter list.");
+    Logger.log("Filters: Requesting a new filter list.");
     const url = "https://mhhunthelper.agiletravels.com/filters.php";
     return fetch(url).then(response => (response.status === 200) ? response.json() : '').then((body) => {
         if (body) {
-            console.log("Filters: Got a new filter list");
+            Logger.log("Filters: Got a new filter list");
             filters.length = 0;
             Array.prototype.push.apply(filters, body);
             filters.forEach(filter => filter.lowerValue = filter.code_name.toLowerCase());
         } else {
-            console.log('Filters: request returned non-200 response');
+            Logger.warn('Filters: request returned non-200 response');
         }
-    }).catch(err => console.log('Filters: request returned error:', err));
+    }).catch(err => Logger.error('Filters: request returned error:', err));
 }
 
 /**
@@ -2039,7 +2004,7 @@ function findItem(channel, args, command) {
             return retStr;
         }, reason => {
             // Querying failed. Received an error object / string, and possibly a response object.
-            console.log('Loot: Lookup failed for some reason:\n', reason.error, reason.response ? reason.response.toJSON() : "No HTTP response");
+            Logger.error('Loot: Lookup failed for some reason:\n', reason.error, reason.response ? reason.response.toJSON() : "No HTTP response");
             throw new Error(`Could not process results for '${args}', AKA ${item.value}`);
         });
     }
@@ -2115,7 +2080,7 @@ function sendInteractiveSearchResult(searchResults, channel, dataCallback, isDM,
             /** @type MessageReaction[] */
             let mrxns = [];
             for (let m of matches)
-                mrxns.push(await msg.react(m.emojiId).catch(err => console.log(err)));
+                mrxns.push(await msg.react(m.emojiId).catch(err => Logger.error(err)));
             return mrxns;
         }).then(msgRxns => {
             // Set a 5-minute listener on the message for these reactions.
@@ -2129,15 +2094,15 @@ function sendInteractiveSearchResult(searchResults, channel, dataCallback, isDM,
                 if (match) dataCallback(true, match.match, urlInfo.qsParams).then(
                     result => mr.users.last().send(result, { split: { prepend: '```', append: '```' } }),
                     result => mr.users.last().send(result)
-                ).catch(err => console.log(err));
+                ).catch(err => Logger.error(err));
             }).on('end', () => rc.message.clearReactions().catch(() => rc.message.delete()));
-        }).catch(err => console.log('Reactions: error setting reactions:\n', err));
+        }).catch(err => Logger.error('Reactions: error setting reactions:\n', err));
 
     // Always send one result to the channel.
     sent.then(() => dataCallback(isDM, matches[0].match, urlInfo.qsParams).then(
         result => channel.send(result, { split: { prepend: '```', append: '```' } }),
         result => channel.send(result))
-    ).catch(err => console.log(err));
+    ).catch(err => Logger.error(err));
 }
 
 /**
@@ -2208,7 +2173,7 @@ function findHunter(message, searchValues, type) {
         .then(member => message.channel.send(`**${searchValues[0]}** is ${member.displayName} ${link}`,
             { disableEveryone: true }))
         .catch(err => {
-            console.log(err);
+            Logger.error(err);
             message.channel.send("That person may not be on this server.");
         });
 }
@@ -2242,13 +2207,13 @@ function setHunterID(message, hid) {
     // Initialize the data for any new registrants.
     if (!hunters[discordId]) {
         hunters[discordId] = {};
-        console.log(`Hunters: OMG! A new hunter id '${discordId}'`);
+        Logger.log(`Hunters: OMG! A new hunter id '${discordId}'`);
     }
 
     // If they already registered a hunter ID, update it.
     if (hunters[discordId]['hid']) {
         message_str = `You used to be known as \`${hunters[discordId]['hid']}\`. `;
-        console.log(`Hunters: Updating hid ${hunters[discordId]['hid']} to ${hid}`);
+        Logger.log(`Hunters: Updating hid ${hunters[discordId]['hid']} to ${hid}`);
     }
     hunters[discordId]['hid'] = hid;
     message_str += `If people look you up they'll see \`${hid}\`.`;
@@ -2286,7 +2251,7 @@ function setHunterProperty(message, property, value) {
  */
 function loadHunterData(path = hunter_ids_filename) {
     return loadDataFromJSON(path).catch(err => {
-        console.log(`Hunters: Error loading data from '${path}':\n`, err);
+        Logger.error(`Hunters: Error loading data from '${path}':\n`, err);
         return {};
     });
 }
@@ -2299,7 +2264,7 @@ function loadHunterData(path = hunter_ids_filename) {
  */
 function saveHunters(path = hunter_ids_filename) {
     return saveDataAsJSON(path, hunters).then(didSave => {
-        console.log(`Hunters: ${didSave ? `Saved` : `Failed to save`} ${Object.keys(hunters).length} to '${path}'.`);
+        Logger.log(`Hunters: ${didSave ? `Saved` : `Failed to save`} ${Object.keys(hunters).length} to '${path}'.`);
         last_timestamps.hunter_save = DateTime.utc();
         return didSave;
     });
@@ -2314,7 +2279,7 @@ function saveHunters(path = hunter_ids_filename) {
  */
 function loadNicknameURLs(path = nickname_urls_filename) {
     return loadDataFromJSON(path).catch(err => {
-        console.log(`Nicknames: Error loading data from '${path}':\n`, err);
+        Logger.error(`Nicknames: Error loading data from '${path}':\n`, err);
         return {};
     });
 }
@@ -2338,7 +2303,7 @@ function refreshNicknameData() {
  */
 function getNicknames(type) {
     if (!nickname_urls[type]) {
-        console.log(`Nicknames: Received '${type}' but I don't know its URL.`);
+        Logger.warn(`Nicknames: Received '${type}' but I don't know its URL.`);
         return;
     }
     const newData = {};
@@ -2349,7 +2314,7 @@ function getNicknames(type) {
             while (record = parser.read())
                 newData[record[0]] = record[1];
         })
-        .on('error', err => console.log(err.message));
+        .on('error', err => Logger.error(err.message));
 
     fetch(nickname_urls[type]).then(async (response) => {
         if (response.status !== 200) {
@@ -2360,8 +2325,8 @@ function getNicknames(type) {
         parser.write(body.split(/[\r\n]+/).splice(1).join("\n").toLowerCase());
         // Create a new (or replace the existing) nickname definition for this type.
         nicknames.set(type, newData);
-        parser.end(() => console.log(`Nicknames: ${Object.keys(newData).length} of type '${type}' loaded.`));
-    }).catch(err => console.log(`Nicknames: request for type '${type}' failed with error:`, err));
+        parser.end(() => Logger.log(`Nicknames: ${Object.keys(newData).length} of type '${type}' loaded.`));
+    }).catch(err => Logger.error(`Nicknames: request for type '${type}' failed with error:`, err));
 }
 
 /**
@@ -2420,7 +2385,7 @@ function integerComma(number) {
  * Reset the Relic Hunter location so reminders know to update people
  */
 function resetRH() {
-    console.log(`Relic hunter: resetting location to "unknown", was ${relic_hunter.source}: ${relic_hunter.location}`);
+    Logger.log(`Relic hunter: resetting location to "unknown", was ${relic_hunter.source}: ${relic_hunter.location}`);
     relic_hunter.location = 'unknown';
     relic_hunter.source = 'reset';
     relic_hunter.last_seen = DateTime.fromMillis(0);
@@ -2445,7 +2410,7 @@ function rescheduleResetRH() {
 function remindRH(new_location) {
     //Logic to look for people with the reminder goes here
     if (new_location != 'unknown') {
-        console.log(`Relic Hunter: Sending reminders for ${new_location}`);
+        Logger.log(`Relic Hunter: Sending reminders for ${new_location}`);
         doRemind(timers_list.find(t => t.getArea() === "relic_hunter"));
     }
 }
@@ -2463,13 +2428,13 @@ function handleRHWebhook(message) {
             relic_hunter.location = new_location;
             relic_hunter.source = 'webhook';
             relic_hunter.last_seen = DateTime.utc();
-            console.log(`Relic Hunter: Webhook set location to "${new_location}"`);
+            Logger.log(`Relic Hunter: Webhook set location to "${new_location}"`);
             setImmediate(remindRH, new_location);
         } else {
-            console.log(`Relic Hunter: skipped location update (already set by ${relic_hunter.source})`);
+            Logger.log(`Relic Hunter: skipped location update (already set by ${relic_hunter.source})`);
         }
     } else {
-        console.log(`Relic Hunter: failed to extract location from webhook message:`, message.cleanContent);
+        Logger.error(`Relic Hunter: failed to extract location from webhook message:`, message.cleanContent);
     }
 }
 
@@ -2478,7 +2443,7 @@ function handleRHWebhook(message) {
  * TODO: This might replace the reset function
  */
 async function getRHLocation() {
-    console.log(`Relic Hunter: Was in ${relic_hunter.location} according to ${relic_hunter.source}`);
+    Logger.log(`Relic Hunter: Was in ${relic_hunter.location} according to ${relic_hunter.source}`);
     const [dbg, mhct] = await Promise.all([
         DBGamesRHLookup(),
         MHCTRHLookup()
@@ -2492,7 +2457,7 @@ async function getRHLocation() {
         // Both sources returned unknown.
         resetRH();
     }
-    console.log(`Relic Hunter: location set to "${relic_hunter.location}" with source "${relic_hunter.source}"`);
+    Logger.log(`Relic Hunter: location set to "${relic_hunter.location}" with source "${relic_hunter.source}"`);
 }
 
 /**
@@ -2504,11 +2469,11 @@ function DBGamesRHLookup() {
         .then(async (response) => {
             if (!response.ok) throw `HTTP ${response.status}`;
             const location = await response.text();
-            console.log('Relic Hunter: DBGames query OK, reported location:', location);
+            Logger.log('Relic Hunter: DBGames query OK, reported location:', location);
             return { source: 'DBGames', location, last_seen: DateTime.utc().startOf('day') };
         })
         .catch((err) => {
-            console.log(`Relic Hunter: DBGames query failed:`, err);
+            Logger.error(`Relic Hunter: DBGames query failed:`, err);
             return { source: 'DBGames', location: 'unknown' };
         });
 }
@@ -2522,13 +2487,13 @@ function MHCTRHLookup() {
         .then(async (response) => {
             if (!response.ok) throw `HTTP ${response.status}`;
             const { rh } = await response.json();
-            console.log(`Relic Hunter: MHCT query OK, location: ${rh.location}, last_seen: ${rh.last_seen}`);
+            Logger.log(`Relic Hunter: MHCT query OK, location: ${rh.location}, last_seen: ${rh.last_seen}`);
             let last_seen = Number(rh.last_seen);
             if (last_seen.NaN) { last_seen = Number(0); }
             return { source: 'MHCT', last_seen: DateTime.fromSeconds(last_seen), location: rh.location };
         })
         .catch((err) => {
-            console.log(`Relic Hunter: MHCT query failed:`, err);
+            Logger.error(`Relic Hunter: MHCT query failed:`, err);
             return { source: 'MHCT', location: 'unknown' };
         });
 }
@@ -2548,13 +2513,13 @@ async function findRH(channel) {
     let original_location = relic_hunter.location;
     // If we have MHCT data from today, trust it, otherwise attempt to update our known location.
     if (relic_hunter.source !== 'MHCT' || !DateTime.utc().hasSame(relic_hunter.last_seen, 'day')) {
-        console.log(`Relic Hunter: location requested, might be "${original_location}"`);
+        Logger.log(`Relic Hunter: location requested, might be "${original_location}"`);
         await getRHLocation();
-        console.log(`Relic Hunter: location update completed, is now "${relic_hunter.location}"`);
+        Logger.log(`Relic Hunter: location update completed, is now "${relic_hunter.location}"`);
     }
 
     channel.send(asMessage(relic_hunter.location))
-        .catch((err) => console.log(`Relic Hunter: Could not send response to Find RH request`, err));
+        .catch((err) => Logger.error(`Relic Hunter: Could not send response to Find RH request`, err));
     if (relic_hunter.location !== 'unknown' && relic_hunter.location !== original_location) {
         setImmediate(remindRH, relic_hunter.location);
     }

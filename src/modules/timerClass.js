@@ -1,5 +1,6 @@
 // Timer Class
 const { DateTime, Duration, Interval } = require('luxon');
+const Logger = require('./logger');
 
 /**
  * @typedef {Object} TimerSeed A serializable representation of a timer, suitable for reading and writing with JSON files.
@@ -58,21 +59,21 @@ class Timer {
 
         // Require the stored seed time to be in the past.
         while (DateTime.utc() < this._seedTime) {
-            console.log(`(${this.name}): seed time ("${this._seedTime}") in future: decrementing ${this._repeatDuration.as('minutes')} minutes.`);
+            Logger.warn(`(${this.name}): seed time ("${this._seedTime}") in future: decrementing ${this._repeatDuration.as('minutes')} minutes.`);
             this._seedTime = this._seedTime.minus(this._repeatDuration);
         }
 
         // Always set an announce string.
         this._announcement = seed.announce_string;
         if (!this._announcement) {
-            console.log(`(${this.name}): using default announce string.`);
-            this._announcement = "This is a default string because the timer was not set up properly";
+            Logger.warn(`(${this.name}): using default announce string.`);
+            this._announcement = 'This is a default string because the timer was not set up properly';
         }
 
         // If not provided, the demand string defaults to the announce string.
         this._demand = seed.demand_string;
         if (!this._demand) {
-            console.log(`(${this.name}): defaulted demand string to announce string '${this._announcement}'.`);
+            Logger.log(`(${this.name}): defaulted demand string to announce string '${this._announcement}'.`);
             this._demand = this._announcement;
         }
 
@@ -119,7 +120,7 @@ class Timer {
         if (this._lastActivation) {
             let next = this._lastActivation.plus(this._repeatDuration);
             if (next > DateTime.utc())
-                console.log(`(${this.name}): Skipped requested advancement into the future.`);
+                Logger.warn(`(${this.name}): Skipped requested advancement into the future.`);
             else
                 this._lastActivation = next;
         }
@@ -140,11 +141,11 @@ class Timer {
             // Seed time is guaranteed to be in the past by the Timer constructor, so this is a
             // well - formed Interval with at least one value.
             if (now < this._seedTime)
-                console.log(`Assertion of seed time in the past failed.`);
+                Logger.error(`(${this.name}): Assertion of seed time in the past failed.`);
             let activations = Interval.fromDateTimes(this._seedTime, now).splitBy(this._repeatDuration).map(i => i.start);
             this._lastActivation = activations.pop();
 
-            console.log(`(${this.name}): Cached last activation (${this._lastActivation.toHTTP()})`);
+            Logger.log(`(${this.name}): Cached last activation (${this._lastActivation.toHTTP()})`);
         }
 
         // Ensure the cache is correct.
@@ -162,7 +163,6 @@ class Timer {
      * @returns {DateTime} a new Date object that indicates the next time this Timer will activate.
      */
     getNext() {
-
         return this.getLastActivation().plus(this._repeatDuration);
     }
 
@@ -358,7 +358,7 @@ function getId() {
 function getAsDuration(value, normalize = false) {
     let dur = _isLuxonObject(value) ? Duration.fromObject(value) : Duration.fromMillis(value || 0);
     if (!dur.isValid) {
-        console.log(`Received invalid input "${value}" to convert to a Duration.`);
+        Logger.error(`Received invalid input "${value}" to convert to a Duration.`);
         dur = Duration.fromMillis(0);
         // throw new TypeError(`Invalid argument to Duration constructor: ${value}`);
     }
