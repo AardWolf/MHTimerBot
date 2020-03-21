@@ -1,13 +1,13 @@
 #!/bin/bash
 if [ -f MHTimer.pid ]; then
   OLDPID=$( cat MHTimer.pid )
-  ps -${OLDPID} >/dev/null 2>&1
-  RC=$?
-  if [ $RC == 0 ]; then
-    echo "Killing the old process: $OLDPID"
-    kill $OLDPID
-  fi
   rm -f MHTimer.pid
-  #Process is gone
+  ps -p $OLDPID 1>/dev/null
+  RC=$?
+  if [ $RC -eq 0 ]; then
+    echo "Killing the old process: PID $OLDPID"
+    kill $OLDPID
+    exit $?
+  fi
 fi
 pkill -f "node src/MHTimer.js"

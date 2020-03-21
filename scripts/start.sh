@@ -9,7 +9,7 @@ done
 
 if [ -f MHTimer.pid ]; then
   OLDPID=$( cat MHTimer.pid )
-  ps --pid $OLDPID >/dev/null 2>&1
+  ps -p $OLDPID >/dev/null 2>&1
   rc=$?
   if [[ $rc -eq 1 ]]; then
     echo "Old process was not running, starting up"
@@ -22,25 +22,29 @@ if [ -f MHTimer.pid ]; then
     exit 1
   fi
 fi
-if [ -f MHTimer.log ]; then
+if [ ! -d logs ]; then
+  mkdir logs
+fi
+if [ -f logs/MHTimer.log ]; then
   NUM=4
   while [ $NUM -ge 0 ]; do
     NEXTNUM=$(( $NUM + 1 ))
-    if [ -f MHTimer.log.$NUM ]; then
-      mv MHTimer.log.$NUM MHTimer.log.$NEXTNUM
+    if [ -f logs/MHTimer.$NUM.log ]; then
+      mv logs/MHTimer.$NUM.log logs/MHTimer.$NEXTNUM.log
     fi
     NUM=$(( $NUM - 1 ))
   done
-  mv MHTimer.log MHTimer.log.0
+  mv logs/MHTimer.log logs/MHTimer.0.log
 fi
-nohup node src/MHTimer.js > MHTimer.log 2>&1 &
+nohup node src/MHTimer.js > logs/MHTimer.log 2>&1 &
 PID=$!
 echo $PID >MHTimer.pid
 sleep 1
-ps $PID
+ps $PID | grep -q "\b${PID}\b"
 RC=$?
 if [ $RC -eq 0 ]; then
-  echo "Bot started as $PID"
+  echo "Bot started with PID $PID"
 else
-  echo "Bot did not start. I thought it was ${PID}. Check MHTimer.log and remove MHTimer.pid"
+  echo "Bot did not start. I thought it was PID ${PID}. Check MHTimer.log and remove MHTimer.pid"
+  exit 1
 fi
