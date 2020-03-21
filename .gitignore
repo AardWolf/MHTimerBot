@@ -51,3 +51,5 @@ _ReSharper*/
 .svn
 ~$*
 /.vs
+.vs
+.vscode
