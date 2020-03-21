@@ -15,7 +15,8 @@ module.exports = {
     'rules': {
         'indent': [
             'error',
-            4
+            4,
+            { "SwitchCase": 1 }
         ],
         'quotes': [
             'error',
@@ -24,6 +25,30 @@ module.exports = {
         'semi': [
             'error',
             'always'
+        ],
+        'no-var': [
+            'warn'
+        ],
+        'prefer-const': [
+            'error'
+        ],
+        'array-bracket-newline': [
+            'error',
+            'consistent'
+        ],
+        'comma-dangle': [
+            'error',
+            'always-multiline'
+        ],
+        'object-curly-spacing': [
+            'error',
+            'always'
+        ],
+        'object-curly-newline': [
+            'error'
+        ],
+        'no-unneeded-ternary': [
+            'error'
         ]
     }
 };

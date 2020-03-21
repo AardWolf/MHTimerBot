@@ -33,14 +33,14 @@ class Timer {
      */
     constructor(seed) {
         if (!seed)
-            throw new TypeError("Timer construction requires an input seed object.");
+            throw new TypeError('Timer construction requires an input seed object.');
 
         // If the input Timer seed is a primitive (e.g. 1), or is missing required properties, bail.
         const keys = Object.keys(seed);
         const required = ['area', 'seed_time', 'repeat_time'];
         // If a required key is missing, or has a falsy value, then the seed is invalid.
         if (!keys.length || !required.every(rq => (keys.indexOf(rq) !== -1 && seed[rq])))
-            throw new TypeError(`Input timer seed is missing required keys or values. Require values for keys "${required.join(`", "`)}".`);
+            throw new TypeError(`Input timer seed is missing required keys or values. Require values for keys "${required.join('", "')}".`);
 
         // Assign area and sub_area.
         this._area = String(seed.area);
@@ -99,7 +99,7 @@ class Timer {
      * @returns {string} e.g. "fg: close"
      */
     get name() {
-        return `${this._area}${this._subArea ? `: ${this._subArea}` : ""}`;
+        return `${this._area}${this._subArea ? `: ${this._subArea}` : ''}`;
     }
 
     /**
@@ -118,7 +118,7 @@ class Timer {
      */
     advance() {
         if (this._lastActivation) {
-            let next = this._lastActivation.plus(this._repeatDuration);
+            const next = this._lastActivation.plus(this._repeatDuration);
             if (next > DateTime.utc())
                 Logger.warn(`(${this.name}): Skipped requested advancement into the future.`);
             else
@@ -137,19 +137,19 @@ class Timer {
         const now = DateTime.utc();
 
         // Compute all activations based on the seed time, and cache the most recent one.
-        if (!this._lastActivation || !this._lastActivation instanceof DateTime || !this._lastActivation.isValid) {
+        if (!this._lastActivation || !(this._lastActivation instanceof DateTime) || !this._lastActivation.isValid) {
             // Seed time is guaranteed to be in the past by the Timer constructor, so this is a
             // well - formed Interval with at least one value.
             if (now < this._seedTime)
                 Logger.error(`(${this.name}): Assertion of seed time in the past failed.`);
-            let activations = Interval.fromDateTimes(this._seedTime, now).splitBy(this._repeatDuration).map(i => i.start);
+            const activations = Interval.fromDateTimes(this._seedTime, now).splitBy(this._repeatDuration).map(i => i.start);
             this._lastActivation = activations.pop();
 
             Logger.log(`(${this.name}): Cached last activation (${this._lastActivation.toHTTP()})`);
         }
 
         // Ensure the cache is correct.
-        let window = Interval.before(now, this._repeatDuration);
+        const window = Interval.before(now, this._repeatDuration);
         while (this._lastActivation < now && !window.contains(this._lastActivation))
             this.advance();
 
@@ -175,7 +175,7 @@ class Timer {
      * @generator
      */
     * upcoming(until) {
-        var last = this.getLastActivation();
+        let last = this.getLastActivation();
         while (!until || last.plus(this._repeatDuration) < until) {
             last = last.plus(this._repeatDuration);
             yield last;
@@ -200,7 +200,7 @@ class Timer {
      * @returns {string} The sub-area descriptor, or "" if none exists.
      */
     getSubArea() {
-        return this._subArea || "";
+        return this._subArea || '';
     }
 
     /**
@@ -274,7 +274,7 @@ class Timer {
             this._timeout[key] = null;
         }
         else {
-            for (let key in this._timeout)
+            for (const key in this._timeout)
                 clearTimeout(this._timeout[key]);
             this._timeout = {};
         }
@@ -311,7 +311,7 @@ class Timer {
             this._interval[key] = null;
         }
         else {
-            for (let key in this._interval)
+            for (const key in this._interval)
                 clearInterval(this._interval[key]);
             this._interval = {};
         }
@@ -334,7 +334,7 @@ class Timer {
  * @generator
  */
 function* nextId() {
-    var id = 0;
+    let id = 0;
     while (true)
         yield (id++).toString();
 }
@@ -369,7 +369,7 @@ function _isLuxonObject(value) {
     if (!value || !isNaN(parseInt(value, 10)) || value !== Object(value))
         return false;
     // It wasn't a valid number.
-    let keys = Object.keys(value);
+    const keys = Object.keys(value);
     if (!keys || !keys.length)
         return false;
     const dateTimeUnits = ['year', 'month', 'day', 'ordinal', 'weekYear', 'weekNumber', 'weekday', 'hour', 'minute', 'second', 'millisecond', 'zone', 'locale', 'outputCalendar', 'numberingSystem'];

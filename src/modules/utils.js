@@ -8,18 +8,18 @@
  */
 function oxfordStringifyValues(container, final = 'and') {
     let printables = [];
-    if (Array.isArray(container))
+    if (typeof container !== 'object')
+        throw new TypeError(`Utils: bad input for 1st argument: Expected object, got ${typeof container}`);
+    else if (Array.isArray(container))
         printables = container;
-    else if (container instanceof Set)
-        printables = Array.from(container);
-    else if (container instanceof Map)
-        printables = Array.from(container, ([k, v]) => v);
+    else if (container instanceof Set || container instanceof Map)
+        printables = Array.from(container.values());
     else
         printables = Array.from(Object.values(container));
 
-    let count = printables.length;
+    const count = printables.length;
     if (!count)
-        return "";
+        return '';
     else if (count === 1)
         return `${printables[0]}`;
     else if (count === 2)
@@ -55,44 +55,43 @@ function prettyPrintArrayAsString(body, columnFormat, headers, headerUnderline) 
         throw new TypeError(`Input body was of type ${typeof body}. Expected an array of objects.`);
     // The column formatter should be an object.
     if (!columnFormat || !Object.keys(columnFormat).length)
-        throw new TypeError(`Input column formatter was of wrong type (or had no keys).`);
+        throw new TypeError('Input column formatter was of wrong type (or had no keys).');
     // The headers should be an array of objects with at minimum 'key' and 'label' properties, of which 'key' must have a non-falsy value.
-    if (!headers || !Array.isArray(headers) || !headers.every(col => col.hasOwnProperty("key") && col.hasOwnProperty("label") && col.key))
-        throw new TypeError(`Input headers of incorrect type. Expected array of objects with properties 'key' and 'label'.`);
+    if (!headers || !Array.isArray(headers) || !headers.every(col => (col.key && col.label !== undefined)))
+        throw new TypeError('Input headers of incorrect type. Expected array of objects with properties \'key\' and \'label\'.');
     // All object keys in the headers array must be found in both the body and columnFormat objects.
-    let bodyKeys = body.reduce((acc, row) => { Object.keys(row).forEach(key => acc.add(key)); return acc; }, new Set());
-    if (!headers.every(col => bodyKeys.has(col.key) && columnFormat.hasOwnProperty(col.key)))
-        throw new TypeError(`Input header array specifies non-existent columns.`);
+    const bodyKeys = body.reduce((acc, row) => { Object.keys(row).forEach(key => acc.add(key)); return acc; }, new Set());
+    if (!headers.every(col => (bodyKeys.has(col.key) && columnFormat[col.key] !== undefined)))
+        throw new TypeError('Input header array specifies non-existent columns.');
 
     // Ensure that the column format prefix/suffix strings are initialized.
-    for (let col in columnFormat) {
-        ["prefix", "suffix"].forEach(key => {
-            columnFormat[col][key] = columnFormat[col][key] || (columnFormat[col][key] === 0 ? "0" : "");
+    for (const col in columnFormat) {
+        ['prefix', 'suffix'].forEach(key => {
+            columnFormat[col][key] = columnFormat[col][key] || (columnFormat[col][key] === 0 ? '0' : '');
         });
     }
 
     // To pad the columns properly, we must determine the widest column value of each column.
     // Initialize with the width of the column's header text.
-    for (let col of headers)
+    for (const col of headers)
         if (!columnFormat[col.key].isFixedWidth)
             columnFormat[col.key].columnWidth = Math.max(col.label.length, columnFormat[col.key].columnWidth);
 
     // Then parse every row in the body. The column width will be set such that any desired prefix or suffix can be included.
     // If a column is specified as fixed width, it is assumed that the width was properly set.
-    for (let row of body)
-        for (let col in columnFormat)
+    for (const row of body)
+        for (const col in columnFormat)
             if (!columnFormat[col].isFixedWidth)
                 columnFormat[col].columnWidth = Math.max(
                     columnFormat[col].columnWidth,
-                    row[col].length + columnFormat[col].prefix.length + columnFormat[col].suffix.length
+                    row[col].length + columnFormat[col].prefix.length + columnFormat[col].suffix.length,
                 );
 
     // Stringify the header information. Headers are center-padded if they are not the widest element in the column.
-    const output = [];
-    output.push(
+    const output = [
         headers.reduce((row, col) => {
             let text = col.label;
-            let diff = columnFormat[col.key].columnWidth - text.length;
+            const diff = columnFormat[col.key].columnWidth - text.length;
             if (diff < 0)
                 // This was a fixed-width column that needs to be expanded.
                 columnFormat[col.key].columnWidth = text.length;
@@ -102,8 +101,8 @@ function prettyPrintArrayAsString(body, columnFormat, headers, headerUnderline) 
 
             row.push(text);
             return row;
-        }, []).join(" | ")
-    );
+        }, []).join(' | '),
+    ];
 
     // If there is a underline string, add it.
     if (headerUnderline || headerUnderline === 0) {
@@ -113,13 +112,13 @@ function prettyPrintArrayAsString(body, columnFormat, headers, headerUnderline) 
     }
 
     // Add rows to the output.
-    for (let row of body) {
-        let rowText = [];
+    for (const row of body) {
+        const rowText = [];
         // Fill the row's text based on the specified header order.
         for (let i = 0, len = headers.length; i < len; ++i) {
-            let key = headers[i].key;
+            const key = headers[i].key;
             let text = row[key].toString();
-            let options = columnFormat[key];
+            const options = columnFormat[key];
 
             // If the convertToPercent flag is set, multiply the value by 100, and then drop required digits.
             // e.x. 0.123456 -> 12.3456
@@ -131,7 +130,7 @@ function prettyPrintArrayAsString(body, columnFormat, headers, headerUnderline) 
                     if (options.numDecimals === 0)
                         text = Math.round(text);
                     else if (!isNaN(parseInt(options.numDecimals, 10))) {
-                        let factor = Math.pow(10, Math.abs(parseInt(options.numDecimals, 10)));
+                        const factor = Math.pow(10, Math.abs(parseInt(options.numDecimals, 10)));
                         if (factor !== Infinity)
                             text = Math.round(text * factor) / factor;
                     }
@@ -149,9 +148,9 @@ function prettyPrintArrayAsString(body, columnFormat, headers, headerUnderline) 
                 text = text.padEnd(options.columnWidth);
             rowText.push(text);
         }
-        output.push(rowText.join(" | "));
+        output.push(rowText.join(' | '));
     }
-    return output.join("\n");
+    return output.join('\n');
 }
 
 /**
@@ -165,7 +164,7 @@ function splitString(input) {
     const tokens = [];
     const splitRegexp = /[^\s"]+|"([^"]*)"/gi;
 
-    let match = "";
+    let match = '';
     do {
         match = splitRegexp.exec(input);
         if (match) {
@@ -185,21 +184,21 @@ function splitString(input) {
  * @returns {string} A timestring that indicates the amount of time left before the given Date.
  */
 function timeLeft(in_date) {
-    const units = ["days", "hours", "minutes"];
+    const units = ['days', 'hours', 'minutes'];
     const remaining = in_date.diffNow(units);
 
     // Make a nice string, but only if there are more than 60 seconds remaining.
-    if (remaining.as("milliseconds") < 60 * 1000)
-        return "in less than a minute";
+    if (remaining.as('milliseconds') < 60 * 1000)
+        return 'in less than a minute';
 
     // Push any nonzero units into an array, removing "s" if appropriate (since unit is plural).
     const labels = [];
     units.forEach(unit => {
-        let val = remaining.get(unit);
+        const val = remaining.get(unit);
         if (val)
             labels.push(`${val.toLocaleString('en-US', { maximumFractionDigits: 0 })} ${(val !== 1) ? unit : unit.slice(0, -1)}`);
     });
-    return `in ${oxfordStringifyValues(labels, `and`)}`;
+    return `in ${oxfordStringifyValues(labels, 'and')}`;
 }
 
 exports.oxfordStringifyValues = oxfordStringifyValues;

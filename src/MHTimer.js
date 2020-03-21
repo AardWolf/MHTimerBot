@@ -6,6 +6,7 @@ const { DateTime, Duration, Interval } = require('luxon');
 const Discord = require('discord.js');
 
 // Extract type-hinting definitions for Discord classes.
+// eslint-disable-next-line no-unused-vars
 const { Client, Guild, Message, MessageReaction, RichEmbed, TextChannel, User } = Discord;
 
 // Import our own local classes and functions.
@@ -32,7 +33,7 @@ const fs_readFile = util.promisify(fs.readFile);
 const fs_writeFile = util.promisify(fs.writeFile);
 
 // Globals
-const client = new Discord.Client({ disabledEvents: ["TYPING_START"] });
+const client = new Discord.Client({ disabledEvents: ['TYPING_START'] });
 const textChannelTypes = new Set(['text', 'dm', 'group']);
 const main_settings_filename = 'data/settings.json',
     timer_settings_filename = 'data/timer_settings.json',
@@ -67,7 +68,7 @@ const last_timestamps = {
     hunter_save: DateTime.utc(),
     item_refresh: null,
     mouse_refresh: null,
-    filter_refresh: null
+    filter_refresh: null,
 };
 
 /** @type {Object <string, NodeJS.Timer>} */
@@ -75,16 +76,17 @@ const dataTimers = {};
 /** @type {Map <string, {active: boolean, channels: TextChannel[], inactiveChannels: TextChannel[]}>} */
 const timer_config = new Map();
 const emojis = [
-    { id: "1%E2%83%A3", text: ':one:' },
-    { id: "2%E2%83%A3", text: ':two:' },
-    { id: "3%E2%83%A3", text: ':three:' },
-    { id: "4%E2%83%A3", text: ':four:' },
-    { id: "5%E2%83%A3", text: ':five:' },
-    { id: "6%E2%83%A3", text: ':six:' },
-    { id: "7%E2%83%A3", text: ':seven:' },
-    { id: "8%E2%83%A3", text: ':eight:' },
-    { id: "9%E2%83%A3", text: ':nine:' },
-    { id: "%F0%9F%94%9F", text: ':keycap_ten:' }];
+    { id: '1%E2%83%A3', text: ':one:' },
+    { id: '2%E2%83%A3', text: ':two:' },
+    { id: '3%E2%83%A3', text: ':three:' },
+    { id: '4%E2%83%A3', text: ':four:' },
+    { id: '5%E2%83%A3', text: ':five:' },
+    { id: '6%E2%83%A3', text: ':six:' },
+    { id: '7%E2%83%A3', text: ':seven:' },
+    { id: '8%E2%83%A3', text: ':eight:' },
+    { id: '9%E2%83%A3', text: ':nine:' },
+    { id: '%F0%9F%94%9F', text: ':keycap_ten:' },
+];
 
 process.once('SIGINT', () => {
     client.destroy();
@@ -95,7 +97,7 @@ process.once('SIGTERM', () => {
 
 process.on('uncaughtException', exception => {
     Logger.error(exception);
-    doSaveAll().then(didSave => Logger.log(`Save status: files ${didSave ? "" : "maybe "}saved.`));
+    doSaveAll().then(didSave => Logger.log(`Save status: files ${didSave ? '' : 'maybe '}saved.`));
 });
 
 function Main() {
@@ -104,7 +106,7 @@ function Main() {
         .then(hasSettings => {
             if (!hasSettings) {
                 process.exitCode = 1;
-                throw new Error(`Exiting due to failure to acquire local settings data.`);
+                throw new Error('Exiting due to failure to acquire local settings data.');
             }
             function failedLoad(prefix, reason) {
                 Logger.log(prefix, reason);
@@ -123,7 +125,7 @@ function Main() {
                     Logger.log(`Timers: imported ${timerData.length} from file.`);
                     return timers_list.length > 0;
                 })
-                .catch(err => failedLoad(`Timers: import error:\n`, err));
+                .catch(err => failedLoad('Timers: import error:\n', err));
 
             // Create reminders list from the reminders file.
             const hasReminders = loadReminders()
@@ -133,8 +135,8 @@ function Main() {
                     Logger.log(`Reminders: imported ${reminderData.length} from file.`);
                     return reminders.length > 0;
                 })
-                .catch(err => failedLoad(`Reminders: import error:\n`, err));
-            hasReminders.then(hasReminders => {
+                .catch(err => failedLoad('Reminders: import error:\n', err));
+            hasReminders.then(() => {
                 Logger.log(`Reminders: Configuring save every ${saveInterval / (60 * 1000)} min.`);
                 dataTimers['reminders'] = setInterval(() => {
                     pruneExpiredReminders();
@@ -149,8 +151,8 @@ function Main() {
                     Logger.log(`Hunters: imported ${Object.keys(hunterData).length} from file.`);
                     return Object.keys(hunters).length > 0;
                 })
-                .catch(err => failedLoad(`Hunters: import error:\n`, err));
-            hasHunters.then(hasHunters => {
+                .catch(err => failedLoad('Hunters: import error:\n', err));
+            hasHunters.then(() => {
                 Logger.log(`Hunters: Configuring save every ${saveInterval / (60 * 1000)} min.`);
                 dataTimers['hunters'] = setInterval(saveHunters, saveInterval);
             });
@@ -162,13 +164,13 @@ function Main() {
                     Logger.log(`Nicknames: imported ${Object.keys(urls).length} sources from file.`);
                     return Object.keys(nickname_urls).length > 0;
                 })
-                .catch(err => failedLoad(`Nicknames: import error:\n`, err));
+                .catch(err => failedLoad('Nicknames: import error:\n', err));
             hasNicknames
                 .then(refreshNicknameData)
                 .then(() => {
                     Logger.log(`Nicknames: Configuring data refresh every ${saveInterval / (60 * 1000)} min.`);
                     dataTimers['nicknames'] = setInterval(refreshNicknameData, saveInterval);
-            });
+                });
 
             // Register filters
             const hasFilters = Promise.resolve()
@@ -176,7 +178,7 @@ function Main() {
                 .then(() => {
                     return Object.keys(filters).length > 0;
                 })
-                .catch(err => failedLoad(`Filters: import error:\n`, err));
+                .catch(err => failedLoad('Filters: import error:\n', err));
             hasFilters
                 .then(() => {
                     Logger.log(`Filters: Configuring refresh every ${saveInterval / (60 * 1000)} min.`);
@@ -191,12 +193,12 @@ function Main() {
             ];
 
             // Configure the bot behavior.
-            client.once("ready", () => {
-                Logger.log("I am alive!");
+            client.once('ready', () => {
+                Logger.log('I am alive!');
 
                 // Find all text channels on which to send announcements.
                 const announcables = client.guilds.reduce((channels, guild) => {
-                    let candidates = guild.channels
+                    const candidates = guild.channels
                         .filter(c => settings.timedAnnouncementChannels.has(c.name) && textChannelTypes.has(c.type))
                         .map(tc => tc);
                     if (candidates.length)
@@ -211,7 +213,7 @@ function Main() {
                 Logger.log(`Timers: Initialized ${timer_config.size} timers on channels ${announcables}.`);
 
                 // If we disconnect and then reconnect, do not bother rescheduling the already-scheduled timers.
-                client.on("ready", () => Logger.log("I am inVINCEeble!"));
+                client.on('ready', () => Logger.log('I am inVINCEeble!'));
             });
 
             // Message handling.
@@ -247,7 +249,7 @@ function Main() {
             // WebSocket disconnected and is no longer trying to reconnect.
             client.on('disconnect', event => {
                 Logger.log(`Client socket closed: ${event.reason || 'No reason given'}`);
-                Logger.log(`Socket close code: ${event.code} (${event.wasClean ? `` : `not `}cleanly closed)`);
+                Logger.log(`Socket close code: ${event.code} (${event.wasClean ? '' : 'not '}cleanly closed)`);
                 quit();
             });
             // Configuration complete. Using Promise.all() requires these tasks to complete
@@ -271,25 +273,25 @@ function Main() {
         });
 }
 try {
-  Main();
+    Main();
 }
 catch(error) {
-  Logger.error(`Error executing Main:\n`, error);
+    Logger.error('Error executing Main:\n', error);
 }
 
 function quit() {
     return doSaveAll()
         .then(
-            () => Logger.log(`Shutdown: data saves completed`),
-            (err) => Logger.error(`Shutdown: error while saving:\n`, err)
+            () => Logger.log('Shutdown: data saves completed'),
+            (err) => Logger.error('Shutdown: error while saving:\n', err),
         )
-        .then(() => { Logger.log(`Shutdown: destroying client`); return client.destroy(); })
+        .then(() => { Logger.log('Shutdown: destroying client'); return client.destroy(); })
         .then(() => {
-            Logger.log(`Shutdown: deactivating data refreshes`);
-            for (let timer of Object.values(dataTimers))
+            Logger.log('Shutdown: deactivating data refreshes');
+            for (const timer of Object.values(dataTimers))
                 clearInterval(timer);
-            Logger.log(`Shutdown: deactivating timers`);
-            for (let timer of timers_list) {
+            Logger.log('Shutdown: deactivating timers');
+            for (const timer of timers_list) {
                 timer.stopInterval();
                 timer.stopTimeout();
             }
@@ -299,7 +301,7 @@ function quit() {
         })
         .then(() => process.exitCode = 1)
         .catch(err => {
-            Logger.error(`Shutdown: unhandled error:\n`, err, `\nImmediately exiting.`);
+            Logger.error('Shutdown: unhandled error:\n', err, '\nImmediately exiting.');
             process.exit();
         });
 }
@@ -366,19 +368,19 @@ function loadSettings(path = main_settings_filename) {
         Object.assign(settings, data);
         // Set defaults if they were not specified.
         if (!settings.linkConversionChannel)
-            settings.linkConversionChannel = "larrys-freebies";
+            settings.linkConversionChannel = 'larrys-freebies';
 
         if (!settings.timedAnnouncementChannels)
-            settings.timedAnnouncementChannels = ["timers"];
+            settings.timedAnnouncementChannels = ['timers'];
         if (!Array.isArray(settings.timedAnnouncementChannels))
-            settings.timedAnnouncementChannels = settings.timedAnnouncementChannels.split(",").map(s => s.trim());
+            settings.timedAnnouncementChannels = settings.timedAnnouncementChannels.split(',').map(s => s.trim());
         settings.timedAnnouncementChannels = new Set(settings.timedAnnouncementChannels);
 
-        settings.relic_hunter_webhook = settings.relic_hunter_webhook || "283571156236107777";
+        settings.relic_hunter_webhook = settings.relic_hunter_webhook || '283571156236107777';
 
         settings.botPrefix = settings.botPrefix ? settings.botPrefix.trim() : '-mh';
 
-        settings.owner = settings.owner || "0"; // So things don't fail if it's unset
+        settings.owner = settings.owner || '0'; // So things don't fail if it's unset
         return true;
     }).catch(err => {
         Logger.error(`Settings: error while reading settings from '${path}':\n`, err);
@@ -412,7 +414,7 @@ function loadTimers(path = timer_settings_filename) {
  */
 function createTimersFromList(timerData) {
     const knownTimers = timers_list.length;
-    for (let seed of timerData) {
+    for (const seed of timerData) {
         let timer;
         try {
             timer = new Timer(seed);
@@ -434,8 +436,8 @@ function createTimersFromList(timerData) {
  */
 function scheduleTimer(timer, channels) {
     if (timer.isSilent())
-        return
-    let msUntilActivation = timer.getNext().diffNow().minus(timer.getAdvanceNotice()).as('milliseconds');
+        return;
+    const msUntilActivation = timer.getNext().diffNow().minus(timer.getAdvanceNotice()).as('milliseconds');
     timer.storeTimeout('scheduling',
         setTimeout(t => {
             t.stopTimeout('scheduling');
@@ -443,11 +445,11 @@ function scheduleTimer(timer, channels) {
                 setInterval(timer => {
                     doRemind(timer);
                     doAnnounce(timer);
-                }, t.getRepeatInterval().as('milliseconds'), t)
+                }, t.getRepeatInterval().as('milliseconds'), t),
             );
             doRemind(t);
             doAnnounce(t);
-        }, msUntilActivation, timer)
+        }, msUntilActivation, timer),
     );
     timer_config.set(timer.id, { active: true, channels: channels, inactiveChannels: [] });
 }
@@ -463,21 +465,21 @@ function getKnownTimersDetails() {
     /** @type {Object <string, Set<string>> */
     const details = {};
     timers_list.forEach(timer => {
-        let area = `**${timer.getArea()}**`;
+        const area = `**${timer.getArea()}**`;
         if (!details[area])
             details[area] = new Set();
         if (timer.getSubArea())
             details[area].add(timer.getSubArea());
     });
     const names = [];
-    for (let area in details) {
+    for (const area in details) {
         let description = area;
         if (details[area].size)
-            description += ` (${Array.from(details[area]).join(", ")})`;
+            description += ` (${Array.from(details[area]).join(', ')})`;
         names.push(description);
     }
 
-    return names.join("\n");
+    return names.join('\n');
 }
 
 /**
@@ -489,7 +491,7 @@ function getKnownTimersDetails() {
 function parseUserMessage(message) {
     const tokens = splitString(message.content);
     if (!tokens.length) {
-        message.channel.send("What is happening???");
+        message.channel.send('What is happening???');
         return;
     }
 
@@ -499,7 +501,7 @@ function parseUserMessage(message) {
 
     const command = tokens.shift();
     if (!command) {
-        message.channel.send("I didn't understand, but you can ask me for help.");
+        message.channel.send('I didn\'t understand, but you can ask me for help.');
         return;
     }
 
@@ -507,37 +509,38 @@ function parseUserMessage(message) {
     const reminderRequest = tokens.length ? timerAliases(tokens) : {};
 
     switch (command.toLowerCase()) {
-        // Display information about the next instance of a timer.
-        case 'next':
-            let aboutTimers = `I know these timers:\n${getKnownTimersDetails()}`;
+    // Display information about the next instance of a timer.
+        case 'next': {
+            const aboutTimers = `I know these timers:\n${getKnownTimersDetails()}`;
             if (!tokens.length) {
-                // received "-mh next" -> display the help string.
-                // TODO: pretty-print known timer info
+            // received "-mh next" -> display the help string.
+            // TODO: pretty-print known timer info
                 message.channel.send(aboutTimers);
             } else if (!reminderRequest.area) {
-                // received "-mh next <words>", but the words didn't match any known timer information.
-                // Currently, the only other information we handle is RONZA.
+            // received "-mh next <words>", but the words didn't match any known timer information.
+            // Currently, the only other information we handle is RONZA.
                 switch (tokens[0].toLowerCase()) {
                     case 'ronza':
-                        message.channel.send("Don't let aardwolf see you ask or you'll get muted");
+                        message.channel.send('Don\'t let aardwolf see you ask or you\'ll get muted');
                         // TODO: increment hunters[id] info? "X has delayed ronza by N years for asking M times"
                         break;
                     default:
                         message.channel.send(aboutTimers);
                 }
             } else {
-                // Display information about this known timer.
-                let timerInfo = nextTimer(reminderRequest);
-                if (typeof timerInfo === "string")
+            // Display information about this known timer.
+                const timerInfo = nextTimer(reminderRequest);
+                if (typeof timerInfo === 'string')
                     message.channel.send(timerInfo);
                 else
-                    message.channel.send("", { embed: timerInfo });
+                    message.channel.send('', { embed: timerInfo });
             }
             break;
+        }
 
         // Display or update the user's reminders.
         case 'remind':
-            // TODO: redirect responses to PM.
+        // TODO: redirect responses to PM.
             if (!tokens.length || !reminderRequest.area)
                 listRemind(message);
             else
@@ -549,24 +552,24 @@ function parseUserMessage(message) {
         case 'itin':
         case 'agenda':
         case 'itinerary':
-        case 'schedule':
-            // Default the searched time period to 24 hours if it was not specified.
+        case 'schedule': {
+        // Default the searched time period to 24 hours if it was not specified.
             reminderRequest.count = reminderRequest.count || 24;
 
-            let usage_str = buildSchedule(reminderRequest);
+            const usage_str = buildSchedule(reminderRequest);
             // Discord limits messages to 2000 characters, so use multiple messages if necessary.
             message.channel.send(usage_str, { split: true });
             break;
-
+        }
         // Display information about the desired mouse.
         case 'find':
         case 'mfind':
             if (!tokens.length)
-                message.channel.send("You have to supply mice to find.");
+                message.channel.send('You have to supply mice to find.');
             else {
-                let criteria = tokens.join(" ").trim().toLowerCase().replace(/ mouse$/,'');
+                const criteria = tokens.join(' ').trim().toLowerCase().replace(/ mouse$/,'');
                 if (criteria.length < 2)
-                    message.channel.send("Your search string was too short, try again.");
+                    message.channel.send('Your search string was too short, try again.');
                 else
                     findMouse(message.channel, criteria, 'find');
             }
@@ -575,11 +578,11 @@ function parseUserMessage(message) {
         // Display information about the desired item.
         case 'ifind':
             if (!tokens.length)
-                message.channel.send("You have to supply an item to find");
+                message.channel.send('You have to supply an item to find');
             else {
-                let criteria = tokens.join(" ").trim().toLowerCase();
+                const criteria = tokens.join(' ').trim().toLowerCase();
                 if (criteria.length < 2)
-                    message.channel.send("Your search string was too short, try again.");
+                    message.channel.send('Your search string was too short, try again.');
                 else
                     findItem(message.channel, criteria, 'ifind');
             }
@@ -588,44 +591,44 @@ function parseUserMessage(message) {
         // Update information about the user volunteered by the user.
         case 'iam':
             if (!tokens.length)
-                message.channel.send("Yes, you are. Provide a hunter ID number to set that.");
+                message.channel.send('Yes, you are. Provide a hunter ID number to set that.');
             else if (tokens.length === 1 && !isNaN(parseInt(tokens[0], 10)))
                 setHunterID(message, tokens[0]);
-            else if (tokens.length === 1 && tokens[0].toLowerCase() === "not")
+            else if (tokens.length === 1 && tokens[0].toLowerCase() === 'not')
                 unsetHunterID(message);
             else {
-                // received -mh iam <words>. The user can specify where they are hunting, their rank/title, or their in-game id.
-                // Nobody should need this many tokens to specify their input, but someone is gonna try for more.
-                let userText = tokens.slice(1, 10).join(" ").trim().toLowerCase();
-                let userCommand = tokens[0].toLowerCase();
-                if (userCommand === "in" && userText) {
-                    if (nicknames.get("locations")[userText])
-                        userText = nicknames.get("locations")[userText];
-                    setHunterProperty(message, "location", userText);
+            // received -mh iam <words>. The user can specify where they are hunting, their rank/title, or their in-game id.
+            // Nobody should need this many tokens to specify their input, but someone is gonna try for more.
+                let userText = tokens.slice(1, 10).join(' ').trim().toLowerCase();
+                const userCommand = tokens[0].toLowerCase();
+                if (userCommand === 'in' && userText) {
+                    if (nicknames.get('locations')[userText])
+                        userText = nicknames.get('locations')[userText];
+                    setHunterProperty(message, 'location', userText);
                 }
-                else if (["rank", "title", "a"].indexOf(userCommand) !== -1 && userText) {
-                    if (nicknames.get("ranks")[userText])
-                        userText = nicknames.get("ranks")[userText];
-                    setHunterProperty(message, "rank", userText);
+                else if (['rank', 'title', 'a'].indexOf(userCommand) !== -1 && userText) {
+                    if (nicknames.get('ranks')[userText])
+                        userText = nicknames.get('ranks')[userText];
+                    setHunterProperty(message, 'rank', userText);
                 }
-                else if (userCommand.substring(0, 3) === "snu" && userText)
-                    setHunterProperty(message, "snuid", userText);
+                else if (userCommand.substring(0, 3) === 'snu' && userText)
+                    setHunterProperty(message, 'snuid', userText);
                 else {
-                    let prefix = settings.botPrefix;
-                    let commandSyntax = [
-                        `I'm not sure what to do with that. Try:`,
+                    const prefix = settings.botPrefix;
+                    const commandSyntax = [
+                        'I\'m not sure what to do with that. Try:',
                         `\`${prefix} iam ####\` to set a hunter ID.`,
                         `\`${prefix} iam rank <rank>\` to set a rank.`,
                         `\`${prefix} iam in <location>\` to set a location`,
                         `\`${prefix} iam snuid ####\` to set your in-game user id`,
-                        `\`${prefix} iam not\` to unregister (and delete your data)`
+                        `\`${prefix} iam not\` to unregister (and delete your data)`,
                     ];
-                    message.channel.send(commandSyntax.join("\n\t"));
+                    message.channel.send(commandSyntax.join('\n\t'));
                 }
             }
             break;
 
-        // Display volunteered information about known users. Handled inputs:
+            // Display volunteered information about known users. Handled inputs:
         /**
          * -mh whois ####                   -> hid lookup (No PM)
          * -mh whois snuid ####             -> snuid lookup (No PM)
@@ -633,69 +636,70 @@ function parseUserMessage(message) {
          * -mh whois in <words>             -> area lookup
          * -mh whois [rank|title|a] <words> -> random query lookup
          */
-        case 'whois':
+        case 'whois': {
             if (!tokens.length) {
-                message.channel.send("Who's who? Who's on first?");
+                message.channel.send('Who\'s who? Who\'s on first?');
                 return;
             }
 
             let searchType = tokens.shift().toLowerCase();
             if (!isNaN(parseInt(searchType, 10))) {
-                // hid lookup of 1 or more IDs.
+            // hid lookup of 1 or more IDs.
                 tokens.unshift(searchType);
-                findHunter(message, tokens, "hid");
+                findHunter(message, tokens, 'hid');
                 return;
             }
-            else if (searchType.substring(0, 3) === "snu") {
-                // snuid lookup of 1 or more IDs.
-                findHunter(message, tokens, "snuid");
+            else if (searchType.substring(0, 3) === 'snu') {
+            // snuid lookup of 1 or more IDs.
+                findHunter(message, tokens, 'snuid');
                 return;
             }
             else if (!tokens.length) {
-                // Display name or user mention lookup.
+            // Display name or user mention lookup.
                 tokens.unshift(searchType);
-                findHunter(message, tokens, "name");
+                findHunter(message, tokens, 'name');
                 return;
             }
             else {
-                // Rank or location lookup. tokens[] contains the terms to search
-                let search = tokens.join(" ").toLowerCase();
-                if (searchType === "in") {
-                    if (nicknames.get("locations")[search]) {
-                        search = nicknames.get("locations")[search];
+            // Rank or location lookup. tokens[] contains the terms to search
+                let search = tokens.join(' ').toLowerCase();
+                if (searchType === 'in') {
+                    if (nicknames.get('locations')[search]) {
+                        search = nicknames.get('locations')[search];
                     }
-                    searchType = "location";
+                    searchType = 'location';
                 }
-                else if (["rank", "title", "a", "an"].indexOf(searchType) !== -1) {
-                    if (nicknames.get("ranks")[search]) {
-                        search = nicknames.get("ranks")[search];
+                else if (['rank', 'title', 'a', 'an'].indexOf(searchType) !== -1) {
+                    if (nicknames.get('ranks')[search]) {
+                        search = nicknames.get('ranks')[search];
                     }
-                    searchType = "rank";
+                    searchType = 'rank';
                 }
                 else {
-                    let prefix = settings.botPrefix;
-                    let commandSyntax = [
-                        `I'm not sure what to do with that. Try:`,
+                    const prefix = settings.botPrefix;
+                    const commandSyntax = [
+                        'I\'m not sure what to do with that. Try:',
                         `\`${prefix} whois [#### | <mention>]\` to look up specific hunters`,
-                        `\`${prefix} whois [in <location> | a <rank>]\` to find up to 5 random new friends`
+                        `\`${prefix} whois [in <location> | a <rank>]\` to find up to 5 random new friends`,
                     ];
-                    message.channel.send(commandSyntax.join("\n\t"));
+                    message.channel.send(commandSyntax.join('\n\t'));
                     return;
                 }
                 const hunters = getHuntersByProperty(searchType, search);
                 message.channel.send(hunters.length
-                    ? `${hunters.length} random hunters: \`${hunters.join("\`, \`")}\``
-                    : `I couldn't find any hunters with \`${searchType}\` matching \`${search}\``
+                    // eslint-disable-next-line no-useless-escape
+                    ? `${hunters.length} random hunters: \`${hunters.join('\`, \`')}\``
+                    : `I couldn't find any hunters with \`${searchType}\` matching \`${search}\``,
                 );
             }
             break;
-
+        }
         case 'reset':
             if (message.author.id === settings.owner) {
                 if (!tokens.length) {
-                    message.channel.send("I don't know what to reset.");
+                    message.channel.send('I don\'t know what to reset.');
                 }
-                let sub_command = tokens.shift();
+                const sub_command = tokens.shift();
                 switch (sub_command) {
                     case 'rh':
                     case 'relic_hunter':
@@ -704,13 +708,15 @@ function parseUserMessage(message) {
                 }
                 break;
             }
+        // Fall through if user isn't the bot owner.
         case 'help':
         case 'arrg':
         case 'aarg':
-        default:
-            let helpMessage = getHelpMessage(tokens);
+        default: {
+            const helpMessage = getHelpMessage(tokens);
             // TODO: Send help to PM?
-            message.channel.send(helpMessage ? helpMessage : "Whoops! That's a bug.");
+            message.channel.send(helpMessage ? helpMessage : 'Whoops! That\'s a bug.');
+        }
     }
 }
 
@@ -731,9 +737,9 @@ async function convertRewardLink(message) {
         const target = await getHGTarget(link);
         if (target) {
             const shortLink = await getBitlyLink(target);
-            return shortLink ? { fb: link, mh: shortLink } : "";
+            return shortLink ? { fb: link, mh: shortLink } : '';
         } else {
-            return "";
+            return '';
         }
     }))).filter(nl => !!nl);
     if (!newLinks.length)
@@ -761,7 +767,7 @@ async function convertRewardLink(message) {
                 throw `HTTP ${response.status}`;
             }
         }).catch((err) => Logger.error('Links: GET to htgb.co failed with error', err))
-        .then(result => result || '');
+            .then(result => result || '');
     }
 
     /**
@@ -787,7 +793,7 @@ async function convertRewardLink(message) {
                 throw `HTTP ${response.status}`;
             }
         }).catch((err) => Logger.error('Links: Bitly shortener failed with error:', err))
-        .then(result => result || '');
+            .then(result => result || '');
     }
 }
 
@@ -809,21 +815,21 @@ function timerAliases(tokens) {
     const newReminder = {
         area: null,
         sub_area: null,
-        count: null
+        count: null,
     };
     const timerAreas = timers_list.map(timer => timer.getArea());
     const timerSubAreas = timers_list.map(timer => timer.getSubArea());
     // Scan the input tokens and attempt to match them to a known timer.
     for (let i = 0; i < tokens.length; i++) {
-        let token = tokens[i].toLowerCase();
+        const token = tokens[i].toLowerCase();
 
         // Check if this is an exact timer name, useful if we can dynamically add new timers.
-        let areaIndex = timerAreas.indexOf(token);
+        const areaIndex = timerAreas.indexOf(token);
         if (areaIndex !== -1) {
             newReminder.area = token;
             continue;
         } else {
-            let subIndex = timerSubAreas.indexOf(token);
+            const subIndex = timerSubAreas.indexOf(token);
             if (subIndex !== -1) {
                 newReminder.area = timerAreas[subIndex];
                 newReminder.sub_area = token;
@@ -863,7 +869,7 @@ function timerAliases(tokens) {
  */
 function parseTokenForArea(token, newReminder) {
     switch (token) {
-        // Seasonal Garden aliases
+    // Seasonal Garden aliases
         case 'sg':
         case 'seasonal':
         case 'season':
@@ -926,7 +932,7 @@ function parseTokenForArea(token, newReminder) {
  */
 function parseTokenForSubArea(token, newReminder) {
     switch (token) {
-        // Seasonal Garden seasons aliases.
+    // Seasonal Garden seasons aliases.
         case 'fall':
         case 'autumn':
             newReminder.area = 'sg';
@@ -947,7 +953,7 @@ function parseTokenForSubArea(token, newReminder) {
 
         // Forbidden Grove gate state aliases.
         case 'open':
-        case "opens":
+        case 'opens':
         case 'opened':
         case 'opening':
             newReminder.area = 'fg';
@@ -1040,7 +1046,7 @@ function parseTokenForSubArea(token, newReminder) {
  */
 function parseTokenForCount(token, newReminder) {
     switch (token) {
-        // Words for numbers...
+    // Words for numbers...
         case 'once':
         case 'one':
             newReminder.count = 1;
@@ -1100,20 +1106,20 @@ function nextTimer(validTimerData) {
         areaTimers = timers_list.filter(timer => timer.getArea() === area);
 
     let nextTimer;
-    for (let timer of areaTimers)
+    for (const timer of areaTimers)
         if (!sub || sub === timer.getSubArea())
             if (!nextTimer || timer.getNext() < nextTimer.getNext())
                 nextTimer = timer;
 
-    const sched_syntax = `${settings.botPrefix} remind ${area}${sub ? ` ${sub}` : ""}`;
+    const sched_syntax = `${settings.botPrefix} remind ${area}${sub ? ` ${sub}` : ''}`;
     return (new Discord.RichEmbed()
         .setDescription(nextTimer.getDemand()
             + `\n${timeLeft(nextTimer.getNext())}`
             // Putting here makes it look nicer and fit in portrait mode
-            + `\nTo schedule this reminder: \`${sched_syntax}\``
+            + `\nTo schedule this reminder: \`${sched_syntax}\``,
         )
         .setTimestamp(nextTimer.getNext().toJSDate())
-        .setFooter("at") // There has to be something in here or there is no footer
+        .setFooter('at') // There has to be something in here or there is no footer
     );
 }
 
@@ -1185,11 +1191,11 @@ function pruneExpiredReminders() {
             ++i;
             // If the current reminder is expired, splice it and the others away.
             if (i < reminders.length && reminders[i].count === 0) {
-                let discarded = reminders.splice(i, numExpired);
+                const discarded = reminders.splice(i, numExpired);
                 Logger.log(`Reminders: spliced ${discarded.length} that were expired. ${reminders.length} remaining.`);
             }
             else
-                Logger.warn(`Reminders: found ${numExpired} expired, but couldn't splice because reminder at index ${i} was bad:\n`, reminders, `\n`, reminders[i]);
+                Logger.warn(`Reminders: found ${numExpired} expired, but couldn't splice because reminder at index ${i} was bad:\n`, reminders, '\n', reminders[i]);
         }
     }
 }
@@ -1203,7 +1209,7 @@ function pruneExpiredReminders() {
 function saveReminders(path = reminder_filename) {
     // Write out the JSON of the reminders array
     return saveDataAsJSON(path, reminders).then(didSave => {
-        Logger.log(`Reminders: ${didSave ? `Saved` : `Failed to save`} ${reminders.length} to '${path}'.`);
+        Logger.log(`Reminders: ${didSave ? 'Saved' : 'Failed to save'} ${reminders.length} to '${path}'.`);
         last_timestamps.reminder_save = DateTime.utc();
         return didSave;
     });
@@ -1217,13 +1223,13 @@ function saveReminders(path = reminder_filename) {
 function doAnnounce(timer) {
     if (!timer)
         return;
-    let config = timer_config.get(timer.id);
+    const config = timer_config.get(timer.id);
     if (!config || !config.active)
         return;
     if (!config.channels.length)
         config.active = false;
 
-    let message = timer.getAnnouncement();
+    const message = timer.getAnnouncement();
     config.channels.forEach(tc => {
         if (tc.guild.available)
             tc.send(message).catch(err => {
@@ -1232,7 +1238,7 @@ function doAnnounce(timer) {
                 // TODO: actually use the enum instead of a value for the enum (in case it changes):
                 // https://github.com/discordjs/discord.js/blob/d97af9d2e0a8c4cc3cd18b7b93ba6b93fe3772f6/src/util/Constants.js#L158
                 if (client.status === 0) {
-                    let index = config.channels.indexOf(tc);
+                    const index = config.channels.indexOf(tc);
                     Array.prototype.push.apply(config.inactiveChannels, config.channels.splice(index, 1));
                     Logger.warn(`(${timer.name}): deactivated announcement on channel ${tc.name} in ${tc.guild.name} due to send error during send.`);
                 }
@@ -1278,7 +1284,7 @@ function doRemind(timer) {
     const sent = new Set();
     // Dispatch the reminders, and update the set as we go.
     toDispatch.forEach(reminder => {
-        let uid = reminder.user;
+        const uid = reminder.user;
         if (!sent.has(uid)) {
             sent.add(uid);
             client.fetchUser(uid).then(user => sendRemind(user, reminder, timer))
@@ -1310,7 +1316,7 @@ function sendRemind(user, remind, timer) {
     // TODO: better timer title info - no markdown formatting in the title.
     const output = new Discord.RichEmbed({ title: timer.getAnnouncement() });
 
-    if (timer.getArea() === "relic_hunter") {
+    if (timer.getArea() === 'relic_hunter') {
         output.addField('Current Location', `She's in **${relic_hunter.location}**`, true);
         output.setTitle(`RH: ${relic_hunter.location}`);
     }
@@ -1319,18 +1325,18 @@ function sendRemind(user, remind, timer) {
     if (remind.fail > 10)
         remind.count = 1;
     // For non-perpetual reminders, decrement the counter.
-    output.addField('Reminders Left', (remind.count < 0) ? "unlimited" : --remind.count, true);
+    output.addField('Reminders Left', (remind.count < 0) ? 'unlimited' : --remind.count, true);
 
-    let advanceAmount = timer.getAdvanceNotice().as('milliseconds');
+    const advanceAmount = timer.getAdvanceNotice().as('milliseconds');
     // Should this be next user reminder, or next activation of this timer?
     output.addField('Next Reminder', (advanceAmount
         ? timer.getNext().plus(timer.getRepeatInterval()).minus(advanceAmount)
         : timer.getNext()
-    ).diffNow().toFormat("dd'd 'hh'h 'mm'm'", { round: true }), true);
+    ).diffNow().toFormat('dd\'d \'hh\'h \'mm\'m\'', { round: true }), true);
 
     // How to add or remove additional counts.
-    let alter_str = `Use \`${settings.botPrefix} remind ${remind.area}${remind.sub_area ? ` ${remind.sub_area}` : ""}`;
-    alter_str += (!remind.count) ? "` to turn this reminder back on." : " stop` to end these sooner.";
+    let alter_str = `Use \`${settings.botPrefix} remind ${remind.area}${remind.sub_area ? ` ${remind.sub_area}` : ''}`;
+    alter_str += (!remind.count) ? '` to turn this reminder back on.' : ' stop` to end these sooner.';
     alter_str += `\nUse \`${settings.botPrefix} help remind\` for additional info.`;
     output.addField('To Update:', alter_str, false);
 
@@ -1348,7 +1354,7 @@ function sendRemind(user, remind, timer) {
 
     user.send({ embed: output }).then(
         () => remind.fail = 0,
-        () => remind.fail = (remind.fail || 0) + 1
+        () => remind.fail = (remind.fail || 0) + 1,
     );
 }
 
@@ -1365,20 +1371,20 @@ function addRemind(timerRequest, message) {
     const area = timerRequest.area;
     const subArea = timerRequest.sub_area;
     if (!area) {
-        message.channel.send("I do not know the area you asked for");
+        message.channel.send('I do not know the area you asked for');
         return;
     }
 
     // Default to reminding the user once.
     const count = timerRequest.count || (timerRequest.count === 0 ? 0 : 1);
-    const requestName = `${area}${subArea ? `: ${subArea}` : ""}`;
+    const requestName = `${area}${subArea ? `: ${subArea}` : ''}`;
 
     // Delete the reminder, if that is being requested.
     // (Rather than try to modify the positions and number of elements in
     // reminders e.g. thread race saveReminders, simply set the count to 0.)
     if (!count) {
-        let responses = [];
-        for (let reminder of reminders)
+        const responses = [];
+        for (const reminder of reminders)
             if (reminder.user === message.author.id && reminder.area === area) {
                 if (subArea && subArea === reminder.sub_area) {
                     reminder.count = 0;
@@ -1391,8 +1397,8 @@ function addRemind(timerRequest, message) {
             }
 
         message.author.send(responses.length
-            ? `\`\`\`${responses.join("\n")}\`\`\``
-            : `I couldn't find a matching reminder for you in '${requestName}'.`
+            ? `\`\`\`${responses.join('\n')}\`\`\``
+            : `I couldn't find a matching reminder for you in '${requestName}'.`,
         );
         return;
     }
@@ -1404,35 +1410,35 @@ function addRemind(timerRequest, message) {
     Logger.log(`Timers: found ${choices.length} matching input request:\n`, timerRequest);
 
     // Assume the desired timer is the soonest one that matched the given criteria.
-    let timer = choices.pop();
+    const timer = choices.pop();
     if (!timer) {
         message.author.send(`I'm sorry, there weren't any timers I know of that match your request. I know\n${getKnownTimersDetails()}`);
         return;
     }
 
     // If the reminder already exists, set its new count to the requested count.
-    let responses = [];
-    for (let reminder of reminders)
+    const responses = [];
+    for (const reminder of reminders)
         if (reminder.user === message.author.id && reminder.area === area)
             if ((subArea && reminder.sub_area === subArea)
                 || (!subArea && !reminder.sub_area))
             {
                 responses.push(`Updated reminder count for '${requestName}' from '${reminder.count === -1
-                    ? `always` : reminder.count}' to '${count === -1 ? `always` : count}'.`);
+                    ? 'always' : reminder.count}' to '${count === -1 ? 'always' : count}'.`);
                 reminder.count = count;
             }
 
     if (responses.length) {
         Logger.log(`Reminders: updated ${responses.length} for ${message.author.username} to a count of ${count}.`, timerRequest);
-        message.author.send(`\`\`\`${responses.join("\n")}\`\`\``);
+        message.author.send(`\`\`\`${responses.join('\n')}\`\`\``);
         return;
     }
 
     // No updates were made - free to add a new reminder.
     const newReminder = {
-        "count": count,
-        "area": area,
-        "user": message.author.id
+        'count': count,
+        'area': area,
+        'user': message.author.id,
     };
     // If the matched timer has a sub-area, we need to care about the sub-area specified
     // in the request. It will either be the same as that of this timer, or it will be
@@ -1446,16 +1452,16 @@ function addRemind(timerRequest, message) {
     // proper response.
     const others = choices.reduce((s, t) => { s.add(`**${t.getSubArea()}**`); return s; }, new Set());
     responses.push(`Your reminder for **${timer.name}** is set. ${choices.length ?
-        `You'll also get reminders for ${oxfordStringifyValues(others)}. I'll PM you about them` : `I'll PM you about it`}`);
-    responses.push((count === 1) ? "once." : (count < 0) ? "until you stop it." : `${count} times.`);
+        `You'll also get reminders for ${oxfordStringifyValues(others)}. I'll PM you about them` : 'I\'ll PM you about it'}`);
+    responses.push((count === 1) ? 'once.' : (count < 0) ? 'until you stop it.' : `${count} times.`);
 
     // Inform a new user of the reminder functionality (i.e. PM only).
-    if (message.channel.type !== "dm" && !reminders.some(r => r.user === message.author.id))
-        responses.unshift(`Hi there! Reminders are only sent via PM, and I'm just making sure I can PM you.`);
+    if (message.channel.type !== 'dm' && !reminders.some(r => r.user === message.author.id))
+        responses.unshift('Hi there! Reminders are only sent via PM, and I\'m just making sure I can PM you.');
 
     // Send notice of the update via PM.
-    message.author.send(responses.join(" ")).catch(() =>
-        Logger.error(`Reminders: notification failure for ${message.author.username}.`)
+    message.author.send(responses.join(' ')).catch(() =>
+        Logger.error(`Reminders: notification failure for ${message.author.username}.`),
     );
 }
 
@@ -1467,23 +1473,23 @@ function addRemind(timerRequest, message) {
 function listRemind(message) {
     const user = message.author.id,
         pm_channel = message.author;
-    let timer_str = "Your reminders:";
+    let timer_str = 'Your reminders:';
     let usage_str;
 
     const userReminders = reminders.filter(r => r.user === user && r.count);
     userReminders.forEach(reminder => {
         // TODO: prettyPrint this info.
-        let name = `${reminder.area}${reminder.sub_area ? ` (${reminder.sub_area})` : ""}`;
+        const name = `${reminder.area}${reminder.sub_area ? ` (${reminder.sub_area})` : ''}`;
         timer_str += `\nTimer:\t**${name}**`;
         usage_str = `\`${settings.botPrefix} remind ${reminder.area}`;
         if (reminder.sub_area)
             usage_str += ` ${reminder.sub_area}`;
 
-        timer_str += "\t";
+        timer_str += '\t';
         if (reminder.count === 1)
-            timer_str += " one more time";
+            timer_str += ' one more time';
         else if (reminder.count === -1)
-            timer_str += " until you stop it";
+            timer_str += ' until you stop it';
         else
             timer_str += ` ${reminder.count} times`;
 
@@ -1493,7 +1499,7 @@ function listRemind(message) {
             timer_str += `There have been ${reminder.fail} failed attempts to activate this reminder.\n`;
     });
 
-    pm_channel.send(userReminders.length ? timer_str : "I found no reminders for you, sorry.")
+    pm_channel.send(userReminders.length ? timer_str : 'I found no reminders for you, sorry.')
         .catch(() => Logger.error(`Reminders: notification failure for ${pm_channel.username}. Possibly blocked.`));
 }
 
@@ -1511,7 +1517,7 @@ function buildSchedule(timer_request) {
     // Search from 1 hour to 10 days out.
     let req_hours = Duration.fromObject({ hours: timer_request.count });
     if (!req_hours.isValid) {
-        return "Invalid timespan given - how many hours did you want to look ahead?";
+        return 'Invalid timespan given - how many hours did you want to look ahead?';
     }
     else if (req_hours.as('hours') <= 0)
         req_hours = req_hours.set({ hours: 24 });
@@ -1525,8 +1531,8 @@ function buildSchedule(timer_request) {
     const max_timers = 24;
     (!area ? timers_list : timers_list.filter(t => t.getArea() === area && !t.isSilent()))
         .forEach(timer => {
-            let message = timer.getDemand();
-            for (let time of timer.upcoming(until))
+            const message = timer.getDemand();
+            for (const time of timer.upcoming(until))
                 upcoming_timers.push({ time: time, message: message });
         });
 
@@ -1539,7 +1545,7 @@ function buildSchedule(timer_request) {
         return_str += `. Here are the next ${max_timers} of them`;
         upcoming_timers.splice(max_timers, upcoming_timers.length);
     }
-    return_str += upcoming_timers.length ? ":\n" : ".";
+    return_str += upcoming_timers.length ? ':\n' : '.';
 
     return_str = upcoming_timers.reduce((str, val) => {
         return `${str}${val.message} ${timeLeft(val.time)}\n`;
@@ -1558,90 +1564,90 @@ function buildSchedule(timer_request) {
  */
 function getHelpMessage(tokens) {
     // TODO: dynamic help text - iterate known keyword commands and their arguments.
-    const keywords = "`iam`, `whois`, `remind`, `next`, `find`, `ifind`, and `schedule`";
+    const keywords = '`iam`, `whois`, `remind`, `next`, `find`, `ifind`, and `schedule`';
     const prefix = settings.botPrefix;
     if (!tokens || !tokens.length) {
         return [
-            `**help**`,
+            '**help**',
             `I know the keywords ${keywords}.`,
             `You can use \`${prefix} help <keyword>\` to get specific information about how to use it.`,
             `Example: \`${prefix} help next\` provides help about the 'next' keyword, \`${prefix} help remind\` provides help about the 'remind' keyword.`,
-            "Pro Tip: **All commands work in PM!**"
-        ].join("\n");
+            'Pro Tip: **All commands work in PM!**',
+        ].join('\n');
     }
 
-    const areaInfo = "Areas are Seasonal Garden (**sg**), Forbidden Grove (**fg**), Toxic Spill (**ts**), Balack's Cove (**cove**), and the daily **reset**.";
-    const subAreaInfo = "Sub areas are the seasons, open/close, spill ranks, and tide levels";
-    const privacyWarning = "\nSetting your location and rank means that when people search for those things, you can be randomly added to the results.";
-    const dbFilters = filters.reduce((acc, filter) => `${acc}\`${filter.code_name}\`, `, "") + "and `current`";
+    const areaInfo = 'Areas are Seasonal Garden (**sg**), Forbidden Grove (**fg**), Toxic Spill (**ts**), Balack\'s Cove (**cove**), and the daily **reset**.';
+    const subAreaInfo = 'Sub areas are the seasons, open/close, spill ranks, and tide levels';
+    const privacyWarning = '\nSetting your location and rank means that when people search for those things, you can be randomly added to the results.';
+    const dbFilters = filters.reduce((acc, filter) => `${acc}\`${filter.code_name}\`, `, '') + 'and `current`';
 
     if (tokens[0] === 'next') {
         return [
-            `**next**`,
+            '**next**',
             `Usage: \`${prefix} next [<area> | <sub-area>]\` will provide a message about the next related occurrence.`,
             areaInfo,
             subAreaInfo,
-            `Example: \`${prefix} next fall\` will tell when it is Autumn in the Seasonal Garden.`
-        ].join("\n");
+            `Example: \`${prefix} next fall\` will tell when it is Autumn in the Seasonal Garden.`,
+        ].join('\n');
     }
     else if (tokens[0] === 'remind') {
         return [
-            `**remind**`,
+            '**remind**',
             `Usage: \`${prefix} remind [<area> | <sub-area>] [<number> | always | stop]\` will control my reminder function relating to you specifically.`,
-            "Using the word `stop` will turn off a reminder if it exists.",
-            "Using a number means I will remind you that many times for that timer.",
-            "Use the word `always` to have me remind you for every occurrence.",
+            'Using the word `stop` will turn off a reminder if it exists.',
+            'Using a number means I will remind you that many times for that timer.',
+            'Use the word `always` to have me remind you for every occurrence.',
             `Just using \`${prefix} remind\` will list all your existing reminders and how to turn off each`,
             areaInfo,
             subAreaInfo,
-            `Example: \`${prefix} remind close always\` will always PM you 15 minutes before the Forbidden Grove closes.`
-        ].join("\n");
+            `Example: \`${prefix} remind close always\` will always PM you 15 minutes before the Forbidden Grove closes.`,
+        ].join('\n');
     }
     else if (tokens[0].substring(0, 5) === 'sched') {
         return [
-            `**schedule**`,
+            '**schedule**',
             `Usage: \`${prefix} schedule [<area>] [<number>]\` will tell you the timers scheduled for the next \`<number>\` of hours. Default is 24, max is 240.`,
-            "If you provide an area, I will only report on that area.",
-            areaInfo
-        ].join("\n");
+            'If you provide an area, I will only report on that area.',
+            areaInfo,
+        ].join('\n');
     }
     else if (tokens[0] === 'find') {
         return [
-            `**find**`,
+            '**find**',
             `Usage \`${prefix} find [-e <filter>] <mouse>\` will print the top attractions for the mouse, capped at 10.`,
             `Use of \`-e <filter>\` is optional and adds a time filter. Known filters are: ${dbFilters}`,
-            "All attraction data is from <https://mhhunthelper.agiletravels.com/>.",
-            "Help populate the database for better information!"
-        ].join("\n");
+            'All attraction data is from <https://mhhunthelper.agiletravels.com/>.',
+            'Help populate the database for better information!',
+        ].join('\n');
     }
     else if (tokens[0] === 'ifind') {
         return [
-            `**ifind**`,
+            '**ifind**',
             `Usage \`${prefix} ifind [-e <filter>] <item>\` will print the top 10 drop rates (per catch) for the item.`,
             `Use of \`-e <filter>\` is optional and adds a time filter. Known filters are: ${dbFilters}`,
-            "All drop rate data is from <https://mhhunthelper.agiletravels.com/>.",
-            "Help populate the database for better information!"
-        ].join("\n");
+            'All drop rate data is from <https://mhhunthelper.agiletravels.com/>.',
+            'Help populate the database for better information!',
+        ].join('\n');
     }
     else if (tokens[0] === 'iam') {
         return [
-            `**iam**`,
+            '**iam**',
             `Usage \`${prefix} iam <####>\` will set your hunter ID. **This must be done before the other options will work.**`,
             `  \`${prefix} iam in <location>\` will set your hunting location. Nicknames are allowed.`,
             `  \`${prefix} iam rank <rank>\` will set your rank. Nicknames are allowed.`,
             `  \`${prefix} iam not\` will remove you from results.`,
-            privacyWarning
-        ].join("\n");
+            privacyWarning,
+        ].join('\n');
     }
     else if (tokens[0] === 'whois') {
         return [
-            `**whois**`,
+            '**whois**',
             `Usage \`${prefix} whois <####>\` will try to look up a Discord user by MH ID. Only works if they set their ID.`,
             `  \`${prefix} whois <user>\` will try to look up a hunter ID based on a user in the server.`,
             `  \`${prefix} whois in <location>\` will find up to 5 random hunters in that location.`,
             `  \`${prefix} whois rank <rank>\` will find up to 5 random hunters with that rank.`,
-            privacyWarning
-        ].join("\n");
+            privacyWarning,
+        ].join('\n');
     }
     else
         return `I don't know that one, but I do know ${keywords}.`;
@@ -1701,9 +1707,9 @@ function getQueriedData(queryType, dbEntity, options) {
  * @returns {string} args, after stripping out any tokens associated with querystring parameters.
  */
 function removeQueryStringParams(args, qsParams) {
-    let tokens = args.split(/\s+/);
+    const tokens = args.split(/\s+/);
     if (tokens.length > 2) {
-        if (tokens[0] === "-e") {
+        if (tokens[0] === '-e') {
             // Allow shorthand specifications instead of only the literal `last3days`.
             // TODO: discover valid shorthands on startup.
             // TODO: parse flag and argument even if given after the query.
@@ -1713,9 +1719,9 @@ function removeQueryStringParams(args, qsParams) {
                     tokens[1] = '3_days';
                     break;
                 case 'current':
-                    // Default to last 3 days, but if there is an ongoing event, use that instead.
+                // Default to last 3 days, but if there is an ongoing event, use that instead.
                     tokens[1] = '1_month';
-                    for (let filter of filters) {
+                    for (const filter of filters) {
                         if (filter.start_time && !filter.end_time && filter.code_name !== tokens[1]) {
                             tokens[1] = filter.code_name;
                             break;
@@ -1727,7 +1733,7 @@ function removeQueryStringParams(args, qsParams) {
             tokens.splice(0, 2);
         }
         // TODO: other querystring params (once supported).
-        args = tokens.join(" ");
+        args = tokens.join(' ');
     }
     return args;
 }
@@ -1740,15 +1746,15 @@ function getMouseList() {
     const now = DateTime.utc();
     // Only request a mouse list update every so often.
     if (last_timestamps.mouse_refresh) {
-        let next_refresh = last_timestamps.mouse_refresh.plus(refresh_rate);
+        const next_refresh = last_timestamps.mouse_refresh.plus(refresh_rate);
         if (now < next_refresh)
             return Promise.resolve();
     }
     last_timestamps.mouse_refresh = now;
 
     // Query @devjacksmith's tools for mouse lists.
-    Logger.log("Mice: Requesting a new mouse list.");
-    const url = "https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=mouse&item_id=all";
+    Logger.log('Mice: Requesting a new mouse list.');
+    const url = 'https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=mouse&item_id=all';
     return fetch(url).then(response => (response.status === 200) ? response.json() : '').then((body) => {
         if (body) {
             Logger.log('Mice: Got a new mouse list.');
@@ -1786,10 +1792,10 @@ function findMouse(channel, args, command) {
                 .map(setup => {
                     return {
                         location: setup.location,
-                        stage: setup.stage ? setup.stage : " N/A ",
+                        stage: setup.stage ? setup.stage : ' N/A ',
                         total_hunts: integerComma(setup.total_hunts),
                         rate: setup.rate * 1.0 / 100,
-                        cheese: setup.cheese
+                        cheese: setup.cheese,
                     };
                 });
             if (!attractions.length)
@@ -1805,17 +1811,17 @@ function findMouse(channel, args, command) {
             const columnFormatting = {};
 
             // Specify the column order.
-            const order = ["location", "stage", "cheese", "rate", "total_hunts"];
+            const order = ['location', 'stage', 'cheese', 'rate', 'total_hunts'];
             // Inspect the attractions array to determine if we need to include the stage column.
-            if (attractions.every(row => row.stage === " N/A "))
-                order.splice(order.indexOf("stage"), 1);
+            if (attractions.every(row => row.stage === ' N/A '))
+                order.splice(order.indexOf('stage'), 1);
 
             // Build the header row.
-            const labels = { location: "Location", stage: "Stage", total_hunts: "Hunts", rate: "AR", cheese: "Cheese" };
+            const labels = { location: 'Location', stage: 'Stage', total_hunts: 'Hunts', rate: 'AR', cheese: 'Cheese' };
             const headers = order.map(key => {
                 columnFormatting[key] = {
                     columnWidth: labels[key].length,
-                    alignRight: !isNaN(parseInt(attractions[0][key], 10))
+                    alignRight: !isNaN(parseInt(attractions[0][key], 10)),
                 };
                 return { 'key': key, 'label': labels[key] };
             });
@@ -1826,16 +1832,16 @@ function findMouse(channel, args, command) {
                 alignRight: true,
                 isFixedWidth: true,
                 columnWidth: 7,
-                suffix: "%"
+                suffix: '%',
             };
 
             let retStr = `${mouse.value} (mouse) can be found the following ways:\n\`\`\``;
-            retStr += prettyPrintArrayAsString(attractions, columnFormatting, headers, "=");
-            retStr += `\`\`\`\nHTML version at: <https://mhhunthelper.agiletravels.com/?mouse=${mouse.id}&timefilter=${opts.timefilter ? opts.timefilter : "all_time"}>`;
+            retStr += prettyPrintArrayAsString(attractions, columnFormatting, headers, '=');
+            retStr += `\`\`\`\nHTML version at: <https://mhhunthelper.agiletravels.com/?mouse=${mouse.id}&timefilter=${opts.timefilter ? opts.timefilter : 'all_time'}>`;
             return retStr;
         }, reason => {
             // Querying failed. Received an error object / string, and possibly a response object.
-            Logger.error('Mice: Lookup failed for some reason:\n', reason.error, reason.response ? reason.response.toJSON() : "No HTTP response");
+            Logger.error('Mice: Lookup failed for some reason:\n', reason.error, reason.response ? reason.response.toJSON() : 'No HTTP response');
             throw new Error(`Could not process results for '${args}', AKA ${mouse.value}`);
         });
     }
@@ -1845,7 +1851,7 @@ function findMouse(channel, args, command) {
     const urlInfo = {
         qsParams: {},
         uri: 'https://mhhunthelper.agiletravels.com/',
-        type: 'mouse'
+        type: 'mouse',
     };
 
     // Deep copy the input args, in case we modify them.
@@ -1853,11 +1859,11 @@ function findMouse(channel, args, command) {
     args = removeQueryStringParams(args, urlInfo.qsParams);
 
     // If the input was a nickname, convert it to the queryable value.
-    if (nicknames.get("mice")[args])
-        args = nicknames.get("mice")[args];
+    if (nicknames.get('mice')[args])
+        args = nicknames.get('mice')[args];
 
     // Special case of the relic hunter RGW
-    if (args.toLowerCase() === "relic hunter") {
+    if (args.toLowerCase() === 'relic hunter') {
         findRH(channel);
         return;
     }
@@ -1883,14 +1889,14 @@ function findMouse(channel, args, command) {
 function getItemList() {
     const now = DateTime.utc();
     if (last_timestamps.item_refresh) {
-        let next_refresh = last_timestamps.item_refresh.plus(refresh_rate);
+        const next_refresh = last_timestamps.item_refresh.plus(refresh_rate);
         if (now < next_refresh)
             return Promise.resolve();
     }
     last_timestamps.item_refresh = now;
 
-    Logger.log("Loot: Requesting a new loot list.");
-    const url = "https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=loot&item_id=all";
+    Logger.log('Loot: Requesting a new loot list.');
+    const url = 'https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=loot&item_id=all';
     return fetch(url).then(response => (response.status === 200) ? response.json() : '').then((body) => {
         if (body) {
             Logger.log('Loot: Got a new loot list.');
@@ -1910,17 +1916,17 @@ function getItemList() {
 function getFilterList() {
     const now = DateTime.utc();
     if (last_timestamps.filter_refresh) {
-        let next_refresh = last_timestamps.filter_refresh.plus(refresh_rate);
+        const next_refresh = last_timestamps.filter_refresh.plus(refresh_rate);
         if (now < next_refresh)
             return Promise.resolve();
     }
     last_timestamps.filter_refresh = now;
 
-    Logger.log("Filters: Requesting a new filter list.");
-    const url = "https://mhhunthelper.agiletravels.com/filters.php";
+    Logger.log('Filters: Requesting a new filter list.');
+    const url = 'https://mhhunthelper.agiletravels.com/filters.php';
     return fetch(url).then(response => (response.status === 200) ? response.json() : '').then((body) => {
         if (body) {
-            Logger.log("Filters: Got a new filter list");
+            Logger.log('Filters: Got a new filter list');
             filters.length = 0;
             Array.prototype.push.apply(filters, body);
             filters.forEach(filter => filter.lowerValue = filter.code_name.toLowerCase());
@@ -1956,10 +1962,10 @@ function findItem(channel, args, command) {
                 .map(setup => {
                     return {
                         location: setup.location,
-                        stage: setup.stage === null ? " N/A " : setup.stage,
+                        stage: setup.stage === null ? ' N/A ' : setup.stage,
                         total_hunts: integerComma(setup.total_catches),
                         rate: setup.rate_per_catch * 1.0 / 1000, // Divide by 1000? should this be 100?
-                        cheese: setup.cheese
+                        cheese: setup.cheese,
                     };
                 });
             if (!attractions.length)
@@ -1975,36 +1981,36 @@ function findItem(channel, args, command) {
             const columnFormatting = {};
 
             // Specify the column order.
-            const order = ["location", "stage", "cheese", "rate", "total_hunts"];
+            const order = ['location', 'stage', 'cheese', 'rate', 'total_hunts'];
             // Inspect the setups array to determine if we need to include the stage column.
-            if (attractions.every(row => row.stage === " N/A "))
-                order.splice(order.indexOf("stage"), 1);
+            if (attractions.every(row => row.stage === ' N/A '))
+                order.splice(order.indexOf('stage'), 1);
 
             // Build the header row.
-            const labels = { location: "Location", stage: "Stage", total_hunts: "Catches", rate: "DR", cheese: "Cheese" };
+            const labels = { location: 'Location', stage: 'Stage', total_hunts: 'Catches', rate: 'DR', cheese: 'Cheese' };
             const headers = order.map(key => {
                 columnFormatting[key] = {
                     columnWidth: labels[key].length,
-                    alignRight: !isNaN(parseInt(attractions[0][key], 10))
+                    alignRight: !isNaN(parseInt(attractions[0][key], 10)),
                 };
                 return { 'key': key, 'label': labels[key] };
-            })
+            });
 
             // Give the numeric column proper formatting.
             columnFormatting['rate'] = {
                 alignRight: true,
                 isFixedWidth: true,
                 numDecimals: 3,
-                columnWidth: 7
+                columnWidth: 7,
             };
 
             let retStr = `${item.value} (loot) can be found the following ways:\n\`\`\``;
-            retStr += prettyPrintArrayAsString(attractions, columnFormatting, headers, "=");
-            retStr += `\`\`\`\nHTML version at: <https://mhhunthelper.agiletravels.com/loot.php?item=${item.id}&timefilter=${opts.timefilter ? opts.timefilter : "all_time"}>`;
+            retStr += prettyPrintArrayAsString(attractions, columnFormatting, headers, '=');
+            retStr += `\`\`\`\nHTML version at: <https://mhhunthelper.agiletravels.com/loot.php?item=${item.id}&timefilter=${opts.timefilter ? opts.timefilter : 'all_time'}>`;
             return retStr;
         }, reason => {
             // Querying failed. Received an error object / string, and possibly a response object.
-            Logger.error('Loot: Lookup failed for some reason:\n', reason.error, reason.response ? reason.response.toJSON() : "No HTTP response");
+            Logger.error('Loot: Lookup failed for some reason:\n', reason.error, reason.response ? reason.response.toJSON() : 'No HTTP response');
             throw new Error(`Could not process results for '${args}', AKA ${item.value}`);
         });
     }
@@ -2014,7 +2020,7 @@ function findItem(channel, args, command) {
     const urlInfo = {
         qsParams: {},
         uri: 'https://mhhunthelper.agiletravels.com/loot.php',
-        type: 'item'
+        type: 'item',
     };
 
     // Deep copy the input args, in case we modify them.
@@ -2022,8 +2028,8 @@ function findItem(channel, args, command) {
     args = removeQueryStringParams(args, urlInfo.qsParams);
 
     // If the input was a nickname, convert it to the queryable value.
-    if (nicknames.get("loot")[args])
-        args = nicknames.get("loot")[args];
+    if (nicknames.get('loot')[args])
+        args = nicknames.get('loot')[args];
 
     const matches = getSearchedEntity(args, items);
     if (!matches.length) {
@@ -2053,47 +2059,47 @@ function sendInteractiveSearchResult(searchResults, channel, dataCallback, isDM,
     // Associate each search result with a "numeric" emoji.
     const matches = searchResults.map((sr, i) => ({ emojiId: emojis[i].id, match: sr }));
     // Construct a RichEmbed with the search result information, unless this is for a PM with a single response.
-    let embed = new Discord.RichEmbed({
+    const embed = new Discord.RichEmbed({
         title: `Search Results for '${searchInput}'`,
-        thumbnail: { url: `https://cdn.discordapp.com/emojis/359244526688141312.png` }, // :clue:
-        footer: { text: `For any reaction you select, I'll ${isDM ? 'send' : 'PM'} you that information.` }
+        thumbnail: { url: 'https://cdn.discordapp.com/emojis/359244526688141312.png' }, // :clue:
+        footer: { text: `For any reaction you select, I'll ${isDM ? 'send' : 'PM'} you that information.` },
     });
 
     // Precompute the url prefix & suffix for each search result. Assumption: single-valued querystring params.
-    let urlPrefix = `${urlInfo.uri}?${urlInfo.type}=`;
-    let urlSuffix = Object.keys(urlInfo.qsParams).reduce((acc, key) => `${acc}&${key}=${urlInfo.qsParams[key]}`, "");
+    const urlPrefix = `${urlInfo.uri}?${urlInfo.type}=`;
+    const urlSuffix = Object.keys(urlInfo.qsParams).reduce((acc, key) => `${acc}&${key}=${urlInfo.qsParams[key]}`, '');
     // Generate the description to include the reaction, name, and link to HTML data on @devjacksmith's website.
-    let description = matches.reduce((acc, entity, i) => {
-        let url = `${urlPrefix}${entity.match.id}${urlSuffix}`;
-        let row = `\n\t${emojis[i].text}:\t[${entity.match.value}](${url})`;
+    const description = matches.reduce((acc, entity, i) => {
+        const url = `${urlPrefix}${entity.match.id}${urlSuffix}`;
+        const row = `\n\t${emojis[i].text}:\t[${entity.match.value}](${url})`;
         return acc + row;
-    }, `I found ${matches.length === 1 ? `a single result` : `${matches.length} good results`}:`);
+    }, `I found ${matches.length === 1 ? 'a single result' : `${matches.length} good results`}:`);
     embed.setDescription(description);
 
-    let searchResponse = (isDM && matches.length === 1)
+    const searchResponse = (isDM && matches.length === 1)
         ? `I found a single result for '${searchInput}':`
         : embed;
-    let sent = channel.send(searchResponse);
+    const sent = channel.send(searchResponse);
     // To ensure a sensible order of emojis, we have to await the previous react's resolution.
     if (!isDM || matches.length > 1)
         sent.then(async (msg) => {
             /** @type MessageReaction[] */
-            let mrxns = [];
-            for (let m of matches)
+            const mrxns = [];
+            for (const m of matches)
                 mrxns.push(await msg.react(m.emojiId).catch(err => Logger.error(err)));
             return mrxns;
         }).then(msgRxns => {
             // Set a 5-minute listener on the message for these reactions.
-            let msg = msgRxns[0].message,
+            const msg = msgRxns[0].message,
                 allowed = msgRxns.map(mr => mr.emoji.name),
                 filter = (reaction, user) => allowed.includes(reaction.emoji.name) && !user.bot,
                 rc = msg.createReactionCollector(filter, { time: 5 * 60 * 1000 });
             rc.on('collect', mr => {
                 // Fetch the response and send it to the user.
-                let match = matches.filter(m => m.emojiId === mr.emoji.identifier)[0];
+                const match = matches.filter(m => m.emojiId === mr.emoji.identifier)[0];
                 if (match) dataCallback(true, match.match, urlInfo.qsParams).then(
                     result => mr.users.last().send(result, { split: { prepend: '```', append: '```' } }),
-                    result => mr.users.last().send(result)
+                    result => mr.users.last().send(result),
                 ).catch(err => Logger.error(err));
             }).on('end', () => rc.message.clearReactions().catch(() => rc.message.delete()));
         }).catch(err => Logger.error('Reactions: error setting reactions:\n', err));
@@ -2101,7 +2107,7 @@ function sendInteractiveSearchResult(searchResults, channel, dataCallback, isDM,
     // Always send one result to the channel.
     sent.then(() => dataCallback(isDM, matches[0].match, urlInfo.qsParams).then(
         result => channel.send(result, { split: { prepend: '```', append: '```' } }),
-        result => channel.send(result))
+        result => channel.send(result)),
     ).catch(err => Logger.error(err));
 }
 
@@ -2117,12 +2123,12 @@ function getSearchedEntity(input, values) {
         return [];
 
     const matches = values.filter(v => v.lowerValue.includes(input)).map(v => {
-        return {entity: v, score: v.lowerValue.indexOf(input)};
+        return { entity: v, score: v.lowerValue.indexOf(input) };
     });
     matches.sort((a, b) => {
-        let r = a.score - b.score;
+        const r = a.score - b.score;
         // Sort lexicographically if the scores are equal.
-        return r ? r : a.entity.value.localeCompare(b.entity.value, { sensitivity: "base" });
+        return r ? r : a.entity.value.localeCompare(b.entity.value, { sensitivity: 'base' });
     });
     // Keep only the top 10 results.
     matches.splice(10);
@@ -2140,16 +2146,16 @@ function getSearchedEntity(input, values) {
  * @param {string} type the method to use to find the member
  */
 function findHunter(message, searchValues, type) {
-    const noPM = ["hid", "snuid", "name"];
+    const noPM = ['hid', 'snuid', 'name'];
     if (!message.guild && noPM.indexOf(type) !== -1) {
         message.channel.send(`Searching by ${type} isn't allowed via PM.`);
         return;
     }
 
     let discordId;
-    if (type === "name") {
+    if (type === 'name') {
         // Use message text or mentions to obtain the discord ID.
-        let member = message.mentions.members.first() || message.guild.members
+        const member = message.mentions.members.first() || message.guild.members
             .filter(member => member.displayName.toLowerCase() === searchValues[0].toLowerCase()).first();
         if (member) {
             // Prevent mentioning this user in our reply.
@@ -2163,7 +2169,7 @@ function findHunter(message, searchValues, type) {
         discordId = getHunterByID(searchValues[0], type);
     }
     if (!discordId) {
-        message.channel.send(`I did not find a registered hunter with **${searchValues[0]}** as a ${type === "hid" ? "hunter ID" : type}.`,
+        message.channel.send(`I did not find a registered hunter with **${searchValues[0]}** as a ${type === 'hid' ? 'hunter ID' : type}.`,
             { disableEveryone: true });
         return;
     }
@@ -2174,7 +2180,7 @@ function findHunter(message, searchValues, type) {
             { disableEveryone: true }))
         .catch(err => {
             Logger.error(err);
-            message.channel.send("That person may not be on this server.");
+            message.channel.send('That person may not be on this server.');
         });
 }
 
@@ -2185,12 +2191,12 @@ function findHunter(message, searchValues, type) {
  * @param {Message} message A Discord message object
  */
 function unsetHunterID(message) {
-    let hunter = message.author.id;
+    const hunter = message.author.id;
     if (hunters[hunter]) {
         delete hunters[hunter];
-        message.channel.send(`*POOF*, you're gone!`);
+        message.channel.send('*POOF*, you\'re gone!');
     } else {
-        message.channel.send("I didn't do anything but that's because you didn't do anything either.");
+        message.channel.send('I didn\'t do anything but that\'s because you didn\'t do anything either.');
     }
 }
 
@@ -2202,7 +2208,7 @@ function unsetHunterID(message) {
  */
 function setHunterID(message, hid) {
     const discordId = message.author.id;
-    let message_str = "";
+    let message_str = '';
 
     // Initialize the data for any new registrants.
     if (!hunters[discordId]) {
@@ -2231,11 +2237,11 @@ function setHunterID(message, hid) {
 function setHunterProperty(message, property, value) {
     const discordId = message.author.id;
     if (!hunters[discordId] || !hunters[discordId]['hid']) {
-        message.channel.send("I don't know who you are so you can't set that now; set your hunter ID first.");
+        message.channel.send('I don\'t know who you are so you can\'t set that now; set your hunter ID first.');
         return;
     }
 
-    let message_str = !hunters[discordId][property] ? "" : `Your ${property} used to be \`${hunters[discordId][property]}\`. `;
+    let message_str = !hunters[discordId][property] ? '' : `Your ${property} used to be \`${hunters[discordId][property]}\`. `;
     hunters[discordId][property] = value;
 
     message_str += `Your ${property} is set to \`${value}\``;
@@ -2264,7 +2270,7 @@ function loadHunterData(path = hunter_ids_filename) {
  */
 function saveHunters(path = hunter_ids_filename) {
     return saveDataAsJSON(path, hunters).then(didSave => {
-        Logger.log(`Hunters: ${didSave ? `Saved` : `Failed to save`} ${Object.keys(hunters).length} to '${path}'.`);
+        Logger.log(`Hunters: ${didSave ? 'Saved' : 'Failed to save'} ${Object.keys(hunters).length} to '${path}'.`);
         last_timestamps.hunter_save = DateTime.utc();
         return didSave;
     });
@@ -2288,7 +2294,7 @@ function loadNicknameURLs(path = nickname_urls_filename) {
  * Load all nicknames from all sources.
  */
 function refreshNicknameData() {
-    for (let key in nickname_urls)
+    for (const key in nickname_urls)
         getNicknames(key);
 }
 
@@ -2311,6 +2317,8 @@ function getNicknames(type) {
     // Set up the parser
     const parser = csv_parse({ delimiter: ',' })
         .on('readable', () => {
+            let record;
+            // eslint-disable-next-line no-cond-assign
             while (record = parser.read())
                 newData[record[0]] = record[1];
         })
@@ -2322,7 +2330,7 @@ function getNicknames(type) {
         }
         const body = await response.text();
         // Pass the response to the CSV parser (after removing the header row).
-        parser.write(body.split(/[\r\n]+/).splice(1).join("\n").toLowerCase());
+        parser.write(body.split(/[\r\n]+/).splice(1).join('\n').toLowerCase());
         // Create a new (or replace the existing) nickname definition for this type.
         nicknames.set(type, newData);
         parser.end(() => Logger.log(`Nicknames: ${Object.keys(newData).length} of type '${type}' loaded.`));
@@ -2339,7 +2347,7 @@ function getNicknames(type) {
  */
 function getHunterByID(input, type) {
     if (input)
-        for (let key in hunters)
+        for (const key in hunters)
             if (hunters[key][type] === input)
                 return key;
 }
@@ -2353,7 +2361,7 @@ function getHunterByID(input, type) {
  */
 function getHunterByDiscordID(discordId) {
     if (hunters[discordId])
-        return hunters[discordId]["hid"];
+        return hunters[discordId]['hid'];
 }
 
 /**
@@ -2378,7 +2386,7 @@ function getHuntersByProperty(property, criterion, limit = 5) {
  * @returns {string} A comma-formatted string.
  */
 function integerComma(number) {
-    return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
 /**
@@ -2411,7 +2419,7 @@ function remindRH(new_location) {
     //Logic to look for people with the reminder goes here
     if (new_location != 'unknown') {
         Logger.log(`Relic Hunter: Sending reminders for ${new_location}`);
-        doRemind(timers_list.find(t => t.getArea() === "relic_hunter"));
+        doRemind(timers_list.find(t => t.getArea() === 'relic_hunter'));
     }
 }
 
@@ -2434,7 +2442,7 @@ function handleRHWebhook(message) {
             Logger.log(`Relic Hunter: skipped location update (already set by ${relic_hunter.source})`);
         }
     } else {
-        Logger.error(`Relic Hunter: failed to extract location from webhook message:`, message.cleanContent);
+        Logger.error('Relic Hunter: failed to extract location from webhook message:', message.cleanContent);
     }
 }
 
@@ -2446,7 +2454,7 @@ async function getRHLocation() {
     Logger.log(`Relic Hunter: Was in ${relic_hunter.location} according to ${relic_hunter.source}`);
     const [dbg, mhct] = await Promise.all([
         DBGamesRHLookup(),
-        MHCTRHLookup()
+        MHCTRHLookup(),
     ]);
     // Trust MHCT more, since it would actually observe an RH appearance, rather than decode a hint.
     if (mhct.location !== 'unknown') {
@@ -2473,7 +2481,7 @@ function DBGamesRHLookup() {
             return { source: 'DBGames', location, last_seen: DateTime.utc().startOf('day') };
         })
         .catch((err) => {
-            Logger.error(`Relic Hunter: DBGames query failed:`, err);
+            Logger.error('Relic Hunter: DBGames query failed:', err);
             return { source: 'DBGames', location: 'unknown' };
         });
 }
@@ -2493,7 +2501,7 @@ function MHCTRHLookup() {
             return { source: 'MHCT', last_seen: DateTime.fromSeconds(last_seen), location: rh.location };
         })
         .catch((err) => {
-            Logger.error(`Relic Hunter: MHCT query failed:`, err);
+            Logger.error('Relic Hunter: MHCT query failed:', err);
             return { source: 'MHCT', location: 'unknown' };
         });
 }
@@ -2506,11 +2514,11 @@ async function findRH(channel) {
     const asMessage = (location) => {
         let message = (location !== 'unknown')
             ? `Relic Hunter has been spotted in **${location}**`
-            : `Relic Hunter has not been spotted yet`;
+            : 'Relic Hunter has not been spotted yet';
         message += ` and moves again ${timeLeft(DateTime.utc().endOf('day'))}`;
         return message;
     };
-    let original_location = relic_hunter.location;
+    const original_location = relic_hunter.location;
     // If we have MHCT data from today, trust it, otherwise attempt to update our known location.
     if (relic_hunter.source !== 'MHCT' || !DateTime.utc().hasSame(relic_hunter.last_seen, 'day')) {
         Logger.log(`Relic Hunter: location requested, might be "${original_location}"`);
@@ -2519,7 +2527,7 @@ async function findRH(channel) {
     }
 
     channel.send(asMessage(relic_hunter.location))
-        .catch((err) => Logger.error(`Relic Hunter: Could not send response to Find RH request`, err));
+        .catch((err) => Logger.error('Relic Hunter: Could not send response to Find RH request', err));
     if (relic_hunter.location !== 'unknown' && relic_hunter.location !== original_location) {
         setImmediate(remindRH, relic_hunter.location);
     }
