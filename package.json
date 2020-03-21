@@ -25,5 +25,11 @@
     "discord.js": "^11.6.3",
     "luxon": "^1.22.0",
     "node-fetch": "^2.6.0"
+  },
+  "scripts": {
+      "start": "bash scripts/start.sh",
+      "stop": "bash scripts/stop.sh",
+      "restart": "bash ./scripts/restart.sh",
+      "dev": "node src/MHTimer.js"
   }
 }
