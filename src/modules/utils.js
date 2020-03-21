@@ -192,11 +192,6 @@ function timeLeft(in_date) {
     if (remaining.as("milliseconds") < 60 * 1000)
         return "in less than a minute";
 
-    // We could use 'Duration#toFormat', but then we will always get days,
-    // hours, and minutes, even if the duration is very short.
-    // return remaining.toFormat("'in' dd 'days,' HH 'hours, and ' mm 'minutes");
-    // return remaining.toFormat("'in' dd':'HH':'mm");
-
     // Push any nonzero units into an array, removing "s" if appropriate (since unit is plural).
     const labels = [];
     units.forEach(unit => {

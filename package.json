@@ -27,9 +27,13 @@
     "node-fetch": "^2.6.0"
   },
   "scripts": {
-      "start": "bash scripts/start.sh",
-      "stop": "bash scripts/stop.sh",
-      "restart": "bash ./scripts/restart.sh",
-      "dev": "node src/MHTimer.js"
+    "start": "bash scripts/start.sh",
+    "stop": "bash scripts/stop.sh",
+    "restart": "bash ./scripts/restart.sh",
+    "dev": "node src/MHTimer.js",
+    "lint": "eslint --fix --quiet src"
+  },
+  "peerDependencies": {
+    "eslint": "^6.8.0"
   }
 }
