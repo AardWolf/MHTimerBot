@@ -2338,21 +2338,6 @@ function loadHunterData(path = hunter_ids_filename) {
 }
 
 /**
- * Update the hunter data object with the key-value pairs from the given object input.
- * Returns true if data was imported. (The data may have been the same as what was known.)
- *
- * @param {Object <string, HunterData>} hunterData key-value pairs to assign to the global hunter data.
- * @returns {boolean} Whether the input data contained anything to import.
- */
-function addHuntersFromData(hunterData) {
-    if (!hunterData || !Object.keys(hunterData).length)
-        return false;
-
-    Object.assign(hunters, hunterData);
-    return true;
-}
-
-/**
  * Serialize the hunters object to the given path, defaulting to the value of 'hunter_ids_filename'
  *
  * @param {string} [path] The path to a file to write JSON data to. Default is the 'hunter_ids_filename'.
@@ -2650,20 +2635,6 @@ function oxfordStringifyValues(container, final = 'and') {
         return `${printables[0]} ${final} ${printables[1]}`;
 
     return printables.slice(0, -1).join(', ') + `, ${final} ${printables.slice(-1)}`;
-}
-
-
-/**
- * @param {string} context Explanatory context for the error message
- * @param {string} error an Error stack trace
- * @param {Object} [response] Request response object (possibly `undefined`)
- * @param {any} [body] Body of the response (probably `undefined` in error cases)
- */
-function reportRequestError(context, error, response, body) {
-    // Assign defaults
-    response = response ? response.toJSON() : '';
-    body = body || '';
-    console.error(context, error, response, body);
 }
 
 
