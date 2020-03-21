@@ -16,8 +16,6 @@ const fetch = require('node-fetch');
 const { URLSearchParams } = require('url');
 // We need more robust CSV handling
 const csv_parse = require('csv-parse');
-// Relic hunter (and maybe others?) introduced HTML escapes
-const decode = require('unescape');
 
 // Convert callbacks to 'Promise' versions
 const util = require('util');
