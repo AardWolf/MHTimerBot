@@ -19,7 +19,7 @@ if [ -f MHTimer.pid ]; then
       echo "It looks like MHTimer is running already as $OLDPID"
       echo "Try killing it manually, using stop.sh, or remove MHTimer.pid"
     fi
-    exit
+    exit 1
   fi
 fi
 if [ -f MHTimer.log ]; then
@@ -33,7 +33,7 @@ if [ -f MHTimer.log ]; then
   done
   mv MHTimer.log MHTimer.log.0
 fi
-nohup node MHTimer.js > MHTimer.log 2>&1 &
+nohup node src/MHTimer.js > MHTimer.log 2>&1 &
 PID=$!
 echo $PID >MHTimer.pid
 sleep 1

@@ -7,7 +7,7 @@
     "url": "https://github.com/AardWolf/"
   },
   "main": "MHTimer.js",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "private": true,
   "repository": {
     "type": "git",

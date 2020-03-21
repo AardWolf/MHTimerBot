@@ -10,5 +10,4 @@ if [ -f MHTimer.pid ]; then
   rm -f MHTimer.pid
   #Process is gone
 fi
-pkill -f "node MHTimer.js"
-
+pkill -f "node src/MHTimer.js"

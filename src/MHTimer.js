@@ -8,7 +8,7 @@ const Discord = require('discord.js');
 // Import type-hinting definitions
 const { Client, Guild, Message, MessageReaction, RichEmbed, TextChannel, User } = require('discord.js');
 
-const Timer = require('./timerClass.js');
+const Timer = require('./modules/timerClass.js');
 // Access local URIs, like files.
 const fs = require('fs');
 // Access external URIs, like @devjacksmith 's tools.
@@ -25,11 +25,11 @@ const fs_writeFile = util.promisify(fs.writeFile);
 // Globals
 const client = new Discord.Client({ disabledEvents: ["TYPING_START"] });
 const textChannelTypes = new Set(['text', 'dm', 'group']);
-const main_settings_filename = 'settings.json',
-    timer_settings_filename = 'timer_settings.json',
-    hunter_ids_filename = 'hunters.json',
-    reminder_filename = 'reminders.json',
-    nickname_urls_filename = 'nicknames.json';
+const main_settings_filename = 'data/settings.json',
+    timer_settings_filename = 'data/timer_settings.json',
+    hunter_ids_filename = 'data/hunters.json',
+    reminder_filename = 'data/reminders.json',
+    nickname_urls_filename = 'data/nicknames.json';
 const file_encoding = 'utf8';
 
 const settings = {},
