@@ -1403,14 +1403,14 @@ function addRemind(timerRequest, message) {
         return;
     }
 
-    // User asked to be reminded - find a timer that meets the request.
+    // User asked to be reminded - find a timer that meets the request, and sort in order of next activation.
     const choices = timers_list
         .filter(t => area === t.getArea() && (!subArea || subArea === t.getSubArea()))
         .sort((a, b) => a.getNext() - b.getNext());
     Logger.log(`Timers: found ${choices.length} matching input request:\n`, timerRequest);
 
-    // Assume the desired timer is the soonest one that matched the given criteria.
-    const timer = choices.pop();
+    // Assume the desired timer is the one that matched the given criteria and occurs next.
+    const [timer] = choices;
     if (!timer) {
         message.author.send(`I'm sorry, there weren't any timers I know of that match your request. I know\n${getKnownTimersDetails()}`);
         return;
@@ -1450,9 +1450,11 @@ function addRemind(timerRequest, message) {
     // If the user entered a generic reminder, they may not expect the specific name. Generic reminder
     // requests will have matched more than one timer, so we can reference 'choices' to determine the
     // proper response.
-    const others = choices.reduce((s, t) => { s.add(`**${t.getSubArea()}**`); return s; }, new Set());
-    responses.push(`Your reminder for **${timer.name}** is set. ${choices.length ?
-        `You'll also get reminders for ${oxfordStringifyValues(others)}. I'll PM you about them` : 'I\'ll PM you about it'}`);
+    const isGenericRequest = !subArea && timer.getSubArea();
+    const subAreas = new Set(choices.map(t => `**${t.getSubArea()}**`));
+    responses.push(`Your reminder for **${isGenericRequest ? area : timer.name}** is set. ${choices.length > 1
+        ? `You'll get reminders for ${oxfordStringifyValues(subAreas)}. I'll PM you about them`
+        : 'I\'ll PM you about it'}`);
     responses.push((count === 1) ? 'once.' : (count < 0) ? 'until you stop it.' : `${count} times.`);
 
     // Inform a new user of the reminder functionality (i.e. PM only).
