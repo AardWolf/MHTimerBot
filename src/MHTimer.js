@@ -2498,9 +2498,12 @@ function MHCTRHLookup() {
             if (!response.ok) throw `HTTP ${response.status}`;
             const { rh } = await response.json();
             Logger.log(`Relic Hunter: MHCT query OK, location: ${rh.location}, last_seen: ${rh.last_seen}`);
-            let last_seen = Number(rh.last_seen);
-            if (last_seen.NaN) { last_seen = Number(0); }
-            return { source: 'MHCT', last_seen: DateTime.fromSeconds(last_seen), location: rh.location };
+            const last_seen = Number(rh.last_seen);
+            return {
+                source: 'MHCT',
+                last_seen: DateTime.fromSeconds(isNaN(last_seen) ? 0 : last_seen),
+                location: rh.location,
+            };
         })
         .catch((err) => {
             Logger.error('Relic Hunter: MHCT query failed:', err);
