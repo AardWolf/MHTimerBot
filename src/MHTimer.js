@@ -509,16 +509,16 @@ function parseUserMessage(message) {
     const reminderRequest = tokens.length ? timerAliases(tokens) : {};
 
     switch (command.toLowerCase()) {
-    // Display information about the next instance of a timer.
+        // Display information about the next instance of a timer.
         case 'next': {
             const aboutTimers = `I know these timers:\n${getKnownTimersDetails()}`;
             if (!tokens.length) {
-            // received "-mh next" -> display the help string.
-            // TODO: pretty-print known timer info
+                // received "-mh next" -> display the help string.
+                // TODO: pretty-print known timer info
                 message.channel.send(aboutTimers);
             } else if (!reminderRequest.area) {
-            // received "-mh next <words>", but the words didn't match any known timer information.
-            // Currently, the only other information we handle is RONZA.
+                // received "-mh next <words>", but the words didn't match any known timer information.
+                // Currently, the only other information we handle is RONZA.
                 switch (tokens[0].toLowerCase()) {
                     case 'ronza':
                         message.channel.send('Don\'t let aardwolf see you ask or you\'ll get muted');
@@ -528,7 +528,7 @@ function parseUserMessage(message) {
                         message.channel.send(aboutTimers);
                 }
             } else {
-            // Display information about this known timer.
+                // Display information about this known timer.
                 const timerInfo = nextTimer(reminderRequest);
                 if (typeof timerInfo === 'string')
                     message.channel.send(timerInfo);
@@ -540,7 +540,7 @@ function parseUserMessage(message) {
 
         // Display or update the user's reminders.
         case 'remind':
-        // TODO: redirect responses to PM.
+            // TODO: redirect responses to PM.
             if (!tokens.length || !reminderRequest.area)
                 listRemind(message);
             else
@@ -553,7 +553,7 @@ function parseUserMessage(message) {
         case 'agenda':
         case 'itinerary':
         case 'schedule': {
-        // Default the searched time period to 24 hours if it was not specified.
+            // Default the searched time period to 24 hours if it was not specified.
             reminderRequest.count = reminderRequest.count || 24;
 
             const usage_str = buildSchedule(reminderRequest);
@@ -597,8 +597,8 @@ function parseUserMessage(message) {
             else if (tokens.length === 1 && tokens[0].toLowerCase() === 'not')
                 unsetHunterID(message);
             else {
-            // received -mh iam <words>. The user can specify where they are hunting, their rank/title, or their in-game id.
-            // Nobody should need this many tokens to specify their input, but someone is gonna try for more.
+                // received -mh iam <words>. The user can specify where they are hunting, their rank/title, or their in-game id.
+                // Nobody should need this many tokens to specify their input, but someone is gonna try for more.
                 let userText = tokens.slice(1, 10).join(' ').trim().toLowerCase();
                 const userCommand = tokens[0].toLowerCase();
                 if (userCommand === 'in' && userText) {
@@ -628,8 +628,8 @@ function parseUserMessage(message) {
             }
             break;
 
-            // Display volunteered information about known users. Handled inputs:
         /**
+         * Display volunteered information about known users. Handled inputs:
          * -mh whois ####                   -> hid lookup (No PM)
          * -mh whois snuid ####             -> snuid lookup (No PM)
          * -mh whois <word/@mention>        -> name lookup (No PM)
@@ -644,24 +644,24 @@ function parseUserMessage(message) {
 
             let searchType = tokens.shift().toLowerCase();
             if (!isNaN(parseInt(searchType, 10))) {
-            // hid lookup of 1 or more IDs.
+                // hid lookup of 1 or more IDs.
                 tokens.unshift(searchType);
                 findHunter(message, tokens, 'hid');
                 return;
             }
             else if (searchType.substring(0, 3) === 'snu') {
-            // snuid lookup of 1 or more IDs.
+                // snuid lookup of 1 or more IDs.
                 findHunter(message, tokens, 'snuid');
                 return;
             }
             else if (!tokens.length) {
-            // Display name or user mention lookup.
+                // Display name or user mention lookup.
                 tokens.unshift(searchType);
                 findHunter(message, tokens, 'name');
                 return;
             }
             else {
-            // Rank or location lookup. tokens[] contains the terms to search
+                // Rank or location lookup. tokens[] contains the terms to search
                 let search = tokens.join(' ').toLowerCase();
                 if (searchType === 'in') {
                     if (nicknames.get('locations')[search]) {
@@ -701,6 +701,10 @@ function parseUserMessage(message) {
                 }
                 const sub_command = tokens.shift();
                 switch (sub_command) {
+                    case 'timers':
+                        // TODO: re-add deactivated channels to active channels for each timer.
+                        break;
+
                     case 'rh':
                     case 'relic_hunter':
                     default:
@@ -869,7 +873,7 @@ function timerAliases(tokens) {
  */
 function parseTokenForArea(token, newReminder) {
     switch (token) {
-    // Seasonal Garden aliases
+        // Seasonal Garden aliases
         case 'sg':
         case 'seasonal':
         case 'season':
@@ -932,7 +936,7 @@ function parseTokenForArea(token, newReminder) {
  */
 function parseTokenForSubArea(token, newReminder) {
     switch (token) {
-    // Seasonal Garden seasons aliases.
+        // Seasonal Garden seasons aliases.
         case 'fall':
         case 'autumn':
             newReminder.area = 'sg';
@@ -1046,7 +1050,7 @@ function parseTokenForSubArea(token, newReminder) {
  */
 function parseTokenForCount(token, newReminder) {
     switch (token) {
-    // Words for numbers...
+        // Words for numbers...
         case 'once':
         case 'one':
             newReminder.count = 1;
@@ -1233,10 +1237,10 @@ function doAnnounce(timer) {
     config.channels.forEach(tc => {
         if (tc.guild.available)
             tc.send(message).catch(err => {
-                Logger.error(`(${timer.name}): Error during announcement on channel ${tc.name} in ${tc.guild.name}. Client status: ${client.status}\n`, err);
+                Logger.error(`(${timer.name}): Error during announcement on channel "${tc.name}" in "${tc.guild.name}".\nClient status: ${client.status}\n`, err);
                 // Deactivate this channel only if we are connected to Discord. (Status === 'READY')
                 // TODO: actually use the enum instead of a value for the enum (in case it changes):
-                // https://github.com/discordjs/discord.js/blob/d97af9d2e0a8c4cc3cd18b7b93ba6b93fe3772f6/src/util/Constants.js#L158
+                // https://github.com/discordjs/discord.js/blob/de0cacdf3209c4cc33b537ca54cd0969d57da3ab/src/util/Constants.js#L258
                 if (client.status === 0) {
                     const index = config.channels.indexOf(tc);
                     Array.prototype.push.apply(config.inactiveChannels, config.channels.splice(index, 1));
@@ -1721,7 +1725,7 @@ function removeQueryStringParams(args, qsParams) {
                     tokens[1] = '3_days';
                     break;
                 case 'current':
-                // Default to last 3 days, but if there is an ongoing event, use that instead.
+                    // Default to last 3 days, but if there is an ongoing event, use that instead.
                     tokens[1] = '1_month';
                     for (const filter of filters) {
                         if (filter.start_time && !filter.end_time && filter.code_name !== tokens[1]) {
