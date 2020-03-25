@@ -2,7 +2,7 @@
 const test = require('tape');
 
 // Functionality to be tested.
-const Timer = require('../src/modules/timerClass');
+const Timer = require('../../src/modules/timerClass');
 
 test('Timer ctor - given no seed - throws', t => {
     t.plan(1);
