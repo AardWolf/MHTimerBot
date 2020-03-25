@@ -6,7 +6,7 @@
     "name": "AardWolf",
     "url": "https://github.com/AardWolf/"
   },
-  "main": "MHTimer.js",
+  "main": "src/MHTimer.js",
   "license": "MIT",
   "private": true,
   "repository": {
