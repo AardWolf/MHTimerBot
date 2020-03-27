@@ -16,7 +16,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [10.x, 12.x]
+        node-version: [12.x]
 
     steps:
     - uses: actions/checkout@v2
@@ -24,9 +24,9 @@ jobs:
       uses: actions/setup-node@v1
       with:
         node-version: ${{ matrix.node-version }}
-    - run: npm ci
-    - run: npm install --save-dev nyc tap-nyc
+    - run: npm install
+    - run: npm install --save-dev tap-nyc
     - run: npm run build --if-present
-    - run: nyc tape tests/**/*.js | tap-nyc
+    - run: npx nyc --all "npm run test" | tap-nyc
       env:
         CI: true
