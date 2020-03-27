@@ -1,0 +1,32 @@
+name: Test Coverage Report
+
+on:
+  push:
+    branches:
+    - master
+    - dev
+  pull_request:
+    branches:
+    - master
+    - dev
+
+jobs:
+  coverage_report:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [10.x, 12.x]
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v1
+      with:
+        node-version: ${{ matrix.node-version }}
+    - run: npm ci
+    - run: npm install --save-dev nyc tap-nyc
+    - run: npm run build --if-present
+    - run: nyc tape tests/**/*.js | tap-nyc
+      env:
+        CI: true
