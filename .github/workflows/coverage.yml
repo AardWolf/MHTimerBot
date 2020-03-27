@@ -25,8 +25,7 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
     - run: npm install
-    - run: npm install --save-dev tap-nyc
     - run: npm run build --if-present
-    - run: npx nyc --all npm run test | tap-nyc
+    - run: npx nyc --all npm run test | npx tap-nyc
       env:
         CI: true
