@@ -1,14 +1,14 @@
 // Required test imports
 const test = require('tape');
+const sinon = require('sinon');
 
 // Functionality to be tested.
 const Timer = require('../../src/modules/timerClass');
 // Stub Logger methods to minimize crosstalk.
-// TODO: Use stub & spy library such as sinon
 const Logger = require('../../src/modules/logger');
-Logger.log = () => {};
-Logger.warn = () => {};
-Logger.error = () => {};
+Logger.log = sinon.stub();
+Logger.warn = sinon.stub();
+Logger.error = sinon.stub();
 
 test('Timer ctor', function (suite) {
     suite.test('given no seed - throws', t => {
@@ -52,7 +52,7 @@ test('Timer ctor', function (suite) {
         t.strictEqual(timer.getDemand(), demand_string, 'should use given demand');
     });
     suite.test('given same seed - assigns different IDs', t => {
-        t.plan(2);
+        t.plan(1);
         const timers = Array(10).fill({ area: 'mars', seed_time: '1970-01-01', repeat_time: 60000 })
             .map(s => new Timer(s));
         const ids = new Set(timers.map(t => t.id));
