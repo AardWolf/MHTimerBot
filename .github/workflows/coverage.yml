@@ -27,6 +27,6 @@ jobs:
     - run: npm install
     - run: npm install --save-dev tap-nyc
     - run: npm run build --if-present
-    - run: npx nyc --all "npm run test" | tap-nyc
+    - run: npx nyc --all npm run test | tap-nyc
       env:
         CI: true
