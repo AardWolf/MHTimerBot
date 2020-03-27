@@ -9,9 +9,10 @@ on:
     - master
     - dev
   pull_request:
-    branches:
-    - master
-    - dev
+    paths:
+    - src/**
+    - tests/**
+    - .github/workflows/**
 
 jobs:
   test:
