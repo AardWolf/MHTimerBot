@@ -1,6 +1,6 @@
 // Required test imports
 const test = require('tape');
-const sinon = require('sinon');
+// const sinon = require('sinon');
 
 // Functionality to be tested.
 const {
@@ -71,15 +71,15 @@ test('oxfordStringifyValues', suite => {
     });
     suite.test('given N items - when N > 2 - uses N-1 commas', t => {
         const inputs = [
+            new Map([[0, 'a0'], [1, 'a1'], [2, 'a2'], [3, 'a3'], [4, 'a4']]),
+            new Set(['a', 'b', 'c', 'd']),
             [1, 2, 3],
-            new Set(['a', 'b', 'c']),
-            new Map([[0, 'a0'], [1, 'a1'], [2, 'a2']]),
         ];
         t.plan(inputs.length);
         inputs.forEach(input => t.deepEqual(
             [...oxfordStringifyValues(input)].filter(char => char === ',').length,
             (input.length || input.size) - 1,
-            'should use N-1 commas',
+            `should use ${(input.length || input.size) - 1} commas`,
         ));
     });
     suite.test('given Map instance - consumes only values', t => {
@@ -91,7 +91,3 @@ test('oxfordStringifyValues', suite => {
         t.deepEqual(oxfordStringifyValues(map), 'earth and world', 'should use map\'s values');
     });
 });
-
-
-// Remove all stubs / spies.
-sinon.restore();

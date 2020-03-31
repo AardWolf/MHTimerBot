@@ -4,13 +4,27 @@ const sinon = require('sinon');
 
 // Functionality to be tested.
 const Timer = require('../../src/modules/timerClass');
+
 // Stub Logger methods to minimize crosstalk.
 const Logger = require('../../src/modules/logger');
-Logger.log = sinon.stub();
-Logger.warn = sinon.stub();
-Logger.error = sinon.stub();
+const stubLogger = () => {
+    return {
+        log: sinon.stub(Logger, 'log'),
+        warn: sinon.stub(Logger, 'warn'),
+        error: sinon.stub(Logger, 'error'),
+    };
+};
+const restoreLogger = ({ ...stubs }) => {
+    Object.values(stubs).forEach(stub => stub.restore());
+};
 
 test('Timer ctor', function (suite) {
+    let logStubs;
+    suite.test('Setup', t => {
+        logStubs = stubLogger();
+        t.end();
+    });
+
     suite.test('given no seed - throws', t => {
         t.plan(1);
         t.throws(() => new Timer(), TypeError, 'requires input');
@@ -58,7 +72,9 @@ test('Timer ctor', function (suite) {
         const ids = new Set(timers.map(t => t.id));
         t.strictEqual(ids.size, timers.length, 'should create unique IDs');
     });
-});
-test.skip('Other suite', function (suite) {
-    // TODO
+
+    suite.test('Cleanup', t => {
+        restoreLogger(logStubs);
+        t.end();
+    });
 });
