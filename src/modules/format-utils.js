@@ -162,6 +162,9 @@ function prettyPrintArrayAsString(body, columnFormat, headers, headerUnderline) 
  */
 function splitString(input) {
     const tokens = [];
+    if (!input) {
+        return tokens;
+    }
     const splitRegexp = /[^\s"]+|"([^"]*)"/gi;
 
     let match = '';
