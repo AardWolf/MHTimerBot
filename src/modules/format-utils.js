@@ -165,7 +165,7 @@ function splitString(input) {
     if (!input) {
         return tokens;
     }
-    const splitRegexp = /[^\s"]+|"([^"]*)"/gi;
+    const splitRegexp = /[^\s"]+|"([^"]+)"/gi;
 
     let match = '';
     do {
