@@ -501,6 +501,7 @@ function parseUserMessage(message) {
                 listRemind(message);
             else
                 addRemind(reminderRequest, message);
+            message.react('✅');
             break;
 
         // Display information about upcoming timers.
