@@ -21,6 +21,7 @@ const {
 } = require('./modules/format-utils');
 const { loadDataFromJSON, saveDataAsJSON } = require('./modules/file-utils');
 const Logger = require('./modules/logger');
+const CommandData = require('./modules/command-data.js');
 
 // Access external URIs, like @devjacksmith 's tools.
 const fetch = require('node-fetch');
@@ -529,13 +530,14 @@ function parseUserMessage(message) {
         }
 
         // Display or update the user's reminders.
-        case 'remind':
+        case 'remind': {
             // TODO: redirect responses to PM.
             if (!tokens.length || !reminderRequest.area)
-                listRemind(message);
+                messageReact(true, message, reminderRequest);
             else
-                addRemind(reminderRequest, message);
+                messageReact(false, message, reminderRequest);
             break;
+        }
 
         // Display information about upcoming timers.
         case 'sched':
@@ -1360,14 +1362,16 @@ function sendRemind(user, remind, timer) {
  *                                       validation to set 'area' and 'sub_area' as possible.
  * @param {Message} message the Discord message that initiated this request.
  */
-function addRemind(timerRequest, message) {
+async function addRemind(timerRequest, message) {
+    const dm = true;
+    let success = true;
     // If there were no area, the reminders would have been
     // listed instead of 'addRemind' being called.
     const area = timerRequest.area;
     const subArea = timerRequest.sub_area;
     if (!area) {
         message.channel.send('I do not know the area you asked for');
-        return;
+        return CommandData(message, false, true);
     }
 
     // Default to reminding the user once.
@@ -1395,7 +1399,7 @@ function addRemind(timerRequest, message) {
             ? `\`\`\`${responses.join('\n')}\`\`\``
             : `I couldn't find a matching reminder for you in '${requestName}'.`,
         );
-        return;
+        return CommandData(message, true, responses.length > 0);
     }
 
     // User asked to be reminded - find a timer that meets the request, and sort in order of next activation.
@@ -1408,7 +1412,7 @@ function addRemind(timerRequest, message) {
     const [timer] = choices;
     if (!timer) {
         message.author.send(`I'm sorry, there weren't any timers I know of that match your request. I know\n${getKnownTimersDetails()}`);
-        return;
+        return CommandData(message, true, false);
     }
 
     // If the reminder already exists, set its new count to the requested count.
@@ -1426,7 +1430,7 @@ function addRemind(timerRequest, message) {
     if (responses.length) {
         Logger.log(`Reminders: updated ${responses.length} for ${message.author.username} to a count of ${count}.`, timerRequest);
         message.author.send(`\`\`\`${responses.join('\n')}\`\`\``);
-        return;
+        return CommandData(message, true, true);
     }
 
     // No updates were made - free to add a new reminder.
@@ -1457,9 +1461,13 @@ function addRemind(timerRequest, message) {
         responses.unshift('Hi there! Reminders are only sent via PM, and I\'m just making sure I can PM you.');
 
     // Send notice of the update via PM.
-    message.author.send(responses.join(' ')).catch(() =>
-        Logger.error(`Reminders: notification failure for ${message.author.username}.`),
-    );
+    try {
+        await message.author.send(responses.join(' '));
+    } catch(err) {
+        Logger.error(`Reminders: notification failure for ${message.author.username}.`);
+        success = false;
+    }
+    return CommandData(message, dm, success);
 }
 
 /**
@@ -1467,11 +1475,13 @@ function addRemind(timerRequest, message) {
  *
  * @param {Message} message a Discord message containing the request to list reminders.
  */
-function listRemind(message) {
+async function listRemind(message) {
     const user = message.author.id,
         pm_channel = message.author;
     let timer_str = 'Your reminders:';
     let usage_str;
+    const dm = true;
+    let success = false;
 
     const userReminders = reminders.filter(r => r.user === user && r.count);
     userReminders.forEach(reminder => {
@@ -1496,8 +1506,12 @@ function listRemind(message) {
             timer_str += `There have been ${reminder.fail} failed attempts to activate this reminder.\n`;
     });
 
-    pm_channel.send(userReminders.length ? timer_str : 'I found no reminders for you, sorry.')
-        .catch(() => Logger.error(`Reminders: notification failure for ${pm_channel.username}. Possibly blocked.`));
+    await pm_channel.send(userReminders.length ? timer_str : 'I found no reminders for you, sorry.')
+        .catch(() => {
+            Logger.error(`Reminders: notification failure for ${pm_channel.username}. Possibly blocked.`);
+            success = false;
+        });
+    return CommandData(message, dm, success);
 }
 
 /**
@@ -2522,6 +2536,26 @@ function MHCTRHLookup() {
             Logger.error('Relic Hunter: MHCT query failed:', err);
             return { source: 'MHCT', location: 'unknown' };
         });
+}
+
+/**
+ * Calls listRemind or addRemind, waits for a DM to send, then reacts accordingly
+ * @param {boolean} list whether to use list- or add- Remind (true or false, respectively)
+ * @param {Message} message the original message
+ * @param {timerRequest} reminderRequest to pass on to addRemind
+ */
+async function messageReact(list, message, reminderRequest) {
+    let dataCatcher;
+    if(list) {
+        dataCatcher = await listRemind(message);
+    } else {
+        dataCatcher = await addRemind(reminderRequest, message);
+    }
+    if(dataCatcher.getDm && !dataCatcher.getSuccess) {
+        message.react('✖️');
+    } else if(dataCatcher.getDm && dataCatcher.getSuccess) {
+        message.react('✔️');
+    }
 }
 
 /**
