@@ -22,8 +22,9 @@
   ],
   "dependencies": {
     "csv-parse": "^4.8.8",
-    "discord.js": "^11.6.3",
-    "luxon": "^1.22.0",
+    "discord.js": "^11.6.4",
+    "eslint": "^6.8.0",
+    "luxon": "^1.23.0",
     "node-fetch": "^2.6.0"
   },
   "scripts": {

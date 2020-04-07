@@ -108,8 +108,8 @@ function Main() {
             // Settings loaded successfully, so initiate loading of other resources.
             const saveInterval = refresh_rate.as('milliseconds');
 
-            // Schedule the daily Relic Hunter reset.
-            rescheduleResetRH();
+            // Schedule the daily Relic Hunter reset. Reset cancelled by issue 152
+            // rescheduleResetRH();
 
             // Create timers list from the timers file.
             const hasTimers = loadTimers()
@@ -2367,6 +2367,7 @@ function resetRH() {
  * Continue resetting Relic Hunter location
  */
 function rescheduleResetRH() {
+    return; // Rescheduled reset cancelled by issue 152
     if (relic_hunter.timeout)
         clearTimeout(relic_hunter.timeout);
 
@@ -2435,12 +2436,14 @@ async function getRHLocation() {
  * @returns {Promise<{ location: string, source: 'DBGames' }>}
  */
 function DBGamesRHLookup() {
-    return fetch('https://docs.google.com/spreadsheets/d/e/2PACX-1vSsqAjocBWcN5dDLXuOBfnBhyrTaO7ZeIEAFlDnQ4r6zqcvtuLKMDBQCh5I8-3M9irS4-17OPfvgKtY/pub?gid=1975888453&single=true&output=csv')
+    // Dev: https://docs.google.com/spreadsheets/d/e/2PACX-1vSsqAjocBWcN5dDLXuOBfnBhyrTaO7ZeIEAFlDnQ4r6zqcvtuLKMDBQCh5I8-3M9irS4-17OPfvgKtY/pub?gid=779913158&single=true&output=csv
+    return fetch('https://docs.google.com/spreadsheets/d/e/2PACX-1vSsqAjocBWcN5dDLXuOBfnBhyrTaO7ZeIEAFlDnQ4r6zqcvtuLKMDBQCh5I8-3M9irS4-17OPfvgKtY/pub?gid=779913158&single=true&output=csv')
         .then(async (response) => {
             if (!response.ok) throw `HTTP ${response.status}`;
-            const location = await response.text();
+            const csv_string = await response.text();
+            const [location, when] = csv_string.split(',');
             Logger.log('Relic Hunter: DBGames query OK, reported location:', location);
-            return { source: 'DBGames', location, last_seen: DateTime.utc().startOf('day') };
+            return { source: 'DBGames', location, last_seen: DateTime.fromMillis(Number(when), { zone: 'utc' }).startOf('day') };
         })
         .catch((err) => {
             Logger.error('Relic Hunter: DBGames query failed:', err);
