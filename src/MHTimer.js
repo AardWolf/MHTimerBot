@@ -19,6 +19,7 @@ const {
 } = require('./modules/format-utils');
 const { loadDataFromJSON, saveDataAsJSON } = require('./modules/file-utils');
 const Logger = require('./modules/logger');
+const CommandData = require('./modules/command-data.js');
 
 // Access external URIs, like @devjacksmith 's tools.
 const fetch = require('node-fetch');
@@ -2514,18 +2515,6 @@ async function findRH(channel) {
     if (relic_hunter.location !== 'unknown' && relic_hunter.location !== original_location) {
         setImmediate(remindRH, relic_hunter.location);
     }
-}
-
-/**
- * Makes an object to hold data about the command interaction
- * @param {Message} the original command
- * @param {boolean} whether the bot sent a DM
- * @param {boolean} whether it succeeded
- */
-function CommandData(message, dm, success) {
-    this.message = message;
-    this.dm = dm;
-    this.success = success;
 }
 
 //Resources:
