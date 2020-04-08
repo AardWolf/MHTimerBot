@@ -501,12 +501,13 @@ function parseUserMessage(message) {
                 let dataCatcher;
                 // TODO: redirect responses to PM.
                 if (!tokens.length || !reminderRequest.area)
-                    dataCatcher = listRemind(message);
+                    listRemind(message).then(function(result){dataCatcher = result});
                 else
-                    dataCatcher = addRemind(reminderRequest, message);
-                if(dataCatcher.dm && !dataCatcher.success) {
+                    addRemind(reminderRequest, message).then(function(result){dataCatcher = result});
+                
+                if(dataCatcher.getDm && !dataCatcher.getSuccess) {
                     message.react('✖️');
-                } else if(dataCatcher.dm && dataCatcher.success) {
+                } else if(dataCatcher.getDm && dataCatcher.getSuccess) {
                     message.react('✔️');
                 }
                 break;
@@ -1334,7 +1335,7 @@ function sendRemind(user, remind, timer) {
  *                                       validation to set 'area' and 'sub_area' as possible.
  * @param {Message} message the Discord message that initiated this request.
  */
-function addRemind(timerRequest, message) {
+async function addRemind(timerRequest, message) {
     let dm = true;
     let success = true;
     // If there were no area, the reminders would have been
@@ -1433,7 +1434,7 @@ function addRemind(timerRequest, message) {
         responses.unshift('Hi there! Reminders are only sent via PM, and I\'m just making sure I can PM you.');
 
     // Send notice of the update via PM.
-    message.author.send(responses.join(' ')).catch(() => {
+    await message.author.send(responses.join(' ')).catch(() => {
         Logger.error(`Reminders: notification failure for ${message.author.username}.`);
         success = false;
     });
@@ -1445,7 +1446,7 @@ function addRemind(timerRequest, message) {
  *
  * @param {Message} message a Discord message containing the request to list reminders.
  */
-function listRemind(message) {
+async function listRemind(message) {
     const user = message.author.id,
         pm_channel = message.author;
     let timer_str = 'Your reminders:';
@@ -1476,7 +1477,7 @@ function listRemind(message) {
             timer_str += `There have been ${reminder.fail} failed attempts to activate this reminder.\n`;
     });
 
-    pm_channel.send(userReminders.length ? timer_str : 'I found no reminders for you, sorry.')
+    await pm_channel.send(userReminders.length ? timer_str : 'I found no reminders for you, sorry.')
         .catch(() => {
             Logger.error(`Reminders: notification failure for ${pm_channel.username}. Possibly blocked.`);
             success = false;
