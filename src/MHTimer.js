@@ -496,18 +496,20 @@ function parseUserMessage(message) {
 
         // Display or update the user's reminders.
         case 'remind':
-            var dataCatcher;
-            // TODO: redirect responses to PM.
-            if (!tokens.length || !reminderRequest.area)
-                dataCatcher = listRemind(message);
-            else
-                dataCatcher = addRemind(reminderRequest, message);
-            if(dataCatcher.dm && !dataCatcher.success) {
-                message.react('✖️');
-            } else if(dataCatcher.dm && dataCatcher.success) {
-                message.react('✔️');
+            {
+                let dataCatcher;
+                // TODO: redirect responses to PM.
+                if (!tokens.length || !reminderRequest.area)
+                    dataCatcher = listRemind(message);
+                else
+                    dataCatcher = addRemind(reminderRequest, message);
+                if(dataCatcher.dm && !dataCatcher.success) {
+                    message.react('✖️');
+                } else if(dataCatcher.dm && dataCatcher.success) {
+                    message.react('✔️');
+                }
+                break;
             }
-            break;
 
         // Display information about upcoming timers.
         case 'sched':
@@ -1368,12 +1370,7 @@ function addRemind(timerRequest, message) {
             ? `\`\`\`${responses.join('\n')}\`\`\``
             : `I couldn't find a matching reminder for you in '${requestName}'.`,
         );
-        if(responses.length) {
-            success = true;
-        } else {
-            success = false;
-        }
-        return CommandData(message, true, success);
+        return CommandData(message, true, responses.length > 0);
     }
 
     // User asked to be reminded - find a timer that meets the request, and sort in order of next activation.
@@ -2521,9 +2518,9 @@ async function findRH(channel) {
 
 /**
  * Makes an object to hold data about the command interaction
- * @param {message} the original command
- * @param {Boolean} whether the bot sent a DM
- * @param {Boolean} whether it succeeded
+ * @param {Message} the original command
+ * @param {boolean} whether the bot sent a DM
+ * @param {boolean} whether it succeeded
  */
 function CommandData(message, dm, success) {
     this.message = message;
