@@ -6,8 +6,8 @@
     "name": "AardWolf",
     "url": "https://github.com/AardWolf/"
   },
-  "main": "MHTimer.js",
-  "license": "UNLICENSED",
+  "main": "src/MHTimer.js",
+  "license": "MIT",
   "private": true,
   "repository": {
     "type": "git",
@@ -22,9 +22,23 @@
   ],
   "dependencies": {
     "csv-parse": "^4.8.8",
-    "discord.js": "^11.6.2",
+    "discord.js": "^11.6.3",
     "luxon": "^1.22.0",
-    "node-fetch": "^2.6.0",
-    "unescape": "^1.0.1"
+    "node-fetch": "^2.6.0"
+  },
+  "scripts": {
+    "start": "bash scripts/start.sh",
+    "stop": "bash scripts/stop.sh",
+    "restart": "bash ./scripts/restart.sh",
+    "dev": "node src/MHTimer.js",
+    "lint": "eslint --fix --quiet src",
+    "test": "tape tests/**/*.js"
+  },
+  "peerDependencies": {
+    "eslint": "^6.8.0"
+  },
+  "devDependencies": {
+    "sinon": "^9.0.1",
+    "tape": "^4.13.2"
   }
 }

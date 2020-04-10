@@ -23,15 +23,15 @@
   "announce_string": "Gift Reset / Relic Hunter Moves - it's midnight UTC",
   "demand_string": "Gift Reset / Relic Hunter Moves at midnight UTC"
  },
-{
-    "area": "relic_hunter",
-    "seed_time": "2017-07-10T00:00:00.000Z",
-    "repeat_time": 86400000,
-    "announce_string": "The Relic Hunter has been located",
-    "demand_string": "Relic Hunter has been found",
-    "silent": true
-},
-{
+ {
+  "area": "relic_hunter",
+  "seed_time": "2017-07-10T00:00:00.000Z",
+  "repeat_time": 86400000,
+  "announce_string": "The Relic Hunter has been located",
+    "demand_string": "The Relic Hunter travels",
+  "silent": true
+ },
+ {
   "area": "cove",
   "sub_area": "low",
   "seed_time": "2017-07-21T14:40:00.000Z",

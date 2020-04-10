@@ -1,5 +1,6 @@
 # MH Timer Bot
 node_modules
+.nyc_output
 settings.json
 /project.geany
 timer_settings.json.bak
@@ -51,3 +52,5 @@ _ReSharper*/
 .svn
 ~$*
 /.vs
+.vs
+.vscode
