@@ -204,7 +204,23 @@ function timeLeft(in_date) {
     return `in ${oxfordStringifyValues(labels, 'and')}`;
 }
 
+
+/**
+ * Unescapes HTML entities (&#\d+;) only
+ * @param {String} str String containing HTML numeric entities
+ * @returns {String} An unescaped string
+ */
+function unescapeEntities(str) {
+    if (typeof str !== 'string')
+        throw new TypeError(`Utils: bad input for string to unescape: Expected string, got ${typeof str}`);
+    return str.replace(/&#(\d+);/gi, function(match, numStr) {
+        const num = parseInt(numStr, 10);
+        return String.fromCharCode(num);
+    });
+}
+
 exports.oxfordStringifyValues = oxfordStringifyValues;
 exports.prettyPrintArrayAsString = prettyPrintArrayAsString;
 exports.splitString = splitString;
 exports.timeLeft = timeLeft;
+exports.unescapeEntities = unescapeEntities;

@@ -8,6 +8,7 @@ const {
     // prettyPrintArrayAsString,
     splitString,
     // timeLeft,
+    unescapeEntities,
 } = require('../../src/modules/format-utils');
 
 test('oxfordStringifyValues', suite => {
@@ -186,5 +187,60 @@ test('splitString', suite => {
                 splitString(input), expected, `when ${msg}`,
             ));
         });
+    });
+});
+test('unescapeEntities', suite => {
+    suite.test('given non-object input - throws TypeError', t => {
+        const inputs = [
+            new Set(),
+            new Map(),
+            {},
+            true,
+            undefined,
+            0,
+            () => {},
+        ];
+        t.plan(inputs.length);
+        inputs.forEach(input => t.throws(
+            () => unescapeEntities(input),
+            TypeError,
+            `should throw for ${typeof input}`,
+        ));
+    });
+    suite.test('given empty string - returns empty string', t => {
+        const inputs = [
+            '',
+            new String(),
+        ];
+        t.plan(inputs.length);
+        inputs.forEach(input => t.deepEqual(
+            unescapeEntities(input),
+            '',
+            `should return empty for empty ${input.constructor.name}`,
+        ));
+    });
+    suite.test('given 1 string - returns item as string', t => {
+        const inputs = [
+            'string',
+            'test',
+        ];
+        t.plan(inputs.length);
+        inputs.forEach(input => t.deepEqual(
+            unescapeEntities(input),
+            input,
+            'should return what it is given when no escaped entities',
+        ));
+    });
+    suite.test('given escaped entities should return unescaped string', t => {
+        t.plan(1);
+        const input = 'King&#39;s Arms';
+        const expected = 'King\'s Arms';
+        t.deepEqual(unescapeEntities(input), expected, 'should use input `final`');
+    });
+    suite.test('given multiple escaped entities should return unescaped string', t => {
+        t.plan(1);
+        const input = 'King&#39;s&#21704;哈 Arms';
+        const expected = 'King\'s哈哈 Arms';
+        t.deepEqual(unescapeEntities(input), expected, 'should use input `final`');
     });
 });

@@ -2368,6 +2368,7 @@ function resetRH() {
  */
 function rescheduleResetRH() {
     return; // Rescheduled reset cancelled by issue 152
+    // eslint-disable-next-line no-unreachable
     if (relic_hunter.timeout)
         clearTimeout(relic_hunter.timeout);
 
@@ -2380,7 +2381,7 @@ function rescheduleResetRH() {
  */
 function remindRH(new_location) {
     //Logic to look for people with the reminder goes here
-    if (new_location != 'unknown') {
+    if (new_location !== 'unknown') {
         Logger.log(`Relic Hunter: Sending reminders for ${new_location}`);
         doRemind(timers_list.find(t => t.getArea() === 'relic_hunter'));
     }
