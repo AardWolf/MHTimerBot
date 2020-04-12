@@ -190,7 +190,7 @@ test('splitString', suite => {
     });
 });
 test('unescapeEntities', suite => {
-    suite.test('given non-object input - throws TypeError', t => {
+    suite.test('given non-string input - throws TypeError', t => {
         const inputs = [
             new Set(),
             new Map(),
@@ -210,7 +210,7 @@ test('unescapeEntities', suite => {
     suite.test('given empty string - returns empty string', t => {
         const inputs = [
             '',
-            new String(),
+            String(),
         ];
         t.plan(inputs.length);
         inputs.forEach(input => t.deepEqual(
@@ -223,6 +223,7 @@ test('unescapeEntities', suite => {
         const inputs = [
             'string',
             'test',
+            'King\'s Arms'
         ];
         t.plan(inputs.length);
         inputs.forEach(input => t.deepEqual(
@@ -235,12 +236,12 @@ test('unescapeEntities', suite => {
         t.plan(1);
         const input = 'King&#39;s Arms';
         const expected = 'King\'s Arms';
-        t.deepEqual(unescapeEntities(input), expected, 'should use input `final`');
+        t.deepEqual(unescapeEntities(input), expected, `sent '${input}' got ${expected}`);
     });
     suite.test('given multiple escaped entities should return unescaped string', t => {
         t.plan(1);
         const input = 'King&#39;s&#21704;哈 Arms';
         const expected = 'King\'s哈哈 Arms';
-        t.deepEqual(unescapeEntities(input), expected, 'should use input `final`');
+        t.deepEqual(unescapeEntities(input), expected, `sent '${input} got ${expected}`);
     });
 });

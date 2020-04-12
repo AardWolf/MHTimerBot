@@ -16,6 +16,7 @@ const {
     prettyPrintArrayAsString,
     splitString,
     timeLeft,
+    unescapeEntities,
 } = require('./modules/format-utils');
 const { loadDataFromJSON, saveDataAsJSON } = require('./modules/file-utils');
 const Logger = require('./modules/logger');
@@ -2461,6 +2462,8 @@ function MHCTRHLookup() {
         .then(async (response) => {
             if (!response.ok) throw `HTTP ${response.status}`;
             const { rh } = await response.json();
+            if (rh.location)
+                rh.location = unescapeEntities(rh.location);
             Logger.log(`Relic Hunter: MHCT query OK, location: ${rh.location}, last_seen: ${rh.last_seen}`);
             const last_seen = Number(rh.last_seen);
             return {

@@ -25,7 +25,8 @@
     "discord.js": "^11.6.4",
     "eslint": "^6.8.0",
     "luxon": "^1.23.0",
-    "node-fetch": "^2.6.0"
+    "node-fetch": "^2.6.0",
+    "tape": "^4.13.2"
   },
   "scripts": {
     "start": "bash scripts/start.sh",
@@ -39,7 +40,6 @@
     "eslint": "^6.8.0"
   },
   "devDependencies": {
-    "sinon": "^9.0.1",
-    "tape": "^4.13.2"
+    "sinon": "^9.0.1"
   }
 }

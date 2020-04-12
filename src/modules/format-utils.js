@@ -211,6 +211,14 @@ function timeLeft(in_date) {
  * @returns {String} An unescaped string
  */
 function unescapeEntities(str) {
+    if (typeof str === 'object') {
+        try {
+            str = str.valueOf();
+        }
+        catch ( error ) {
+            throw new TypeError(`Utils: tried turning argument into a string, unsuccessful`);
+        }
+    }
     if (typeof str !== 'string')
         throw new TypeError(`Utils: bad input for string to unescape: Expected string, got ${typeof str}`);
     return str.replace(/&#(\d+);/gi, function(match, numStr) {
