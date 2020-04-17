@@ -1434,10 +1434,12 @@ async function addRemind(timerRequest, message) {
         responses.unshift('Hi there! Reminders are only sent via PM, and I\'m just making sure I can PM you.');
 
     // Send notice of the update via PM.
-    await message.author.send(responses.join(' ')).catch(() => {
+    try {
+        await message.author.send(responses.join(' '));
+    } catch {
         Logger.error(`Reminders: notification failure for ${message.author.username}.`);
         success = false;
-    });
+    }
     return CommandData(message, dm, success);
 }
 
