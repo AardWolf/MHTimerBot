@@ -496,15 +496,14 @@ function parseUserMessage(message) {
         }
 
         // Display or update the user's reminders.
-        case 'remind':
-            {
-                // TODO: redirect responses to PM.
-                if (!tokens.length || !reminderRequest.area)
-                    messageReact(true, message, reminderRequest);
-                else
-                    messageReact(false, message, reminderRequest);
-                break;
-            }
+        case 'remind': {
+            // TODO: redirect responses to PM.
+            if (!tokens.length || !reminderRequest.area)
+                messageReact(true, message, reminderRequest);
+            else
+                messageReact(false, message, reminderRequest);
+            break;
+        }
 
         // Display information about upcoming timers.
         case 'sched':
@@ -1329,7 +1328,7 @@ function sendRemind(user, remind, timer) {
  * @param {Message} message the Discord message that initiated this request.
  */
 async function addRemind(timerRequest, message) {
-    let dm = true;
+    const dm = true;
     let success = true;
     // If there were no area, the reminders would have been
     // listed instead of 'addRemind' being called.
@@ -1446,7 +1445,7 @@ async function listRemind(message) {
         pm_channel = message.author;
     let timer_str = 'Your reminders:';
     let usage_str;
-    let dm = true;
+    const dm = true;
     let success = false;
 
     const userReminders = reminders.filter(r => r.user === user && r.count);
@@ -2488,13 +2487,13 @@ function MHCTRHLookup() {
 
 /**
  * Calls listRemind or addRemind, waits for a DM to send, then reacts accordingly
- * @param {boolean} listRemind whether to use list- or add- Remind (true or false, respectively)
+ * @param {boolean} list whether to use list- or add- Remind (true or false, respectively)
  * @param {Message} message the original message
  * @param {timerRequest} reminderRequest to pass on to addRemind
  */
-async function messageReact(listRemind, message, reminderRequest) {
+async function messageReact(list, message, reminderRequest) {
     let dataCatcher;
-    if(listRemind) {
+    if(list) {
         dataCatcher = await listRemind(message);
     } else {
         dataCatcher = await addRemind(reminderRequest, message);
