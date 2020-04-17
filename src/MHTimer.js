@@ -498,18 +498,11 @@ function parseUserMessage(message) {
         // Display or update the user's reminders.
         case 'remind':
             {
-                let dataCatcher;
                 // TODO: redirect responses to PM.
                 if (!tokens.length || !reminderRequest.area)
-                    listRemind(message).then(function(result){dataCatcher = result});
+                    messageReact(true, message, reminderRequest);
                 else
-                    addRemind(reminderRequest, message).then(function(result){dataCatcher = result});
-                
-                if(dataCatcher.getDm && !dataCatcher.getSuccess) {
-                    message.react('✖️');
-                } else if(dataCatcher.getDm && dataCatcher.getSuccess) {
-                    message.react('✔️');
-                }
+                    messageReact(false, message, reminderRequest);
                 break;
             }
 
@@ -2491,6 +2484,26 @@ function MHCTRHLookup() {
             Logger.error('Relic Hunter: MHCT query failed:', err);
             return { source: 'MHCT', location: 'unknown' };
         });
+}
+
+/**
+ * Calls listRemind or addRemind, waits for a DM to send, then reacts accordingly
+ * @param {boolean} listRemind whether to use list- or add- Remind (true or false, respectively)
+ * @param {Message} message the original message
+ * @param {timerRequest} reminderRequest to pass on to addRemind
+ */
+async function messageReact(listRemind, message, reminderRequest) {
+    let dataCatcher;
+    if(listRemind) {
+        dataCatcher = await listRemind(message);
+    } else {
+        dataCatcher = await addRemind(reminderRequest, message);
+    }
+    if(dataCatcher.getDm && !dataCatcher.getSuccess) {
+        message.react('✖️');
+    } else if(dataCatcher.getDm && dataCatcher.getSuccess) {
+        message.react('✔️');
+    }
 }
 
 /**
