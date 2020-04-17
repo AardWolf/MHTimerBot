@@ -1429,7 +1429,7 @@ async function addRemind(timerRequest, message) {
     // Send notice of the update via PM.
     try {
         await message.author.send(responses.join(' '));
-    } catch {
+    } catch(err) {
         Logger.error(`Reminders: notification failure for ${message.author.username}.`);
         success = false;
     }
