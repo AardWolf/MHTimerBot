@@ -1279,6 +1279,7 @@ function sendRemind(user, remind, timer) {
 
     if (timer.getArea() === 'relic_hunter') {
         output.addField('Current Location', `She's in **${relic_hunter.location}**`, true);
+        output.addField('Source', relic_hunter.source, true);
         output.setTitle(`RH: ${relic_hunter.location}`);
     }
 
