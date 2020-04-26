@@ -216,7 +216,8 @@ function unescapeEntities(str) {
             str = str.valueOf();
         }
         catch ( error ) {
-            throw new TypeError('Utils: tried turning argument into a string, unsuccessful');
+            error.message = 'Utils: tried turning argument into a string, unsuccessful' + error.message;
+            throw error;
         }
     }
     if (typeof str !== 'string')

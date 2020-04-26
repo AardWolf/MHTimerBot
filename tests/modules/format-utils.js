@@ -233,15 +233,13 @@ test('unescapeEntities', suite => {
         ));
     });
     suite.test('given escaped entities should return unescaped string', t => {
-        t.plan(1);
-        const input = 'King&#39;s Arms';
-        const expected = 'King\'s Arms';
-        t.deepEqual(unescapeEntities(input), expected, `sent '${input}' got ${expected}`);
-    });
-    suite.test('given multiple escaped entities should return unescaped string', t => {
-        t.plan(1);
-        const input = 'King&#39;s&#21704;哈 Arms';
-        const expected = 'King\'s哈哈 Arms';
-        t.deepEqual(unescapeEntities(input), expected, `sent '${input} got ${expected}`);
+        const inputs = [
+            { input: 'King&#39;s Arms', expected: 'King\'s Arms', msg: 'single escape' },
+            { input: 'King&#39;s&#21704;哈 Arms', expected: 'King\'s哈哈 Arms', msg: 'two escapes' }
+        ];
+        t.plan(inputs.length);
+        inputs.forEach(({ input, expected, msg }) => t.deepEqual(
+            unescapeEntities(input), expected, `when given ${msg}`,
+        ));
     });
 });
