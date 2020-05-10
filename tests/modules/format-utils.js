@@ -9,6 +9,7 @@ const {
     splitString,
     // timeLeft,
     unescapeEntities,
+    isValidURL,
 } = require('../../src/modules/format-utils');
 
 test('oxfordStringifyValues', suite => {
@@ -240,6 +241,64 @@ test('unescapeEntities', suite => {
         t.plan(inputs.length);
         inputs.forEach(({ input, expected, msg }) => t.deepEqual(
             unescapeEntities(input), expected, `when given ${msg}`,
+        ));
+    });
+});
+test('isValidURL', suite => {
+    suite.test('given non-string input - throws TypeError', t => {
+        const inputs = [
+            new Set(),
+            new Map(),
+            {},
+            true,
+            undefined,
+            0,
+            () => {},
+        ];
+        t.plan(inputs.length);
+        inputs.forEach(input => t.throws(
+            () => isValidURL(input),
+            TypeError,
+            `should throw for ${typeof input}`,
+        ));
+    });
+    suite.test('given empty string - returns false', t => {
+        const inputs = [
+            '',
+            String(),
+        ];
+        t.plan(inputs.length);
+        inputs.forEach(input => t.false(
+            isValidURL(input),
+            `should return false for empty ${input.constructor.name}`,
+        ));
+    });
+    suite.test('given non-http url strings, returns false', t => {
+        const inputs = [
+            'string',
+            'test',
+            'King\'s Arms',
+            'ftp://ftp.com/bob',
+            'htp://www.mousehuntgame.com/',
+        ];
+        t.plan(inputs.length);
+        inputs.forEach(input => t.false(
+            isValidURL(input),
+            'should return false for non-http strings',
+        ));
+    });
+    suite.test('given valid URLs should return true', t => {
+        const inputs = [
+            'http://www.google.com/search?q=find+this',
+            'http://www.google.com/search?q=find+this',
+            'https://stackoverflow.com/questions/5717093/check-if-a-javascript-string-is-a-url',
+            'https://www.google.com/search?q=find+url&oq=find+url&aqs=chrome..69i57j0l7.2903j0j4&sourceid=chrome&ie=UTF-8',
+            'http://www.mousehuntgame.com/',
+        ];
+        t.plan(inputs.length);
+        inputs.forEach(input => t.true(
+            isValidURL(input),
+            'should return true for valid URLs',
         ));
     });
 });

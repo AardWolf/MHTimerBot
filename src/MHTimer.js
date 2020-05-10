@@ -17,6 +17,7 @@ const {
     splitString,
     timeLeft,
     unescapeEntities,
+    isValidURL,
 } = require('./modules/format-utils');
 const { loadDataFromJSON, saveDataAsJSON } = require('./modules/file-utils');
 const Logger = require('./modules/logger');
@@ -350,6 +351,12 @@ function loadSettings(path = main_settings_filename) {
         settings.botPrefix = settings.botPrefix ? settings.botPrefix.trim() : '-mh';
 
         settings.owner = settings.owner || '0'; // So things don't fail if it's unset
+
+        if (settings.DBGames && !isValidURL(settings.DBGames)) {
+            settings.DBGames = false;
+            Logger.log('Settings: invalid value for DBGames, set to false');
+        }
+
         return true;
     }).catch(err => {
         Logger.error(`Settings: error while reading settings from '${path}':\n`, err);

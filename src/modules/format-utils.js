@@ -228,8 +228,38 @@ function unescapeEntities(str) {
     });
 }
 
+
+/**
+ * Checks if a string is a valid URL
+ * @param {String} str String to be tested
+ * @returns {Boolean} Whether it's valid
+ */
+function isValidURL(str) {
+    if (typeof str === 'object') {
+        try {
+            str = str.valueOf();
+        }
+        catch ( error ) {
+            error.message = 'Utils: tried turning argument into a string, unsuccessful' + error.message;
+            throw error;
+        }
+    }
+    if (typeof str !== 'string')
+        throw new TypeError(`Utils: bad input for string to unescape: Expected string, got ${typeof str}`);
+    let url;
+    try {
+        url = new URL(str);
+    } catch (_) {
+        return false;
+    }
+
+    return url.protocol === 'http:' || url.protocol === 'https:';
+
+}
+
 exports.oxfordStringifyValues = oxfordStringifyValues;
 exports.prettyPrintArrayAsString = prettyPrintArrayAsString;
 exports.splitString = splitString;
 exports.timeLeft = timeLeft;
 exports.unescapeEntities = unescapeEntities;
+exports.isValidURL = isValidURL;
