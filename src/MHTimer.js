@@ -2468,6 +2468,10 @@ function DBGamesRHLookup() {
     if (!settings.DBGames) {
         return { source: 'DBGames', location: 'unknown' };
     }
+    // Politeness cool down - if we've got a location for today, stop asking
+    if (relic_hunter.last_seen >= DateTime.utc().startOf('day')) {
+        return relic_hunter;
+    }
     // Dev: https://docs.google.com/spreadsheets/d/e/2PACX-1vSsqAjocBWcN5dDLXuOBfnBhyrTaO7ZeIEAFlDnQ4r6zqcvtuLKMDBQCh5I8-3M9irS4-17OPfvgKtY/pub?gid=779913158&single=true&output=csv
     return fetch(settings.DBGames)
         .then(async (response) => {
