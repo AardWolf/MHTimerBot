@@ -34,6 +34,7 @@ const main_settings_filename = 'data/settings.json',
     timer_settings_filename = 'data/timer_settings.json',
     hunter_ids_filename = 'data/hunters.json',
     reminder_filename = 'data/reminders.json',
+    dbgames_filename = 'data/dbgames_locations.json',
     nickname_urls_filename = 'data/nicknames.json';
 
 const settings = {},
@@ -41,6 +42,7 @@ const settings = {},
     items = [],
     filters = [],
     hunters = {},
+    dbgames_locations = {},
     relic_hunter = {
         location: 'unknown',
         source: 'startup',
@@ -179,6 +181,15 @@ function Main() {
                     dataTimers['filters'] = setInterval(getFilterList, saveInterval);
                 });
 
+            // Register DBGames short -> long mappings
+            const hasDBGamesLocations = loadDBGamesLocations()
+                .then(DBGamesLocationData => {
+                    Object.assign(dbgames_locations, DBGamesLocationData);
+                    Logger.log(`DBGames Location: imported ${Object.keys(dbgames_locations).length} from file.`);
+                    return Object.keys(dbgames_locations).length > 0;
+                })
+                .catch(err => failedLoad('DBGames Location: import error:\n', err));
+
             // Start loading remote data.
             const remoteData = [
                 getMouseList(),
@@ -254,6 +265,7 @@ function Main() {
                 hasNicknames,
                 hasReminders,
                 hasTimers,
+                hasDBGamesLocations,
                 ...remoteData,
             ]);
         })
@@ -342,6 +354,20 @@ function loadSettings(path = main_settings_filename) {
     }).catch(err => {
         Logger.error(`Settings: error while reading settings from '${path}':\n`, err);
         return false;
+    });
+}
+
+/**
+ * Load DBGames Location data from the input path, defaulting to the value of 'dbgames_filename'.
+ * Returns an object mapping short names to long (or an empty array if there was an error reading the file)
+ *
+ * @param {string} [path] The path to a JSON file to read data from. Default is the 'dbgames_filename'
+ * @returns {Promise <Object>} keys of short names with values of long/pretty names
+ */
+function loadDBGamesLocations(path = dbgames_filename) {
+    return loadDataFromJSON(path).catch(err => {
+        Logger.error(`DBGamesLocation: Error loading data from '${path}':\n`, err);
+        return {};
     });
 }
 
@@ -2439,14 +2465,23 @@ async function getRHLocation() {
  * @returns {Promise<{ location: string, source: 'DBGames' }>}
  */
 function DBGamesRHLookup() {
+    if (!settings.DBGames) {
+        return;
+    }
     // Dev: https://docs.google.com/spreadsheets/d/e/2PACX-1vSsqAjocBWcN5dDLXuOBfnBhyrTaO7ZeIEAFlDnQ4r6zqcvtuLKMDBQCh5I8-3M9irS4-17OPfvgKtY/pub?gid=779913158&single=true&output=csv
-    return fetch('https://docs.google.com/spreadsheets/d/e/2PACX-1vSsqAjocBWcN5dDLXuOBfnBhyrTaO7ZeIEAFlDnQ4r6zqcvtuLKMDBQCh5I8-3M9irS4-17OPfvgKtY/pub?gid=779913158&single=true&output=csv')
+    return fetch(settings.DBGames)
         .then(async (response) => {
             if (!response.ok) throw `HTTP ${response.status}`;
-            const csv_string = await response.text();
-            const [location, when] = csv_string.split(',');
-            Logger.log('Relic Hunter: DBGames query OK, reported location:', location);
-            return { source: 'DBGames', location, last_seen: DateTime.fromMillis(Number(when), { zone: 'utc' }).startOf('day') };
+            const json = await response.json();
+            if (json.location) {
+                Logger.log('Relic Hunter: DBGames query OK, reported location:', json.location);
+                if (dbgames_locations[json.location]) {
+                    Logger.log('Relic Hunter: Translated DBGames location: ', dbgames_locations[json.location]);
+                    return { source: 'DBGames', location: dbgames_locations[json.location], last_seen: DateTime.utc().startOf('day') };
+                } else {
+                    return { source: 'DBGames', location: json.location, last_seen: DateTime.utc().startOf('day') };
+                }
+            }
         })
         .catch((err) => {
             Logger.error('Relic Hunter: DBGames query failed:', err);
