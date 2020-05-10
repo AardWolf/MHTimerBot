@@ -2466,7 +2466,7 @@ async function getRHLocation() {
  */
 function DBGamesRHLookup() {
     if (!settings.DBGames) {
-        return;
+        return { source: 'DBGames', location: 'unknown' };
     }
     // Dev: https://docs.google.com/spreadsheets/d/e/2PACX-1vSsqAjocBWcN5dDLXuOBfnBhyrTaO7ZeIEAFlDnQ4r6zqcvtuLKMDBQCh5I8-3M9irS4-17OPfvgKtY/pub?gid=779913158&single=true&output=csv
     return fetch(settings.DBGames)
