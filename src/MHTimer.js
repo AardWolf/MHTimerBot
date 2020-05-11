@@ -2458,7 +2458,7 @@ async function getRHLocation() {
     // Trust MHCT more, since it would actually observe an RH appearance, rather than decode a hint.
     if (mhct.location !== 'unknown') {
         Object.assign(relic_hunter, mhct);
-    } else if (dbg.location !== 'unknown') {
+    } else if (dbg.location !== 'unknown' && dbg.location !== relic_hunter.location) {
         Object.assign(relic_hunter, dbg);
     } else {
         // Both sources returned unknown.
@@ -2479,7 +2479,6 @@ function DBGamesRHLookup() {
     if (relic_hunter.last_seen >= DateTime.utc().startOf('day')) {
         return relic_hunter;
     }
-    // Dev: https://docs.google.com/spreadsheets/d/e/2PACX-1vSsqAjocBWcN5dDLXuOBfnBhyrTaO7ZeIEAFlDnQ4r6zqcvtuLKMDBQCh5I8-3M9irS4-17OPfvgKtY/pub?gid=779913158&single=true&output=csv
     return fetch(settings.DBGames)
         .then(async (response) => {
             if (!response.ok) throw `HTTP ${response.status}`;

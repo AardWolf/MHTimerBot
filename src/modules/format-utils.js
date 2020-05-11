@@ -204,13 +204,12 @@ function timeLeft(in_date) {
     return `in ${oxfordStringifyValues(labels, 'and')}`;
 }
 
-
 /**
- * Unescapes HTML entities (&#\d+;) only
- * @param {String} str String containing HTML numeric entities
- * @returns {String} An unescaped string
+ * If it's given an object it returns a string. Rethrows errors in that process
+ * @param {String} str Accepts "any" object, tries to turn it into a string
+ * @returns {String}
  */
-function unescapeEntities(str) {
+function forceToString(str) {
     if (typeof str === 'object') {
         try {
             str = str.valueOf();
@@ -220,6 +219,17 @@ function unescapeEntities(str) {
             throw error;
         }
     }
+    return str;
+}
+
+
+/**
+ * Unescapes HTML entities (&#\d+;) only
+ * @param {String} str String containing HTML numeric entities
+ * @returns {String} An unescaped string
+ */
+function unescapeEntities(str) {
+    str = forceToString(str);
     if (typeof str !== 'string')
         throw new TypeError(`Utils: bad input for string to unescape: Expected string, got ${typeof str}`);
     return str.replace(/&#(\d+);/gi, function(match, numStr) {
@@ -235,15 +245,7 @@ function unescapeEntities(str) {
  * @returns {Boolean} Whether it's valid
  */
 function isValidURL(str) {
-    if (typeof str === 'object') {
-        try {
-            str = str.valueOf();
-        }
-        catch ( error ) {
-            error.message = 'Utils: tried turning argument into a string, unsuccessful' + error.message;
-            throw error;
-        }
-    }
+    str = forceToString(str);
     if (typeof str !== 'string')
         throw new TypeError(`Utils: bad input for string to unescape: Expected string, got ${typeof str}`);
     let url;
