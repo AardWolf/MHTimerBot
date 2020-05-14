@@ -21,9 +21,9 @@
     "@devjacksmith"
   ],
   "dependencies": {
-    "csv-parse": "^4.8.8",
-    "discord.js": "^11.6.3",
-    "luxon": "^1.22.0",
+    "csv-parse": "^4.9.1",
+    "discord.js": "^11.6.4",
+    "luxon": "^1.24.1",
     "node-fetch": "^2.6.0"
   },
   "scripts": {
@@ -38,7 +38,7 @@
     "eslint": "^6.8.0"
   },
   "devDependencies": {
-    "sinon": "^9.0.1",
-    "tape": "^4.13.2"
+    "sinon": "^9.0.2",
+    "tape": "^5.0.0"
   }
 }

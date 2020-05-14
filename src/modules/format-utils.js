@@ -162,7 +162,10 @@ function prettyPrintArrayAsString(body, columnFormat, headers, headerUnderline) 
  */
 function splitString(input) {
     const tokens = [];
-    const splitRegexp = /[^\s"]+|"([^"]*)"/gi;
+    if (!input) {
+        return tokens;
+    }
+    const splitRegexp = /[^\s"]+|"([^"]+)"/gi;
 
     let match = '';
     do {
@@ -201,7 +204,64 @@ function timeLeft(in_date) {
     return `in ${oxfordStringifyValues(labels, 'and')}`;
 }
 
+/**
+ * If it's given an object it returns a string. Rethrows errors in that process
+ * @param {String} str Accepts "any" object, tries to turn it into a string
+ * @returns {String}
+ */
+function forceToString(str) {
+    if (typeof str === 'object') {
+        try {
+            str = str.valueOf();
+        }
+        catch ( error ) {
+            error.message = 'Utils: tried turning argument into a string, unsuccessful' + error.message;
+            throw error;
+        }
+    }
+    return str;
+}
+
+
+/**
+ * Unescapes HTML entities (&#\d+;) only
+ * @param {String} str String containing HTML numeric entities
+ * @returns {String} An unescaped string
+ */
+function unescapeEntities(str) {
+    str = forceToString(str);
+    if (typeof str !== 'string')
+        throw new TypeError(`Utils: bad input for string to unescape: Expected string, got ${typeof str}`);
+    return str.replace(/&#(\d+);/gi, function(match, numStr) {
+        const num = parseInt(numStr, 10);
+        return String.fromCharCode(num);
+    });
+}
+
+
+/**
+ * Checks if a string is a valid URL
+ * @param {String} str String to be tested
+ * @returns {Boolean} Whether it's valid
+ */
+function isValidURL(str) {
+    str = forceToString(str);
+    if (typeof str !== 'string')
+        throw new TypeError(`Utils: bad input for string to unescape: Expected string, got ${typeof str}`);
+    let url;
+    try {
+        url = new URL(str);
+    } catch (_) {
+        return false;
+    }
+
+    return url.protocol === 'http:' || url.protocol === 'https:';
+
+}
+
 exports.oxfordStringifyValues = oxfordStringifyValues;
 exports.prettyPrintArrayAsString = prettyPrintArrayAsString;
 exports.splitString = splitString;
 exports.timeLeft = timeLeft;
+exports.unescapeEntities = unescapeEntities;
+exports.isValidURL = isValidURL;

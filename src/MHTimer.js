@@ -16,6 +16,8 @@ const {
     prettyPrintArrayAsString,
     splitString,
     timeLeft,
+    unescapeEntities,
+    isValidURL,
 } = require('./modules/format-utils');
 const { loadDataFromJSON, saveDataAsJSON } = require('./modules/file-utils');
 const Logger = require('./modules/logger');
@@ -34,6 +36,7 @@ const main_settings_filename = 'data/settings.json',
     timer_settings_filename = 'data/timer_settings.json',
     hunter_ids_filename = 'data/hunters.json',
     reminder_filename = 'data/reminders.json',
+    dbgames_filename = 'data/dbgames_locations.json',
     nickname_urls_filename = 'data/nicknames.json';
 
 const settings = {},
@@ -41,6 +44,7 @@ const settings = {},
     items = [],
     filters = [],
     hunters = {},
+    dbgames_locations = {},
     relic_hunter = {
         location: 'unknown',
         source: 'startup',
@@ -109,8 +113,8 @@ function Main() {
             // Settings loaded successfully, so initiate loading of other resources.
             const saveInterval = refresh_rate.as('milliseconds');
 
-            // Schedule the daily Relic Hunter reset.
-            rescheduleResetRH();
+            // Schedule the daily Relic Hunter reset. Reset cancelled by issue 152
+            // rescheduleResetRH();
 
             // Create timers list from the timers file.
             const hasTimers = loadTimers()
@@ -178,6 +182,15 @@ function Main() {
                     Logger.log(`Filters: Configuring refresh every ${saveInterval / (60 * 1000)} min.`);
                     dataTimers['filters'] = setInterval(getFilterList, saveInterval);
                 });
+
+            // Register DBGames short -> long mappings
+            const hasDBGamesLocations = loadDBGamesLocations()
+                .then(DBGamesLocationData => {
+                    Object.assign(dbgames_locations, DBGamesLocationData);
+                    Logger.log(`DBGames Location: imported ${Object.keys(dbgames_locations).length} from file.`);
+                    return Object.keys(dbgames_locations).length > 0;
+                })
+                .catch(err => failedLoad('DBGames Location: import error:\n', err));
 
             // Start loading remote data.
             const remoteData = [
@@ -254,6 +267,7 @@ function Main() {
                 hasNicknames,
                 hasReminders,
                 hasTimers,
+                hasDBGamesLocations,
                 ...remoteData,
             ]);
         })
@@ -338,10 +352,30 @@ function loadSettings(path = main_settings_filename) {
         settings.botPrefix = settings.botPrefix ? settings.botPrefix.trim() : '-mh';
 
         settings.owner = settings.owner || '0'; // So things don't fail if it's unset
+
+        if (settings.DBGames && !isValidURL(settings.DBGames)) {
+            settings.DBGames = false;
+            Logger.log('Settings: invalid value for DBGames, set to false');
+        }
+
         return true;
     }).catch(err => {
         Logger.error(`Settings: error while reading settings from '${path}':\n`, err);
         return false;
+    });
+}
+
+/**
+ * Load DBGames Location data from the input path, defaulting to the value of 'dbgames_filename'.
+ * Returns an object mapping short names to long (or an empty array if there was an error reading the file)
+ *
+ * @param {string} [path] The path to a JSON file to read data from. Default is the 'dbgames_filename'
+ * @returns {Promise <Object>} keys of short names with values of long/pretty names
+ */
+function loadDBGamesLocations(path = dbgames_filename) {
+    return loadDataFromJSON(path).catch(err => {
+        Logger.error(`DBGamesLocation: Error loading data from '${path}':\n`, err);
+        return {};
     });
 }
 
@@ -1280,6 +1314,7 @@ function sendRemind(user, remind, timer) {
 
     if (timer.getArea() === 'relic_hunter') {
         output.addField('Current Location', `She's in **${relic_hunter.location}**`, true);
+        output.addField('Source', relic_hunter.source, true);
         output.setTitle(`RH: ${relic_hunter.location}`);
     }
 
@@ -2381,6 +2416,8 @@ function resetRH() {
  * Continue resetting Relic Hunter location
  */
 function rescheduleResetRH() {
+    return; // Rescheduled reset cancelled by issue 152
+    // eslint-disable-next-line no-unreachable
     if (relic_hunter.timeout)
         clearTimeout(relic_hunter.timeout);
 
@@ -2393,7 +2430,7 @@ function rescheduleResetRH() {
  */
 function remindRH(new_location) {
     //Logic to look for people with the reminder goes here
-    if (new_location != 'unknown') {
+    if (new_location !== 'unknown') {
         Logger.log(`Relic Hunter: Sending reminders for ${new_location}`);
         doRemind(timers_list.find(t => t.getArea() === 'relic_hunter'));
     }
@@ -2435,7 +2472,7 @@ async function getRHLocation() {
     // Trust MHCT more, since it would actually observe an RH appearance, rather than decode a hint.
     if (mhct.location !== 'unknown') {
         Object.assign(relic_hunter, mhct);
-    } else if (dbg.location !== 'unknown') {
+    } else if (dbg.location !== 'unknown' && dbg.location !== relic_hunter.location) {
         Object.assign(relic_hunter, dbg);
     } else {
         // Both sources returned unknown.
@@ -2449,12 +2486,26 @@ async function getRHLocation() {
  * @returns {Promise<{ location: string, source: 'DBGames' }>}
  */
 function DBGamesRHLookup() {
-    return fetch('https://docs.google.com/spreadsheets/d/e/2PACX-1vSsqAjocBWcN5dDLXuOBfnBhyrTaO7ZeIEAFlDnQ4r6zqcvtuLKMDBQCh5I8-3M9irS4-17OPfvgKtY/pub?gid=1975888453&single=true&output=csv')
+    if (!settings.DBGames) {
+        return { source: 'DBGames', location: 'unknown' };
+    }
+    // Politeness cool down - if we've got a location for today, stop asking
+    if (relic_hunter.last_seen >= DateTime.utc().startOf('day')) {
+        return relic_hunter;
+    }
+    return fetch(settings.DBGames)
         .then(async (response) => {
             if (!response.ok) throw `HTTP ${response.status}`;
-            const location = await response.text();
-            Logger.log('Relic Hunter: DBGames query OK, reported location:', location);
-            return { source: 'DBGames', location, last_seen: DateTime.utc().startOf('day') };
+            const json = await response.json();
+            if (json.location) {
+                Logger.log('Relic Hunter: DBGames query OK, reported location:', json.location);
+                if (dbgames_locations[json.location]) {
+                    Logger.log('Relic Hunter: Translated DBGames location: ', dbgames_locations[json.location]);
+                    return { source: 'DBGames', location: dbgames_locations[json.location], last_seen: DateTime.utc().startOf('day') };
+                } else {
+                    return { source: 'DBGames', location: json.location, last_seen: DateTime.utc().startOf('day') };
+                }
+            }
         })
         .catch((err) => {
             Logger.error('Relic Hunter: DBGames query failed:', err);
@@ -2471,6 +2522,8 @@ function MHCTRHLookup() {
         .then(async (response) => {
             if (!response.ok) throw `HTTP ${response.status}`;
             const { rh } = await response.json();
+            if (rh.location)
+                rh.location = unescapeEntities(rh.location);
             Logger.log(`Relic Hunter: MHCT query OK, location: ${rh.location}, last_seen: ${rh.last_seen}`);
             const last_seen = Number(rh.last_seen);
             return {
