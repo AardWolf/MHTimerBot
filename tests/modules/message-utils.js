@@ -102,7 +102,7 @@ test('addMessageReaction', suite => {
             const input = new CommandResult({ success, sentDm: false, botError: true, message });
             await addMessageReaction(input);
             t.strictEqual(message.react.callCount, 3, `should call react when command ${success ? 'succeeded' : 'failed'}`);
-            t.deepEqual(message.react.args, [['🤖'], ['💣'], ['💥']], `should react with bot error sequence`);
+            t.deepEqual(message.react.args, [['🤖'], ['💣'], ['💥']], 'should react with bot error sequence');
         });
     });
     suite.test('when origin was public - when replied via DM - reacts', t => {
@@ -159,7 +159,7 @@ test('addMessageReaction', suite => {
             };
             const input = new CommandResult({ sentDm, message, botError: true });
             await addMessageReaction(input);
-            t.strictEqual(message.react.callCount, 3, 'should react with bot error sequence')
+            t.strictEqual(message.react.callCount, 3, 'should react with bot error sequence');
             t.deepEqual(message.react.args, [['🤖'], ['💣'], ['💥']], 'should react with bot error sequence');
         });
     });
