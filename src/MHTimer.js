@@ -1511,6 +1511,7 @@ async function listRemind(message) {
     const ourResult = new CommandResult({ success: true, sentDm: false, message });
     try {
         await pm_channel.send(userReminders.length ? timer_str : 'I found no reminders for you, sorry.');
+        ourResult.sentDm = true;
     } catch (err) {
         Logger.error(`Reminders: notification failure for ${pm_channel.username}. Possibly blocked.`, err);
         ourResult.success = false;
