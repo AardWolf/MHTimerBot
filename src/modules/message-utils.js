@@ -1,9 +1,10 @@
+const fs = require('fs');
 const CommandResult = require('../interfaces/command-result');
 const Logger = require('./logger');
 
 // Read instance overrides from the settings file.
-const settingsPath = require.resolve('../../data/settings');
-const settings = settingsPath ? require(settingsPath) : {};
+const settingsPath = '../../data/settings';
+const settings = fs.existsSync(settingsPath) ? require(settingsPath) : {};
 const { reactions = {} } = settings;
 const successfulEmoji = reactions.success || '✅';
 const failedEmoji = reactions.failure || '❌';
