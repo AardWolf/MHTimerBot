@@ -51,5 +51,134 @@ test('addMessageReaction', suite => {
         t.true(result instanceof CommandResult, 'should return a CommandResult');
         t.isNot(result, input, 'should return own CommandResult');
     });
-    // TODO: tests with mock messages that 1) call react with checkmark, 2) call react with X, 3) call react with error sequence
+    suite.test('when origin was DM - when replied via DM - does not react', t => {
+        const inputs = [true, false];
+        t.plan(inputs.length);
+        inputs.forEach(async (success) => {
+            const message = {
+                channel: { type: 'dm' },
+                react: sinon.spy(),
+            };
+            const input = new CommandResult({ success, sentDm: true, message });
+            await addMessageReaction(input);
+            t.strictEqual(message.react.callCount, 0, `should not call Message#react when command ${success ? 'succeeded' : 'failed'}`);
+        });
+    });
+    suite.test('when origin was DM - when no reply sent - reacts', t => {
+        const inputs = [
+            { success: true, emoji: '✅' },
+            { success: false, emoji: '❌' },
+        ];
+        t.plan(inputs.length * 2);
+        inputs.forEach(async ({ success, emoji }) => {
+            const message = {
+                channel: { type: 'dm' },
+                react: sinon.spy(),
+            };
+            const input = new CommandResult({ success, sentDm: false, message });
+            await addMessageReaction(input);
+            t.strictEqual(message.react.callCount, 1, `should call react when command ${success ? 'succeeded' : 'failed'}`);
+            t.deepEqual(message.react.getCall(0).args, [emoji], `should react with ${emoji} when command's success=${success}`);
+        });
+    });
+    suite.test('when origin was DM - when replied via DM - when command errored - does not react', async t => {
+        t.plan(1);
+        const message = {
+            channel: { type: 'dm' },
+            react: sinon.spy(),
+        };
+        const input = new CommandResult({ sentDm: true, botError: true, message });
+        await addMessageReaction(input);
+        t.strictEqual(message.react.callCount, 0, 'should not call Message#react even when command errors');
+    });
+    suite.test('when origin was DM - when no reply sent - when command errored - reacts with error sequence', t => {
+        const inputs = [true, false];
+        t.plan(inputs.length * 2);
+        inputs.forEach(async (success) => {
+            const message = {
+                channel: { type: 'dm' },
+                react: sinon.spy(),
+            };
+            const input = new CommandResult({ success, sentDm: false, botError: true, message });
+            await addMessageReaction(input);
+            t.strictEqual(message.react.callCount, 3, `should call react when command ${success ? 'succeeded' : 'failed'}`);
+            t.deepEqual(message.react.args, [['🤖'], ['💣'], ['💥']], `should react with bot error sequence`);
+        });
+    });
+    suite.test('when origin was public - when replied via DM - reacts', t => {
+        const inputs = [
+            { success: true, emoji: '✅' },
+            { success: false, emoji: '❌' },
+        ];
+        t.plan(inputs.length * 2);
+        inputs.forEach(async ({ success, emoji }) => {
+            const message = {
+                channel: { type: 'text' },
+                react: sinon.spy(),
+            };
+            const input = new CommandResult({ success, sentDm: true, message });
+            await addMessageReaction(input);
+            t.strictEqual(message.react.callCount, 1, `should call react when command ${success ? 'succeeded' : 'failed'}`);
+            t.deepEqual(message.react.getCall(0).args, [emoji], `should react with ${emoji} when command's success=${success}`);
+        });
+    });
+    suite.test('when origin was public - when no reply sent - reacts', t => {
+        const inputs = [
+            { success: true, emoji: '✅' },
+            { success: false, emoji: '❌' },
+        ];
+        t.plan(inputs.length * 2);
+        inputs.forEach(async ({ success, emoji }) => {
+            const message = {
+                channel: { type: 'text' },
+                react: sinon.spy(),
+            };
+            const input = new CommandResult({ success, sentDm: false, message });
+            await addMessageReaction(input);
+            t.strictEqual(message.react.callCount, 1, `should call react when command ${success ? 'succeeded' : 'failed'}`);
+            t.deepEqual(message.react.getCall(0).args, [emoji], `should react with ${emoji} when command's success=${success}`);
+        });
+    });
+    suite.test('when origin was public - when replied publicly - does not react', async t => {
+        t.plan(1);
+        const message = {
+            channel: { type: 'text' },
+            react: sinon.spy(),
+        };
+        const input = new CommandResult({ replied: true, message });
+        await addMessageReaction(input);
+        t.strictEqual(message.react.callCount, 0, 'should not call Message#react');
+    });
+    suite.test('when origin was public - when command errored -  calls react with error sequence', t => {
+        const inputs = [true, false];
+        t.plan(inputs.length * 2);
+        inputs.forEach(async (sentDm) => {
+            const message = {
+                channel: { type: 'text' },
+                react: sinon.spy(),
+            };
+            const input = new CommandResult({ sentDm, message, botError: true });
+            await addMessageReaction(input);
+            t.strictEqual(message.react.callCount, 3, 'should react with bot error sequence')
+            t.deepEqual(message.react.args, [['🤖'], ['💣'], ['💥']], 'should react with bot error sequence');
+        });
+    });
+    suite.test('when sending reaction - when error occurs - handles error', async t => {
+        t.plan(6);
+        const message = { channel : { type: 'text' }, react: sinon.stub().rejects(Error('oops!')) };
+        const input = new CommandResult({ success: true, sentDm: false, message });
+        const errorStub = sinon.stub(require('../../src/modules/logger'), 'error');
+        const result = await addMessageReaction(input);
+        t.strictEqual(errorStub.callCount, 1, 'should log error from Message#react');
+        const [description, err, givenResult] = errorStub.getCall(0).args;
+        t.match(description, /Failed to react to input message/, 'should describe error');
+        t.match(err.message, /oops!/, 'should log error from Message#react');
+        t.same(givenResult, input, 'should log input command result');
+        t.true(result.botError, 'should signal bot error to caller');
+        t.false(result.success, 'should signal unsuccessful result to caller');
+    });
+    suite.test('Module Cleanup', t => {
+        sinon.restore();
+        t.end();
+    });
 });
