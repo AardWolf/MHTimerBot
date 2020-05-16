@@ -2,7 +2,8 @@ const CommandResult = require('../interfaces/command-result');
 const Logger = require('./logger');
 
 // Read instance overrides from the settings file.
-const settings = require('../../data/settings');
+const settingsPath = require.resolve('../../data/settings');
+const settings = settingsPath ? require(settingsPath) : {};
 const { reactions = {} } = settings;
 const successfulEmoji = reactions.success || '✅';
 const failedEmoji = reactions.failure || '❌';
