@@ -1,10 +1,18 @@
 const CommandResult = require('../interfaces/command-result');
 const Logger = require('./logger');
 
+// Read instance overrides from the settings file.
+const settings = require('../../data/settings');
+const { reactions = {} } = settings;
+const successfulEmoji = reactions.success || '✅';
+const failedEmoji = reactions.failure || '❌';
+const errorSequence = (reactions.errorSequence && reactions.errorSequence.length > 0)
+    ? reactions.errorSequence
+    : ['🤖', '💣', '💥'];
+
 const botErrorSequence = async (msg) => {
-    await msg.react('🤖');
-    await msg.react('💣');
-    await msg.react('💥');
+    for (const emoji of errorSequence)
+        await msg.react(emoji);
 };
 
 /**
@@ -20,8 +28,6 @@ const addMessageReaction = async function addMessageReaction(executedCommand) {
     }
 
     const ourResult = new CommandResult({ success: false, request: inputResult.message });
-    const successfulEmoji = '✅';
-    const failedEmoji = '❌';
 
     let shouldAddReaction = false;
 

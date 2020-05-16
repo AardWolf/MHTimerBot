@@ -8,5 +8,14 @@
         "relic_hunter_webhook" : "283571156236107777",
         "botPrefix": "-mh",
         "owner": "0",
+        "reactions": {
+          "success": "✅",
+          "failure": "❌",
+          "errorSequence": [
+            "🤖",
+            "💣",
+            "💥"
+          ]
+        }
         "DBGames" : ""
     }
