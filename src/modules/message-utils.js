@@ -2,13 +2,9 @@ const CommandResult = require('../interfaces/command-result');
 const Logger = require('./logger');
 
 const botErrorSequence = async (msg) => {
-    try {
-        await msg.react('🤖');
-        await msg.react('💣');
-        await msg.react('💥');
-    } catch (err) {
-        Logger.error('Command Reaction: Failed to react to input message:', err);
-    }
+    await msg.react('🤖');
+    await msg.react('💣');
+    await msg.react('💥');
 };
 
 /**
@@ -24,13 +20,12 @@ const addMessageReaction = async function addMessageReaction(executedCommand) {
     }
 
     const ourResult = new CommandResult({ success: false, request: inputResult.message });
-    const successfulEmoji = '✔️';
+    const successfulEmoji = '✅';
     const failedEmoji = '❌';
 
     let shouldAddReaction = false;
 
     if (!inputResult.message) {
-        ourResult.success = false;
         ourResult.botError = true;
     } else if (inputResult.message.channel.type === 'dm') {
         // The requesting message was a DM, so we likely replied via DM.
@@ -38,6 +33,9 @@ const addMessageReaction = async function addMessageReaction(executedCommand) {
     } else if (inputResult.sentDm) {
         // We sent a DM, but the request came from a non-DM channel (e.g. group DM or regular TextChannel)
         // and thus we should react to it.
+        shouldAddReaction = true;
+    } else if (inputResult.botError || !inputResult.replied) {
+        // If there was an error, or we didn't reply at all, we should add a reaction to the request.
         shouldAddReaction = true;
     }
 
@@ -53,19 +51,14 @@ const addMessageReaction = async function addMessageReaction(executedCommand) {
                 await inputResult.message.react(inputResult.success ? successfulEmoji : failedEmoji);
             }
         } catch (err) {
-            Logger.error('Command Reaction: Failed to react to input message:', err);
+            Logger.error('Command Reaction: Failed to react to input message:', err, inputResult);
             ourResult.botError = true;
-            ourResult.success = false;
         }
     }
 
-    // Our result is always a success, unless there was an issue reacting to the original message
-    // or some other fundamental issue. When there is a bot error, try to signal this fact.
-    if (!ourResult.botError) {
-        ourResult.success = true;
-    } else if (inputResult.message) {
-        await botErrorSequence(inputResult.message);
-    }
+    // This method's result is always a success, unless there was an issue reacting to
+    // the original message or some other fundamental issue.
+    ourResult.success == !ourResult.botError;
 
     return ourResult;
 };

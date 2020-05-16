@@ -12,6 +12,8 @@ class CommandResult {
     // botError = false;
     /** @type {boolean} Whether the command sent a DM */
     // sentDm = false;
+    /** @type {boolean} Whether the command replied at all (either publicly or privately). */
+    // replied = false;
     /** @type {Message} The original command request message (a Discord Message object) */
     // message = null;
 
@@ -20,17 +22,20 @@ class CommandResult {
      * @param {boolean} c.success Whether the command was successful
      * @param {boolean} c.botError Whether the bot encountered an error processing the command
      * @param {boolean} c.sentDm Whether the command sent a DM
+     * @param {boolean} c.replied Whether the command sent a response (public or DM).
      * @param {Message} c.message The original command request
      */
     constructor({
         success = null,
         botError = false,
         sentDm = false,
+        replied = false,
         message = null,
     } = {}) {
         this.success = success;
         this.botError = botError;
         this.sentDm = sentDm;
+        this.replied = sentDm || replied;
         this.message = message;
     }
 }
