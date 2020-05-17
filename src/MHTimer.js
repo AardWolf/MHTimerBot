@@ -2480,9 +2480,6 @@ async function getRHLocation() {
         Object.assign(relic_hunter, mhct);
     } else if (dbg.location !== 'unknown' && dbg.location !== relic_hunter.location) {
         Object.assign(relic_hunter, dbg);
-    } else {
-        // Both sources returned unknown.
-        resetRH();
     }
     Logger.log(`Relic Hunter: location set to "${relic_hunter.location}" with source "${relic_hunter.source}"`);
 }
