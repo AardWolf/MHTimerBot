@@ -518,9 +518,16 @@ function parseUserMessage(message) {
 
     // Parse the message to see if it matches any known timer areas, sub-areas, or has count information.
     const reminderRequest = tokens.length ? timerAliases(tokens) : {};
-    if (client.commands.has(command.toLowerCase())) {
+    const dynCommand = client.commands.get(command.toLowerCase())
+        || client.commands.find(cmd => cmd.aliases && cmd.aliases.includes(command));
+    if (dynCommand) {
+        if (dynCommand.args && !tokens.length) {
+            const reply = `You didn't provide arguments.\n` +
+                `\`${settings.botPrefix.trim()} ${dynCommand.name} ${dynCommand.usage}`;
+            message.reply(reply);
+        }
         try {
-            addMessageReaction(client.commands.get(command.toLowerCase()).execute(message, tokens));
+            addMessageReaction(client.commands.get(dynCommand.execute(message, tokens));
         }
         catch (e) {
             Logger.error(`Error executing dynamic command ${command.toLowerCase()}`, e);
