@@ -31,7 +31,7 @@
     "stop": "bash scripts/stop.sh",
     "restart": "bash ./scripts/restart.sh",
     "dev": "node src/MHTimer.js",
-    "lint": "eslint --fix --quiet src",
+    "lint": "eslint --fix --quiet src tests",
     "test": "tape tests/**/*.js"
   },
   "peerDependencies": {

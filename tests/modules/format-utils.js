@@ -224,7 +224,7 @@ test('unescapeEntities', suite => {
         const inputs = [
             'string',
             'test',
-            'King\'s Arms'
+            'King\'s Arms',
         ];
         t.plan(inputs.length);
         inputs.forEach(input => t.deepEqual(
@@ -236,7 +236,7 @@ test('unescapeEntities', suite => {
     suite.test('given escaped entities should return unescaped string', t => {
         const inputs = [
             { input: 'King&#39;s Arms', expected: 'King\'s Arms', msg: 'single escape' },
-            { input: 'King&#39;s&#21704;哈 Arms', expected: 'King\'s哈哈 Arms', msg: 'two escapes' }
+            { input: 'King&#39;s&#21704;哈 Arms', expected: 'King\'s哈哈 Arms', msg: 'two escapes' },
         ];
         t.plan(inputs.length);
         inputs.forEach(({ input, expected, msg }) => t.deepEqual(
