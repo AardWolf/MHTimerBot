@@ -4,10 +4,11 @@
 // Import required modules
 const { DateTime, Duration, Interval } = require('luxon');
 const Discord = require('discord.js');
+const fs = require('fs');
 
 // Extract type-hinting definitions for Discord classes.
 // eslint-disable-next-line no-unused-vars
-const { Client, Guild, Message, MessageReaction, RichEmbed, TextChannel, User } = Discord;
+const { Client, Collection, Guild, Message, MessageReaction, RichEmbed, TextChannel, User } = Discord;
 
 // Import our own local classes and functions.
 const Timer = require('./modules/timerClass.js');
@@ -88,6 +89,22 @@ const emojis = [
     { id: '9%E2%83%A3', text: ':nine:' },
     { id: '%F0%9F%94%9F', text: ':keycap_ten:' },
 ];
+
+// A collection to hold all the commands in the commands directory
+client.commands = new Discord.Collection();
+const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
+for (const file of commandFiles) {
+    try {
+        const command = require(`./commands/${file}`);
+        if (command.name) {
+            client.commands.set(command.name, command);
+        } else {
+            Logger.error(`Error in ${file}: Command name property is missing`);
+        }
+    } catch (e) {
+        Logger.error(`Could not load ${file}:`, e);
+    }
+}
 
 process.once('SIGINT', () => {
     client.destroy();
@@ -501,224 +518,231 @@ function parseUserMessage(message) {
 
     // Parse the message to see if it matches any known timer areas, sub-areas, or has count information.
     const reminderRequest = tokens.length ? timerAliases(tokens) : {};
-
-    switch (command.toLowerCase()) {
-        // Display information about the next instance of a timer.
-        case 'next': {
-            const aboutTimers = `I know these timers:\n${getKnownTimersDetails()}`;
-            if (!tokens.length) {
-                // received "-mh next" -> display the help string.
-                // TODO: pretty-print known timer info
-                message.channel.send(aboutTimers);
-            } else if (!reminderRequest.area) {
-                // received "-mh next <words>", but the words didn't match any known timer information.
-                // Currently, the only other information we handle is RONZA.
-                switch (tokens[0].toLowerCase()) {
-                    case 'ronza':
-                        message.channel.send('Don\'t let aardwolf see you ask or you\'ll get muted');
-                        // TODO: increment hunters[id] info? "X has delayed ronza by N years for asking M times"
-                        break;
-                    default:
-                        message.channel.send(aboutTimers);
-                }
-            } else {
-                // Display information about this known timer.
-                const timerInfo = nextTimer(reminderRequest);
-                if (typeof timerInfo === 'string')
-                    message.channel.send(timerInfo);
-                else
-                    message.channel.send('', { embed: timerInfo });
-            }
-            break;
+    if (client.commands.has(command.toLowerCase())) {
+        try {
+            addMessageReaction(client.commands.get(command.toLowerCase()).execute(message, tokens));
         }
-
-        // Display or update the user's reminders.
-        case 'remind': {
-            // TODO: redirect responses to PM.
-            if (!tokens.length || !reminderRequest.area)
-                addMessageReaction(listRemind(message));
-            else
-                addMessageReaction(addRemind(reminderRequest, message));
-            break;
+        catch (e) {
+            Logger.error(`Error executing dynamic command ${command.toLowerCase()}`, e);
+            try {
+                message.reply(`Sorry, I couldn't do ${command.toLowerCase()} for ... reasons.`);
+            } catch (e) {
+                Logger.error('Furthermore, replying caused more problems.', e);
+            }
         }
-
-        // Display information about upcoming timers.
-        case 'sched':
-        case 'itin':
-        case 'agenda':
-        case 'itinerary':
-        case 'schedule': {
-            // Default the searched time period to 24 hours if it was not specified.
-            reminderRequest.count = reminderRequest.count || 24;
-
-            const usage_str = buildSchedule(reminderRequest);
-            // Discord limits messages to 2000 characters, so use multiple messages if necessary.
-            message.channel.send(usage_str, { split: true });
-            break;
-        }
-        // Display information about the desired mouse.
-        case 'find':
-        case 'mfind':
-            if (!tokens.length)
-                message.channel.send('You have to supply mice to find.');
-            else {
-                const criteria = tokens.join(' ').trim().toLowerCase().replace(/ mouse$/,'');
-                if (criteria.length < 2)
-                    message.channel.send('Your search string was too short, try again.');
-                else
-                    findMouse(message.channel, criteria, 'find');
-            }
-            break;
-
-        // Display information about the desired item.
-        case 'ifind':
-            if (!tokens.length)
-                message.channel.send('You have to supply an item to find');
-            else {
-                const criteria = tokens.join(' ').trim().toLowerCase();
-                if (criteria.length < 2)
-                    message.channel.send('Your search string was too short, try again.');
-                else
-                    findItem(message.channel, criteria, 'ifind');
-            }
-            break;
-
-        // Update information about the user volunteered by the user.
-        case 'iam':
-            if (!tokens.length)
-                message.channel.send('Yes, you are. Provide a hunter ID number to set that.');
-            else if (tokens.length === 1 && !isNaN(parseInt(tokens[0], 10)))
-                setHunterID(message, tokens[0]);
-            else if (tokens.length === 1 && tokens[0].toLowerCase() === 'not')
-                unsetHunterID(message);
-            else {
-                // received -mh iam <words>. The user can specify where they are hunting, their rank/title, or their in-game id.
-                // Nobody should need this many tokens to specify their input, but someone is gonna try for more.
-                let userText = tokens.slice(1, 10).join(' ').trim().toLowerCase();
-                const userCommand = tokens[0].toLowerCase();
-                if (userCommand === 'in' && userText) {
-                    if (nicknames.get('locations')[userText])
-                        userText = nicknames.get('locations')[userText];
-                    setHunterProperty(message, 'location', userText);
-                }
-                else if (['rank', 'title', 'a'].indexOf(userCommand) !== -1 && userText) {
-                    if (nicknames.get('ranks')[userText])
-                        userText = nicknames.get('ranks')[userText];
-                    setHunterProperty(message, 'rank', userText);
-                }
-                else if (userCommand.substring(0, 3) === 'snu' && userText)
-                    setHunterProperty(message, 'snuid', userText);
-                else {
-                    const prefix = settings.botPrefix;
-                    const commandSyntax = [
-                        'I\'m not sure what to do with that. Try:',
-                        `\`${prefix} iam ####\` to set a hunter ID.`,
-                        `\`${prefix} iam rank <rank>\` to set a rank.`,
-                        `\`${prefix} iam in <location>\` to set a location`,
-                        `\`${prefix} iam snuid ####\` to set your in-game user id`,
-                        `\`${prefix} iam not\` to unregister (and delete your data)`,
-                    ];
-                    message.channel.send(commandSyntax.join('\n\t'));
-                }
-            }
-            break;
-
-        /**
-         * Display volunteered information about known users. Handled inputs:
-         * -mh whois ####                   -> hid lookup (No PM)
-         * -mh whois snuid ####             -> snuid lookup (No PM)
-         * -mh whois <word/@mention>        -> name lookup (No PM)
-         * -mh whois in <words>             -> area lookup
-         * -mh whois [rank|title|a] <words> -> random query lookup
-         */
-        case 'whois': {
-            if (!tokens.length) {
-                message.channel.send('Who\'s who? Who\'s on first?');
-                return;
-            }
-
-            let searchType = tokens.shift().toLowerCase();
-            if (!isNaN(parseInt(searchType, 10))) {
-                // hid lookup of 1 or more IDs.
-                tokens.unshift(searchType);
-                findHunter(message, tokens, 'hid');
-                return;
-            }
-            else if (searchType.substring(0, 3) === 'snu') {
-                // snuid lookup of 1 or more IDs.
-                findHunter(message, tokens, 'snuid');
-                return;
-            }
-            else if (!tokens.length) {
-                // Display name or user mention lookup.
-                tokens.unshift(searchType);
-                findHunter(message, tokens, 'name');
-                return;
-            }
-            else {
-                // Rank or location lookup. tokens[] contains the terms to search
-                let search = tokens.join(' ').toLowerCase();
-                if (searchType === 'in') {
-                    if (nicknames.get('locations')[search]) {
-                        search = nicknames.get('locations')[search];
-                    }
-                    searchType = 'location';
-                }
-                else if (['rank', 'title', 'a', 'an'].indexOf(searchType) !== -1) {
-                    if (nicknames.get('ranks')[search]) {
-                        search = nicknames.get('ranks')[search];
-                    }
-                    searchType = 'rank';
-                }
-                else {
-                    const prefix = settings.botPrefix;
-                    const commandSyntax = [
-                        'I\'m not sure what to do with that. Try:',
-                        `\`${prefix} whois [#### | <mention>]\` to look up specific hunters`,
-                        `\`${prefix} whois [in <location> | a <rank>]\` to find up to 5 random new friends`,
-                    ];
-                    message.channel.send(commandSyntax.join('\n\t'));
-                    return;
-                }
-                const hunters = getHuntersByProperty(searchType, search);
-                message.channel.send(hunters.length
-                    // eslint-disable-next-line no-useless-escape
-                    ? `${hunters.length} random hunters: \`${hunters.join('\`, \`')}\``
-                    : `I couldn't find any hunters with \`${searchType}\` matching \`${search}\``,
-                );
-            }
-            break;
-        }
-        case 'reset':
-            if (message.author.id === settings.owner) {
+    }
+    else
+    {
+        switch (command.toLowerCase()) {
+            // Display information about the next instance of a timer.
+            case 'next': {
+                const aboutTimers = `I know these timers:\n${getKnownTimersDetails()}`;
                 if (!tokens.length) {
-                    message.channel.send('I don\'t know what to reset.');
-                }
-                const sub_command = tokens.shift();
-                switch (sub_command) {
-                    case 'timers':
-                        // TODO: re-add deactivated channels to active channels for each timer.
-                        break;
-
-                    case 'rh':
-                    case 'relic_hunter':
-                    default:
-                        resetRH();
+                    // received "-mh next" -> display the help string.
+                    // TODO: pretty-print known timer info
+                    message.channel.send(aboutTimers);
+                } else if (!reminderRequest.area) {
+                    // received "-mh next <words>", but the words didn't match any known timer information.
+                    // Currently, the only other information we handle is RONZA.
+                    switch (tokens[0].toLowerCase()) {
+                        case 'ronza':
+                            message.channel.send('Don\'t let aardwolf see you ask or you\'ll get muted');
+                            // TODO: increment hunters[id] info? "X has delayed ronza by N years for asking M times"
+                            break;
+                        default:
+                            message.channel.send(aboutTimers);
+                    }
+                } else {
+                    // Display information about this known timer.
+                    const timerInfo = nextTimer(reminderRequest);
+                    if (typeof timerInfo === 'string')
+                        message.channel.send(timerInfo);
+                    else
+                        message.channel.send('', { embed: timerInfo });
                 }
                 break;
             }
-        // Fall through if user isn't the bot owner.
-        case 'help':
-        case 'arrg':
-        case 'aarg':
-        default: {
-            const helpMessage = getHelpMessage(tokens);
-            // TODO: Send help to PM?
-            message.channel.send(helpMessage ? helpMessage : 'Whoops! That\'s a bug.');
+
+            // Display or update the user's reminders.
+            case 'remind': {
+                // TODO: redirect responses to PM.
+                if (!tokens.length || !reminderRequest.area)
+                    addMessageReaction(listRemind(message));
+                else
+                    addMessageReaction(addRemind(reminderRequest, message));
+                break;
+            }
+
+            // Display information about upcoming timers.
+            case 'sched':
+            case 'itin':
+            case 'agenda':
+            case 'itinerary':
+            case 'schedule': {
+                // Default the searched time period to 24 hours if it was not specified.
+                reminderRequest.count = reminderRequest.count || 24;
+
+                const usage_str = buildSchedule(reminderRequest);
+                // Discord limits messages to 2000 characters, so use multiple messages if necessary.
+                message.channel.send(usage_str, { split: true });
+                break;
+            }
+            // Display information about the desired mouse.
+            case 'find':
+            case 'mfind':
+                if (!tokens.length)
+                    message.channel.send('You have to supply mice to find.');
+                else {
+                    const criteria = tokens.join(' ').trim().toLowerCase().replace(/ mouse$/, '');
+                    if (criteria.length < 2)
+                        message.channel.send('Your search string was too short, try again.');
+                    else
+                        findMouse(message.channel, criteria, 'find');
+                }
+                break;
+
+            // Display information about the desired item.
+            case 'ifind':
+                if (!tokens.length)
+                    message.channel.send('You have to supply an item to find');
+                else {
+                    const criteria = tokens.join(' ').trim().toLowerCase();
+                    if (criteria.length < 2)
+                        message.channel.send('Your search string was too short, try again.');
+                    else
+                        findItem(message.channel, criteria, 'ifind');
+                }
+                break;
+
+            // Update information about the user volunteered by the user.
+            case 'iam':
+                if (!tokens.length)
+                    message.channel.send('Yes, you are. Provide a hunter ID number to set that.');
+                else if (tokens.length === 1 && !isNaN(parseInt(tokens[0], 10)))
+                    setHunterID(message, tokens[0]);
+                else if (tokens.length === 1 && tokens[0].toLowerCase() === 'not')
+                    unsetHunterID(message);
+                else {
+                    // received -mh iam <words>. The user can specify where they are hunting, their rank/title, or their in-game id.
+                    // Nobody should need this many tokens to specify their input, but someone is gonna try for more.
+                    let userText = tokens.slice(1, 10).join(' ').trim().toLowerCase();
+                    const userCommand = tokens[0].toLowerCase();
+                    if (userCommand === 'in' && userText) {
+                        if (nicknames.get('locations')[userText])
+                            userText = nicknames.get('locations')[userText];
+                        setHunterProperty(message, 'location', userText);
+                    } else if (['rank', 'title', 'a'].indexOf(userCommand) !== -1 && userText) {
+                        if (nicknames.get('ranks')[userText])
+                            userText = nicknames.get('ranks')[userText];
+                        setHunterProperty(message, 'rank', userText);
+                    } else if (userCommand.substring(0, 3) === 'snu' && userText)
+                        setHunterProperty(message, 'snuid', userText);
+                    else {
+                        const prefix = settings.botPrefix;
+                        const commandSyntax = [
+                            'I\'m not sure what to do with that. Try:',
+                            `\`${prefix} iam ####\` to set a hunter ID.`,
+                            `\`${prefix} iam rank <rank>\` to set a rank.`,
+                            `\`${prefix} iam in <location>\` to set a location`,
+                            `\`${prefix} iam snuid ####\` to set your in-game user id`,
+                            `\`${prefix} iam not\` to unregister (and delete your data)`,
+                        ];
+                        message.channel.send(commandSyntax.join('\n\t'));
+                    }
+                }
+                break;
+
+            /**
+             * Display volunteered information about known users. Handled inputs:
+             * -mh whois ####                   -> hid lookup (No PM)
+             * -mh whois snuid ####             -> snuid lookup (No PM)
+             * -mh whois <word/@mention>        -> name lookup (No PM)
+             * -mh whois in <words>             -> area lookup
+             * -mh whois [rank|title|a] <words> -> random query lookup
+             */
+            case 'whois': {
+                if (!tokens.length) {
+                    message.channel.send('Who\'s who? Who\'s on first?');
+                    return;
+                }
+
+                let searchType = tokens.shift().toLowerCase();
+                if (!isNaN(parseInt(searchType, 10))) {
+                    // hid lookup of 1 or more IDs.
+                    tokens.unshift(searchType);
+                    findHunter(message, tokens, 'hid');
+                    return;
+                } else if (searchType.substring(0, 3) === 'snu') {
+                    // snuid lookup of 1 or more IDs.
+                    findHunter(message, tokens, 'snuid');
+                    return;
+                } else if (!tokens.length) {
+                    // Display name or user mention lookup.
+                    tokens.unshift(searchType);
+                    findHunter(message, tokens, 'name');
+                    return;
+                } else {
+                    // Rank or location lookup. tokens[] contains the terms to search
+                    let search = tokens.join(' ').toLowerCase();
+                    if (searchType === 'in') {
+                        if (nicknames.get('locations')[search]) {
+                            search = nicknames.get('locations')[search];
+                        }
+                        searchType = 'location';
+                    } else if (['rank', 'title', 'a', 'an'].indexOf(searchType) !== -1) {
+                        if (nicknames.get('ranks')[search]) {
+                            search = nicknames.get('ranks')[search];
+                        }
+                        searchType = 'rank';
+                    } else {
+                        const prefix = settings.botPrefix;
+                        const commandSyntax = [
+                            'I\'m not sure what to do with that. Try:',
+                            `\`${prefix} whois [#### | <mention>]\` to look up specific hunters`,
+                            `\`${prefix} whois [in <location> | a <rank>]\` to find up to 5 random new friends`,
+                        ];
+                        message.channel.send(commandSyntax.join('\n\t'));
+                        return;
+                    }
+                    const hunters = getHuntersByProperty(searchType, search);
+                    message.channel.send(hunters.length
+                        // eslint-disable-next-line no-useless-escape
+                        ? `${hunters.length} random hunters: \`${hunters.join('\`, \`')}\``
+                        : `I couldn't find any hunters with \`${searchType}\` matching \`${search}\``,
+                    );
+                }
+                break;
+            }
+            case 'reset':
+                if (message.author.id === settings.owner) {
+                    if (!tokens.length) {
+                        message.channel.send('I don\'t know what to reset.');
+                    }
+                    const sub_command = tokens.shift();
+                    switch (sub_command) {
+                        case 'timers':
+                            // TODO: re-add deactivated channels to active channels for each timer.
+                            break;
+
+                        case 'rh':
+                        case 'relic_hunter':
+                        default:
+                            resetRH();
+                    }
+                    break;
+                }
+            // Fall through if user isn't the bot owner.
+            case 'help':
+            case 'arrg':
+            case 'aarg':
+            default: {
+                const helpMessage = getHelpMessage(tokens);
+                // TODO: Send help to PM?
+                message.channel.send(helpMessage ? helpMessage : 'Whoops! That\'s a bug.');
+            }
         }
     }
 }
-
 /**
  * Convert a HitGrab shortlink into a BitLy shortlink that does not send the clicker to Facebook.
  * If successful, sends the converted link to the same channel that received the input message.
