@@ -1,15 +1,15 @@
 //TODO move the setHunterID, unsetHunterID, etc into a module and require it here
-
+const {unsetHunterID, setHunterID, setHunterProperty } = require('../modules/hunterRegistry');
 module.exports = {
     name: 'iam',
     args: true,
     usage: [
-        `#### - provide a number to set your hunter ID`,
-        `rank <rank> - identify your rank`,
-        `in <location> - identify where you're hunting / looking for friends`,
-        `snuid #### - sets your in-game user id`,
-        `not - removes you from the registry`,
-        ].join('\n\t');
+        '#### - provide a number to set your hunter ID',
+        'rank <rank> - identify your rank',
+        'in <location> - identify where you\'re hunting / looking for friends',
+        'snuid #### - sets your in-game user id',
+        'not - removes you from the registry',
+    ].join('\n\t'),
     description: 'Identify yourself so others can find/friend you',
     execute(message, tokens) {
         if (!tokens.length)
@@ -24,17 +24,17 @@ module.exports = {
             let userText = tokens.slice(1, 10).join(' ').trim().toLowerCase();
             const userCommand = tokens[0].toLowerCase();
             if (userCommand === 'in' && userText) {
-                if (nicknames.get('locations')[userText])
-                    userText = nicknames.get('locations')[userText];
+                if (message.client.nicknames.get('locations')[userText])
+                    userText = message.client.nicknames.get('locations')[userText];
                 setHunterProperty(message, 'location', userText);
             } else if (['rank', 'title', 'a'].indexOf(userCommand) !== -1 && userText) {
-                if (nicknames.get('ranks')[userText])
-                    userText = nicknames.get('ranks')[userText];
+                if (message.client.nicknames.get('ranks')[userText])
+                    userText = message.client.nicknames.get('ranks')[userText];
                 setHunterProperty(message, 'rank', userText);
             } else if (userCommand.substring(0, 3) === 'snu' && userText)
                 setHunterProperty(message, 'snuid', userText);
             else {
-                const prefix = settings.botPrefix;
+                const prefix = message.client.settings.botPrefix;
                 const commandSyntax = [
                     'I\'m not sure what to do with that. Try:',
                     `\`${prefix} iam ####\` to set a hunter ID.`,

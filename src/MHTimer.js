@@ -43,11 +43,13 @@ const main_settings_filename = 'data/settings.json',
     dbgames_filename = 'data/dbgames_locations.json',
     nickname_urls_filename = 'data/nicknames.json';
 
+client.hunters = {};
 const settings = {},
     mice = [],
     items = [],
     filters = [],
-    hunters = {},
+    // Moved hunters objects to client object
+    // hunters = {},
     dbgames_locations = {},
     relic_hunter = {
         location: 'unknown',
@@ -58,6 +60,8 @@ const settings = {},
     nicknames = new Map(),
     nickname_urls = {};
 
+//TODO This will replace the above, temporarily both exist
+client.nicknames = new Map();
 /** @type {Timer[]} */
 const timers_list = [];
 /** @type {TimerReminder[]} */
@@ -165,9 +169,9 @@ function Main() {
             // Create hunters data from the hunters file.
             const hasHunters = loadHunterData()
                 .then(hunterData => {
-                    Object.assign(hunters, hunterData);
+                    Object.assign(client.hunters, hunterData);
                     Logger.log(`Hunters: imported ${Object.keys(hunterData).length} from file.`);
-                    return Object.keys(hunters).length > 0;
+                    return Object.keys(client.hunters).length > 0;
                 })
                 .catch(err => failedLoad('Hunters: import error:\n', err));
             hasHunters.then(() => {
@@ -522,19 +526,20 @@ function parseUserMessage(message) {
         || client.commands.find(cmd => cmd.aliases && cmd.aliases.includes(command));
     if (dynCommand) {
         if (dynCommand.args && !tokens.length) {
-            const reply = `You didn't provide arguments.\n` +
+            const reply = 'You didn\'t provide arguments.\n' +
                 `\`${settings.botPrefix.trim()} ${dynCommand.name} ${dynCommand.usage}`;
             message.reply(reply);
         }
-        try {
-            addMessageReaction(client.commands.get(dynCommand.execute(message, tokens));
-        }
-        catch (e) {
-            Logger.error(`Error executing dynamic command ${command.toLowerCase()}`, e);
+        else {
             try {
-                message.reply(`Sorry, I couldn't do ${command.toLowerCase()} for ... reasons.`);
+                addMessageReaction(client.commands.get(dynCommand.execute(message, tokens)));
             } catch (e) {
-                Logger.error('Furthermore, replying caused more problems.', e);
+                Logger.error(`Error executing dynamic command ${command.toLowerCase()}`, e);
+                try {
+                    message.reply(`Sorry, I couldn't do ${command.toLowerCase()} for ... reasons.`);
+                } catch (e) {
+                    Logger.error('Furthermore, replying caused more problems.', e);
+                }
             }
         }
     }
@@ -618,44 +623,6 @@ function parseUserMessage(message) {
                         message.channel.send('Your search string was too short, try again.');
                     else
                         findItem(message.channel, criteria, 'ifind');
-                }
-                break;
-
-            // Update information about the user volunteered by the user.
-            case 'iam':
-                if (!tokens.length)
-                    message.channel.send('Yes, you are. Provide a hunter ID number to set that.');
-                else if (tokens.length === 1 && !isNaN(parseInt(tokens[0], 10)))
-                    setHunterID(message, tokens[0]);
-                else if (tokens.length === 1 && tokens[0].toLowerCase() === 'not')
-                    unsetHunterID(message);
-                else {
-                    // received -mh iam <words>. The user can specify where they are hunting, their rank/title, or their in-game id.
-                    // Nobody should need this many tokens to specify their input, but someone is gonna try for more.
-                    let userText = tokens.slice(1, 10).join(' ').trim().toLowerCase();
-                    const userCommand = tokens[0].toLowerCase();
-                    if (userCommand === 'in' && userText) {
-                        if (nicknames.get('locations')[userText])
-                            userText = nicknames.get('locations')[userText];
-                        setHunterProperty(message, 'location', userText);
-                    } else if (['rank', 'title', 'a'].indexOf(userCommand) !== -1 && userText) {
-                        if (nicknames.get('ranks')[userText])
-                            userText = nicknames.get('ranks')[userText];
-                        setHunterProperty(message, 'rank', userText);
-                    } else if (userCommand.substring(0, 3) === 'snu' && userText)
-                        setHunterProperty(message, 'snuid', userText);
-                    else {
-                        const prefix = settings.botPrefix;
-                        const commandSyntax = [
-                            'I\'m not sure what to do with that. Try:',
-                            `\`${prefix} iam ####\` to set a hunter ID.`,
-                            `\`${prefix} iam rank <rank>\` to set a rank.`,
-                            `\`${prefix} iam in <location>\` to set a location`,
-                            `\`${prefix} iam snuid ####\` to set your in-game user id`,
-                            `\`${prefix} iam not\` to unregister (and delete your data)`,
-                        ];
-                        message.channel.send(commandSyntax.join('\n\t'));
-                    }
                 }
                 break;
 
@@ -2233,70 +2200,6 @@ function findHunter(message, searchValues, type) {
 }
 
 /**
- * Unsets the hunter's id (and all other friend-related settings), and messages the user back.
- * Currently all settings are friend-related.
- *
- * @param {Message} message A Discord message object
- */
-function unsetHunterID(message) {
-    const hunter = message.author.id;
-    if (hunters[hunter]) {
-        delete hunters[hunter];
-        message.channel.send('*POOF*, you\'re gone!');
-    } else {
-        message.channel.send('I didn\'t do anything but that\'s because you didn\'t do anything either.');
-    }
-}
-
-/**
- * Sets the message author's hunter ID to the passed argument, and messages the user back.
- *
- * @param {Message} message a Discord message object from a user
- * @param {string} hid a "Hunter ID" string, which is known to parse to a number.
- */
-function setHunterID(message, hid) {
-    const discordId = message.author.id;
-    let message_str = '';
-
-    // Initialize the data for any new registrants.
-    if (!hunters[discordId]) {
-        hunters[discordId] = {};
-        Logger.log(`Hunters: OMG! A new hunter id '${discordId}'`);
-    }
-
-    // If they already registered a hunter ID, update it.
-    if (hunters[discordId]['hid']) {
-        message_str = `You used to be known as \`${hunters[discordId]['hid']}\`. `;
-        Logger.log(`Hunters: Updating hid ${hunters[discordId]['hid']} to ${hid}`);
-    }
-    hunters[discordId]['hid'] = hid;
-    message_str += `If people look you up they'll see \`${hid}\`.`;
-
-    message.channel.send(message_str);
-}
-
-/**
- * Accepts a message object and hunter id, sets the author's hunter ID to the passed argument
- *
- * @param {Message} message a Discord message object
- * @param {string} property the property key for the given user, e.g. 'hid', 'rank', 'location'
- * @param {any} value the property's new value.
- */
-function setHunterProperty(message, property, value) {
-    const discordId = message.author.id;
-    if (!hunters[discordId] || !hunters[discordId]['hid']) {
-        message.channel.send('I don\'t know who you are so you can\'t set that now; set your hunter ID first.');
-        return;
-    }
-
-    let message_str = !hunters[discordId][property] ? '' : `Your ${property} used to be \`${hunters[discordId][property]}\`. `;
-    hunters[discordId][property] = value;
-
-    message_str += `Your ${property} is set to \`${value}\``;
-    message.channel.send(message_str);
-}
-
-/**
  * Load hunter data from the input path, defaulting to the value of 'hunter_ids_filename'.
  * Returns the hunter data contained in the given file.
  *
@@ -2317,8 +2220,8 @@ function loadHunterData(path = hunter_ids_filename) {
  * @returns {Promise <boolean>} Whether the save operation completed without error.
  */
 function saveHunters(path = hunter_ids_filename) {
-    return saveDataAsJSON(path, hunters).then(didSave => {
-        Logger.log(`Hunters: ${didSave ? 'Saved' : 'Failed to save'} ${Object.keys(hunters).length} to '${path}'.`);
+    return saveDataAsJSON(path, client.hunters).then(didSave => {
+        Logger.log(`Hunters: ${didSave ? 'Saved' : 'Failed to save'} ${Object.keys(client.hunters).length} to '${path}'.`);
         last_timestamps.hunter_save = DateTime.utc();
         return didSave;
     });
@@ -2381,6 +2284,8 @@ function getNicknames(type) {
         parser.write(body.split(/[\r\n]+/).splice(1).join('\n').toLowerCase());
         // Create a new (or replace the existing) nickname definition for this type.
         nicknames.set(type, newData);
+        //TODO Remove above when nicknames are ONLY in the client
+        client.nicknames.set(type, newData);
         parser.end(() => Logger.log(`Nicknames: ${Object.keys(newData).length} of type '${type}' loaded.`));
     }).catch(err => Logger.error(`Nicknames: request for type '${type}' failed with error:`, err));
 }
@@ -2395,8 +2300,8 @@ function getNicknames(type) {
  */
 function getHunterByID(input, type) {
     if (input)
-        for (const key in hunters)
-            if (hunters[key][type] === input)
+        for (const key in client.hunters)
+            if (client.hunters[key][type] === input)
                 return key;
 }
 
@@ -2408,8 +2313,8 @@ function getHunterByID(input, type) {
  * @returns {string?} the hunter ID of the registered hunter having that Discord ID.
  */
 function getHunterByDiscordID(discordId) {
-    if (hunters[discordId])
-        return hunters[discordId]['hid'];
+    if (client.hunters[discordId])
+        return client.hunters[discordId]['hid'];
 }
 
 /**
@@ -2421,9 +2326,9 @@ function getHunterByDiscordID(discordId) {
  * @returns {string[]} an array of up to 5 hunter ids where the property value matched the user's criterion
  */
 function getHuntersByProperty(property, criterion, limit = 5) {
-    const valid = Object.keys(hunters)
-        .filter(key => hunters[key][property] === criterion)
-        .map(key => hunters[key].hid);
+    const valid = Object.keys(client.hunters)
+        .filter(key => client.hunters[key][property] === criterion)
+        .map(key => client.hunters[key].hid);
 
     return valid.sort(() => 0.5 - Math.random()).slice(0, limit);
 }
