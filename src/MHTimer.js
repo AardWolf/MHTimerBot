@@ -11,6 +11,7 @@ const { Client, Guild, Message, MessageReaction, RichEmbed, TextChannel, User } 
 
 // Import our own local classes and functions.
 const Timer = require('./modules/timerClass.js');
+const CommandResult = require('./interfaces/command-result');
 const {
     oxfordStringifyValues,
     prettyPrintArrayAsString,
@@ -21,6 +22,9 @@ const {
 } = require('./modules/format-utils');
 const { loadDataFromJSON, saveDataAsJSON } = require('./modules/file-utils');
 const Logger = require('./modules/logger');
+const {
+    addMessageReaction,
+} = require('./modules/message-utils');
 
 // Access external URIs, like @devjacksmith 's tools.
 const fetch = require('node-fetch');
@@ -529,13 +533,14 @@ function parseUserMessage(message) {
         }
 
         // Display or update the user's reminders.
-        case 'remind':
+        case 'remind': {
             // TODO: redirect responses to PM.
             if (!tokens.length || !reminderRequest.area)
-                listRemind(message);
+                addMessageReaction(listRemind(message));
             else
-                addRemind(reminderRequest, message);
+                addMessageReaction(addRemind(reminderRequest, message));
             break;
+        }
 
         // Display information about upcoming timers.
         case 'sched':
@@ -1360,14 +1365,14 @@ function sendRemind(user, remind, timer) {
  *                                       validation to set 'area' and 'sub_area' as possible.
  * @param {Message} message the Discord message that initiated this request.
  */
-function addRemind(timerRequest, message) {
+async function addRemind(timerRequest, message) {
     // If there were no area, the reminders would have been
     // listed instead of 'addRemind' being called.
     const area = timerRequest.area;
     const subArea = timerRequest.sub_area;
     if (!area) {
-        message.channel.send('I do not know the area you asked for');
-        return;
+        await message.channel.send('I do not know the area you asked for');
+        return new CommandResult({ success: false, replied: true, message });
     }
 
     // Default to reminding the user once.
@@ -1391,11 +1396,11 @@ function addRemind(timerRequest, message) {
                 }
             }
 
-        message.author.send(responses.length
+        await message.author.send(responses.length
             ? `\`\`\`${responses.join('\n')}\`\`\``
             : `I couldn't find a matching reminder for you in '${requestName}'.`,
         );
-        return;
+        return new CommandResult({ success: responses.length > 0, sentDm: true, message });
     }
 
     // User asked to be reminded - find a timer that meets the request, and sort in order of next activation.
@@ -1407,8 +1412,8 @@ function addRemind(timerRequest, message) {
     // Assume the desired timer is the one that matched the given criteria and occurs next.
     const [timer] = choices;
     if (!timer) {
-        message.author.send(`I'm sorry, there weren't any timers I know of that match your request. I know\n${getKnownTimersDetails()}`);
-        return;
+        await message.author.send(`I'm sorry, there weren't any timers I know of that match your request. I know\n${getKnownTimersDetails()}`);
+        return new CommandResult({ success: false, sentDm: true, message });
     }
 
     // If the reminder already exists, set its new count to the requested count.
@@ -1425,8 +1430,8 @@ function addRemind(timerRequest, message) {
 
     if (responses.length) {
         Logger.log(`Reminders: updated ${responses.length} for ${message.author.username} to a count of ${count}.`, timerRequest);
-        message.author.send(`\`\`\`${responses.join('\n')}\`\`\``);
-        return;
+        await message.author.send(`\`\`\`${responses.join('\n')}\`\`\``);
+        return new CommandResult({ success: true, sentDm: true, message });
     }
 
     // No updates were made - free to add a new reminder.
@@ -1457,9 +1462,16 @@ function addRemind(timerRequest, message) {
         responses.unshift('Hi there! Reminders are only sent via PM, and I\'m just making sure I can PM you.');
 
     // Send notice of the update via PM.
-    message.author.send(responses.join(' ')).catch(() =>
-        Logger.error(`Reminders: notification failure for ${message.author.username}.`),
-    );
+    const ourResult = new CommandResult({ success: true, sentDm: false, message });
+    try {
+        await message.author.send(responses.join(' '));
+        ourResult.sentDm = true;
+    } catch(err) {
+        Logger.error(`Reminders: notification failure for ${message.author.username}.`);
+        ourResult.success = false;
+        ourResult.botError = true;
+    }
+    return ourResult;
 }
 
 /**
@@ -1467,7 +1479,7 @@ function addRemind(timerRequest, message) {
  *
  * @param {Message} message a Discord message containing the request to list reminders.
  */
-function listRemind(message) {
+async function listRemind(message) {
     const user = message.author.id,
         pm_channel = message.author;
     let timer_str = 'Your reminders:';
@@ -1496,8 +1508,16 @@ function listRemind(message) {
             timer_str += `There have been ${reminder.fail} failed attempts to activate this reminder.\n`;
     });
 
-    pm_channel.send(userReminders.length ? timer_str : 'I found no reminders for you, sorry.')
-        .catch(() => Logger.error(`Reminders: notification failure for ${pm_channel.username}. Possibly blocked.`));
+    const ourResult = new CommandResult({ success: true, sentDm: false, message });
+    try {
+        await pm_channel.send(userReminders.length ? timer_str : 'I found no reminders for you, sorry.');
+        ourResult.sentDm = true;
+    } catch (err) {
+        Logger.error(`Reminders: notification failure for ${pm_channel.username}. Possibly blocked.`, err);
+        ourResult.success = false;
+        ourResult.botError = true;
+    }
+    return ourResult;
 }
 
 /**
