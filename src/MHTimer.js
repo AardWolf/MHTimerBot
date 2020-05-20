@@ -96,7 +96,7 @@ const emojis = [
 
 // A collection to hold all the commands in the commands directory
 client.commands = new Discord.Collection();
-const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
+const commandFiles = fs.readdirSync('src/commands').filter(file => file.endsWith('.js'));
 for (const file of commandFiles) {
     try {
         const command = require(`./commands/${file}`);
@@ -381,6 +381,7 @@ function loadSettings(path = main_settings_filename) {
             settings.DBGames = false;
             Logger.log('Settings: invalid value for DBGames, set to false');
         }
+        client.settings = settings;
 
         return true;
     }).catch(err => {
@@ -527,12 +528,13 @@ function parseUserMessage(message) {
     if (dynCommand) {
         if (dynCommand.args && !tokens.length) {
             const reply = 'You didn\'t provide arguments.\n' +
-                `\`${settings.botPrefix.trim()} ${dynCommand.name} ${dynCommand.usage}`;
+                `\`\`\`\n${settings.botPrefix.trim()} ${dynCommand.name} ${dynCommand.usage}\n\`\`\``;
             message.reply(reply);
         }
         else {
             try {
-                addMessageReaction(client.commands.get(dynCommand.execute(message, tokens)));
+                //TODO addMessageReaction around this
+                client.commands.get(dynCommand.execute(message, tokens));
             } catch (e) {
                 Logger.error(`Error executing dynamic command ${command.toLowerCase()}`, e);
                 try {

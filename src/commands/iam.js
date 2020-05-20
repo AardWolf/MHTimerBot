@@ -1,5 +1,6 @@
 //TODO move the setHunterID, unsetHunterID, etc into a module and require it here
-const {unsetHunterID, setHunterID, setHunterProperty } = require('../modules/hunterRegistry');
+const { unsetHunterID, setHunterID, setHunterProperty } = require('../modules/hunterRegistry');
+
 module.exports = {
     name: 'iam',
     args: true,
@@ -12,6 +13,7 @@ module.exports = {
     ].join('\n\t'),
     description: 'Identify yourself so others can find/friend you',
     execute(message, tokens) {
+
         if (!tokens.length)
             message.channel.send('Yes, you are. Provide a hunter ID number to set that.');
         else if (tokens.length === 1 && !isNaN(parseInt(tokens[0], 10)))
@@ -47,5 +49,5 @@ module.exports = {
             }
         }
 
-    }
+    },
 };

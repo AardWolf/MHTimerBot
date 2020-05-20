@@ -35,8 +35,8 @@ function setHunterID(message, hid) {
 
     // If they already registered a hunter ID, update it.
     if (message.client.hunters[discordId]['hid']) {
-        message_str = `You used to be known as \`${hunters[discordId]['hid']}\`. `;
-        Logger.log(`Hunters: Updating hid ${hunters[discordId]['hid']} to ${hid}`);
+        message_str = `You used to be known as \`${message.client.hunters[discordId]['hid']}\`. `;
+        Logger.log(`Hunters: Updating hid ${message.client.hunters[discordId]['hid']} to ${hid}`);
     }
     message.client.hunters[discordId]['hid'] = hid;
     message_str += `If people look you up they'll see \`${hid}\`.`;
