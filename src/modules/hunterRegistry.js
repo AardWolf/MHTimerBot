@@ -9,12 +9,13 @@ const Logger = require('./logger');
  */
 function unsetHunterID(message) {
     const hunter = message.author.id;
+    let response = '';
     if (message.client.hunters[hunter]) {
         delete message.client.hunters[hunter];
-        message.channel.send('*POOF*, you\'re gone!');
-    } else {
-        message.channel.send('I didn\'t do anything but that\'s because you didn\'t do anything either.');
-    }
+        response = '*POOF*, you\'re gone!';
+    } else
+        response = 'I didn\'t do anything but that\'s because you didn\'t do anything either.';
+    return response;
 }
 
 /**
@@ -41,7 +42,7 @@ function setHunterID(message, hid) {
     message.client.hunters[discordId]['hid'] = hid;
     message_str += `If people look you up they'll see \`${hid}\`.`;
 
-    message.channel.send(message_str);
+    return message_str;
 }
 
 /**
@@ -54,8 +55,7 @@ function setHunterID(message, hid) {
 function setHunterProperty(message, property, value) {
     const discordId = message.author.id;
     if (!message.client.hunters[discordId] || !message.client.hunters[discordId]['hid']) {
-        message.channel.send('I don\'t know who you are so you can\'t set that now; set your hunter ID first.');
-        return;
+        return 'I don\'t know who you are so you can\'t set that now; set your hunter ID first.';
     }
 
     let message_str = !message.client.hunters[discordId][property] ? '' :
@@ -63,7 +63,7 @@ function setHunterProperty(message, property, value) {
     message.client.hunters[discordId][property] = value;
 
     message_str += `Your ${property} is set to \`${value}\``;
-    message.channel.send(message_str);
+    return message_str;
 }
 
 exports.unsetHunterID = unsetHunterID;

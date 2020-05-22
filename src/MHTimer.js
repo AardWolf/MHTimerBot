@@ -528,13 +528,15 @@ function parseUserMessage(message) {
     if (dynCommand) {
         if (dynCommand.args && !tokens.length) {
             const reply = 'You didn\'t provide arguments.\n' +
-                `\`\`\`\n${settings.botPrefix.trim()} ${dynCommand.name} ${dynCommand.usage}\n\`\`\``;
+                `\`\`\`\n${settings.botPrefix.trim()} ${dynCommand.name}:\n` +
+                `\t${dynCommand.usage.replace('\n', '\t\n')}\n\`\`\``;
             message.reply(reply);
         }
         else {
             try {
                 //TODO addMessageReaction around this
-                client.commands.get(dynCommand.execute(message, tokens));
+                const result = dynCommand.execute(message, tokens);
+                addMessageReaction(result);
             } catch (e) {
                 Logger.error(`Error executing dynamic command ${command.toLowerCase()}`, e);
                 try {
