@@ -1583,7 +1583,9 @@ function buildSchedule(timer_request) {
  */
 function getHelpMessage(tokens) {
     // TODO: dynamic help text - iterate known keyword commands and their arguments.
-    const keywords = '`iam`, `whois`, `remind`, `next`, `find`, `ifind`, and `schedule`';
+    const keywordArray = [ 'whois', 'remind', 'next', 'find', 'ifind', 'schedule' ];
+    keywordArray.push(client.commands.map(command => command.name));
+    const keywords = oxfordStringifyValues(keywordArray.map(name => `\`${name}\``));
     const prefix = settings.botPrefix;
     if (!tokens || !tokens.length) {
         return [
@@ -1591,7 +1593,7 @@ function getHelpMessage(tokens) {
             `I know the keywords ${keywords}.`,
             `You can use \`${prefix} help <keyword>\` to get specific information about how to use it.`,
             `Example: \`${prefix} help next\` provides help about the 'next' keyword, \`${prefix} help remind\` provides help about the 'remind' keyword.`,
-            'Pro Tip: **All commands work in PM!**',
+            'Pro Tip: **Most commands work in PM!**',
         ].join('\n');
     }
 
@@ -1599,8 +1601,18 @@ function getHelpMessage(tokens) {
     const subAreaInfo = 'Sub areas are the seasons, open/close, spill ranks, and tide levels';
     const privacyWarning = '\nSetting your location and rank means that when people search for those things, you can be randomly added to the results.';
     const dbFilters = filters.reduce((acc, filter) => `${acc}\`${filter.code_name}\`, `, '') + 'and `current`';
+    const command = tokens[0].toLowerCase();
 
-    if (tokens[0] === 'next') {
+    const dynCommand = client.commands.get(command)
+        || client.commands.find(cmd => cmd.aliases && cmd.aliases.includes(command));
+    if (dynCommand) {
+        if (dynCommand.usage)
+            return `\`\`\`\n${settings.botPrefix.trim()} ${dynCommand.name}:\n` +
+                `\t${dynCommand.usage.replace('\n', '\t\n')}\n\`\`\``;
+        else
+            return `I know how to ${command} but I don't know how to tell you how to ${command}`;
+    }
+    else if (tokens[0] === 'next') {
         return [
             '**next**',
             `Usage: \`${prefix} next [<area> | <sub-area>]\` will provide a message about the next related occurrence.`,
@@ -1646,16 +1658,6 @@ function getHelpMessage(tokens) {
             `Use of \`-e <filter>\` is optional and adds a time filter. Known filters are: ${dbFilters}`,
             'All drop rate data is from <https://mhhunthelper.agiletravels.com/>.',
             'Help populate the database for better information!',
-        ].join('\n');
-    }
-    else if (tokens[0] === 'iam') {
-        return [
-            '**iam**',
-            `Usage \`${prefix} iam <####>\` will set your hunter ID. **This must be done before the other options will work.**`,
-            `  \`${prefix} iam in <location>\` will set your hunting location. Nicknames are allowed.`,
-            `  \`${prefix} iam rank <rank>\` will set your rank. Nicknames are allowed.`,
-            `  \`${prefix} iam not\` will remove you from results.`,
-            privacyWarning,
         ].join('\n');
     }
     else if (tokens[0] === 'whois') {
