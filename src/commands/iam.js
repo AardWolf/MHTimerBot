@@ -4,7 +4,7 @@ const { Message } = require('discord.js');
 
 const CommandResult = require('../interfaces/command-result');
 const Logger = require('../modules/logger');
-const { unsetHunterID, setHunterID, setHunterProperty } = require('../modules/hunterRegistry');
+const { unsetHunterID, setHunterID, setHunterProperty } = require('../modules/hunter-registry');
 
 /**
  * @param {Message} message
@@ -63,7 +63,7 @@ async function doIAM(message, tokens) {
 
 module.exports = {
     name: 'iam',
-    args: true,
+    requiresArgs: true,
     usage: [
         '#### - provide a number to set your hunter ID',
         'rank <rank> - identify your rank',

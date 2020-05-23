@@ -3,7 +3,7 @@ const test = require('tape');
 const sinon = require('sinon');
 
 // Functionality to be tested.
-const Timer = require('../../src/modules/timerClass');
+const Timer = require('../../src/modules/timers');
 
 // Stub Logger methods to minimize crosstalk.
 const Logger = require('../../src/modules/logger');

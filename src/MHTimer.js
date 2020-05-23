@@ -11,7 +11,7 @@ const fs = require('fs');
 const { Client, Collection, Guild, Message, MessageReaction, RichEmbed, TextChannel, User } = Discord;
 
 // Import our own local classes and functions.
-const Timer = require('./modules/timerClass.js');
+const Timer = require('./modules/timers.js');
 const CommandResult = require('./interfaces/command-result');
 const {
     oxfordStringifyValues,
@@ -526,7 +526,7 @@ function parseUserMessage(message) {
     const dynCommand = client.commands.get(command.toLowerCase())
         || client.commands.find(cmd => cmd.aliases && cmd.aliases.includes(command));
     if (dynCommand) {
-        if (dynCommand.args && !tokens.length) {
+        if (dynCommand.requiresArgs && !tokens.length) {
             const reply = 'You didn\'t provide arguments.\n' +
                 `\`\`\`\n${settings.botPrefix.trim()} ${dynCommand.name}:\n` +
                 `\t${dynCommand.usage.replace('\n', '\t\n')}\n\`\`\``;
