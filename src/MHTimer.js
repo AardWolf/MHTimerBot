@@ -2161,55 +2161,6 @@ function getSearchedEntity(input, values) {
     return matches.map(m => m.entity);
 }
 
-
-
-/**
- * Interrogate the local 'hunters' data object to find self-registered hunters that match the requested
- * criteria.
- *
- * @param {Message} message the Discord message that initiated this search
- * @param {string[]} searchValues an array of hids, snuids, or names/mentions to search for.
- * @param {string} type the method to use to find the member
- */
-function findHunter(message, searchValues, type) {
-    const noPM = ['hid', 'snuid', 'name'];
-    if (!message.guild && noPM.indexOf(type) !== -1) {
-        message.channel.send(`Searching by ${type} isn't allowed via PM.`);
-        return;
-    }
-
-    let discordId;
-    if (type === 'name') {
-        // Use message text or mentions to obtain the discord ID.
-        const member = message.mentions.members.first() || message.guild.members
-            .filter(member => member.displayName.toLowerCase() === searchValues[0].toLowerCase()).first();
-        if (member) {
-            // Prevent mentioning this user in our reply.
-            searchValues[0] = member.displayName;
-            // Ensure only registered hunters get a link in our reply.
-            if (getHunterByDiscordID(member.id))
-                discordId = member.id;
-        }
-    } else if (searchValues[0]) {
-        // This is self-volunteered information that is tracked.
-        discordId = getHunterByID(searchValues[0], type);
-    }
-    if (!discordId) {
-        message.channel.send(`I did not find a registered hunter with **${searchValues[0]}** as a ${type === 'hid' ? 'hunter ID' : type}.`,
-            { disableEveryone: true });
-        return;
-    }
-    // The Discord ID belongs to a registered member of this server.
-    const link = `<https://mshnt.ca/p/${getHunterByDiscordID(discordId)}>`;
-    client.fetchUser(discordId).then(user => message.guild.fetchMember(user))
-        .then(member => message.channel.send(`**${searchValues[0]}** is ${member.displayName} ${link}`,
-            { disableEveryone: true }))
-        .catch(err => {
-            Logger.error(err);
-            message.channel.send('That person may not be on this server.');
-        });
-}
-
 /**
  * Load hunter data from the input path, defaulting to the value of 'hunter_ids_filename'.
  * Returns the hunter data contained in the given file.
@@ -2299,49 +2250,6 @@ function getNicknames(type) {
         client.nicknames.set(type, newData);
         parser.end(() => Logger.log(`Nicknames: ${Object.keys(newData).length} of type '${type}' loaded.`));
     }).catch(err => Logger.error(`Nicknames: request for type '${type}' failed with error:`, err));
-}
-
-/**
- * Find the first Discord account for the user with the given input property.
- * Returns undefined if no registered user has the given property.
- *
- * @param {string} input The property value to attempt to match.
- * @param {string} type Any stored property type (typically fairly-unique ones such as 'snuid' or 'hid').
- * @returns {string?} The discord ID, or undefined if the hunter ID was not registered.
- */
-function getHunterByID(input, type) {
-    if (input)
-        for (const key in client.hunters)
-            if (client.hunters[key][type] === input)
-                return key;
-}
-
-/**
- * Find the self-registered account for the user identified by the given Discord ID.
- * Returns undefined if the user has not self-registered.
- *
- * @param {string} discordId the Discord ID of a registered hunter.
- * @returns {string?} the hunter ID of the registered hunter having that Discord ID.
- */
-function getHunterByDiscordID(discordId) {
-    if (client.hunters[discordId])
-        return client.hunters[discordId]['hid'];
-}
-
-/**
- * Find random hunter ids to befriend, based on the desired property and criterion.
- *
- * @param {string} property a hunter attribute, like "location" or "rank"
- * @param {string} criterion user-entered input.
- * @param {number} limit the maximum number of hunters to return.
- * @returns {string[]} an array of up to 5 hunter ids where the property value matched the user's criterion
- */
-function getHuntersByProperty(property, criterion, limit = 5) {
-    const valid = Object.keys(client.hunters)
-        .filter(key => client.hunters[key][property] === criterion)
-        .map(key => client.hunters[key].hid);
-
-    return valid.sort(() => 0.5 - Math.random()).slice(0, limit);
 }
 
 /**
