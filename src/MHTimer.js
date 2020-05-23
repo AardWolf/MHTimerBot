@@ -34,7 +34,7 @@ const { URLSearchParams } = require('url');
 const csv_parse = require('csv-parse');
 
 // Globals
-const client = new Discord.Client({ disabledEvents: ['TYPING_START'] });
+const client = new Client({ disabledEvents: ['TYPING_START'] });
 const textChannelTypes = new Set(['text', 'dm', 'group']);
 const main_settings_filename = 'data/settings.json',
     timer_settings_filename = 'data/timer_settings.json',
@@ -95,7 +95,7 @@ const emojis = [
 ];
 
 // A collection to hold all the commands in the commands directory
-client.commands = new Discord.Collection();
+client.commands = new Collection();
 const commandFiles = fs.readdirSync('src/commands').filter(file => file.endsWith('.js'));
 for (const file of commandFiles) {
     try {
@@ -533,18 +533,23 @@ function parseUserMessage(message) {
             message.reply(reply);
         }
         else {
-            try {
-                //TODO addMessageReaction around this
-                const result = dynCommand.execute(message, tokens);
-                addMessageReaction(result);
-            } catch (e) {
-                Logger.error(`Error executing dynamic command ${command.toLowerCase()}`, e);
-                try {
-                    message.reply(`Sorry, I couldn't do ${command.toLowerCase()} for ... reasons.`);
-                } catch (e) {
-                    Logger.error('Furthermore, replying caused more problems.', e);
-                }
-            }
+            // Wrap in a promise, in case the dynamic command does not return a promise / is not async.
+            Promise.resolve(dynCommand.execute(message, tokens))
+                // Ideally our dynamic commands will never throw (i.e. they will catch and handle any errors
+                // that occur during their execution) and instead just return the appropriate command result.
+                // In case they leak an exception, catch it here.
+                .catch((commandErr) => {
+                    Logger.error(`Error executing dynamic command ${command.toLowerCase()}`, commandErr);
+                    return message.reply(`Sorry, I couldn't do ${command.toLowerCase()} for ... reasons.`)
+                        .then(() => new CommandResult({ replied: true, botError: true, message }))
+                        .catch((replyErr) => {
+                            Logger.error('Furthermore, replying caused more problems.', replyErr);
+                            return new CommandResult({ botError: true, message });
+                        });
+                })
+                // Whether or not there was an exception executing the command, we now have a CommandResult
+                // we can process further.
+                .then((cmdResult) => addMessageReaction(cmdResult));
         }
     }
     else
@@ -1113,7 +1118,7 @@ function nextTimer(validTimerData) {
                 nextTimer = timer;
 
     const sched_syntax = `${settings.botPrefix} remind ${area}${sub ? ` ${sub}` : ''}`;
-    return (new Discord.RichEmbed()
+    return (new RichEmbed()
         .setDescription(nextTimer.getDemand()
             + `\n${timeLeft(nextTimer.getNext())}`
             // Putting here makes it look nicer and fit in portrait mode
@@ -1315,7 +1320,7 @@ function sendRemind(user, remind, timer) {
     if (remind.count === 0)
         return;
     // TODO: better timer title info - no markdown formatting in the title.
-    const output = new Discord.RichEmbed({ title: timer.getAnnouncement() });
+    const output = new RichEmbed({ title: timer.getAnnouncement() });
 
     if (timer.getArea() === 'relic_hunter') {
         output.addField('Current Location', `She's in **${relic_hunter.location}**`, true);
@@ -2080,7 +2085,7 @@ function sendInteractiveSearchResult(searchResults, channel, dataCallback, isDM,
     // Associate each search result with a "numeric" emoji.
     const matches = searchResults.map((sr, i) => ({ emojiId: emojis[i].id, match: sr }));
     // Construct a RichEmbed with the search result information, unless this is for a PM with a single response.
-    const embed = new Discord.RichEmbed({
+    const embed = new RichEmbed({
         title: `Search Results for '${searchInput}'`,
         thumbnail: { url: 'https://cdn.discordapp.com/emojis/359244526688141312.png' }, // :clue:
         footer: { text: `For any reaction you select, I'll ${isDM ? 'send' : 'PM'} you that information.` },

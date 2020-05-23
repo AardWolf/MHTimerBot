@@ -1,8 +1,17 @@
+// Type-hinting imports
+// eslint-disable-next-line no-unused-vars
+const { Message } = require('discord.js');
+
 const CommandResult = require('../interfaces/command-result');
+const Logger = require('../modules/logger');
 const { unsetHunterID, setHunterID, setHunterProperty } = require('../modules/hunterRegistry');
 
-function doIAM(message, tokens) {
-    const theResult = new CommandResult({ message: message, success: false });
+/**
+ * @param {Message} message
+ * @param {string[]} tokens
+ */
+async function doIAM(message, tokens) {
+    const theResult = new CommandResult({ message, success: false });
     let reply = '';
     if (!tokens.length)
         reply = 'Yes, you are. Provide a hunter ID number to set that.';
@@ -39,10 +48,15 @@ function doIAM(message, tokens) {
         }
     }
     if (reply) {
-        message.channel.send(reply, { split: true })
-            .then(theResult.replied = true)
-            .then(theResult.success = true)
-            .catch(theResult.success = false);
+        try {
+            await message.channel.send(reply, { split: true });
+            theResult.replied = true;
+            if (message.channel.type === 'dm') theResult.sentDm = true;
+            theResult.success = true;
+        } catch (err) {
+            Logger.error('IAM: failed to send reply', err);
+            theResult.botError = true;
+        }
     }
     return theResult;
 }
