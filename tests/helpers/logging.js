@@ -1,3 +1,6 @@
+// Provide an easy way for test suites to intercept calls to the logging library.
+// To use, a suite can store the result of calling `stubLogger` in a setup "test",
+// and then pass this result to `restoreLogger` in a cleanup "test".
 const sinon = require('sinon');
 const Logger = require('../../src/modules/logger');
 
