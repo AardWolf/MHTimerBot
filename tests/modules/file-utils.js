@@ -4,17 +4,7 @@ const sinon = require('sinon');
 
 // Stub IO
 const fs = require('fs');
-const Logger = require('../../src/modules/logger');
-const stubLogger = () => {
-    return {
-        log: sinon.stub(Logger, 'log'),
-        warn: sinon.stub(Logger, 'warn'),
-        error: sinon.stub(Logger, 'error'),
-    };
-};
-const restoreLogger = ({ ...stubs }) => {
-    Object.values(stubs).forEach(stub => stub.restore());
-};
+const { stubLogger, restoreLogger } = require('../helpers/logging');
 let logStubs;
 
 // Functionality to be tested.
