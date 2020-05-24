@@ -4,9 +4,8 @@ const { Message } = require('discord.js');
 
 const Logger = require('./logger');
 
-
 /**
- * Unsets the hunter's id (and all other friend-related settings), and messages the user back.
+ * Unset the hunter's id (and all other friend-related settings), and messages the user back.
  * Currently all settings are friend-related.
  *
  * @param {Message} message A Discord message object
@@ -119,7 +118,7 @@ function getHunterByID(message, input, type) {
 
 /**
  * Interrogate the local 'hunters' data object to find self-registered hunters that match the requested
- * criteria.
+ * criteria. NOTE: Handles sending of messages
  *
  * @param {Message} message the Discord message that initiated this search
  * @param {string[]} searchValues an array of hids, snuids, or names/mentions to search for.
@@ -154,7 +153,7 @@ function findHunter(message, searchValues, type) {
         return;
     }
     // The Discord ID belongs to a registered member of this server.
-    const link = `<https://mshnt.ca/p/${getHunterByDiscordID(discordId)}>`;
+    const link = `https://mshnt.ca/p/${getHunterByDiscordID(message, discordId)}`;
     message.client.fetchUser(discordId).then(user => message.guild.fetchMember(user))
         .then(member => message.channel.send(`**${searchValues[0]}** is ${member.displayName} ${link}`,
             { disableEveryone: true }))

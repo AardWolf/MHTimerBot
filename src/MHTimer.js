@@ -109,6 +109,7 @@ for (const file of commandFiles) {
         Logger.error(`Could not load ${file}:`, e);
     }
 }
+Logger.log(`Commands: Loaded ${client.commands.size} commands: ${oxfordStringifyValues(client.commands.map(command => command.name))}`);
 
 process.once('SIGINT', () => {
     client.destroy();
@@ -634,68 +635,6 @@ function parseUserMessage(message) {
                         findItem(message.channel, criteria, 'ifind');
                 }
                 break;
-
-            /**
-             * Display volunteered information about known users. Handled inputs:
-             * -mh whois ####                   -> hid lookup (No PM)
-             * -mh whois snuid ####             -> snuid lookup (No PM)
-             * -mh whois <word/@mention>        -> name lookup (No PM)
-             * -mh whois in <words>             -> area lookup
-             * -mh whois [rank|title|a] <words> -> random query lookup
-             */
-            case 'whois': {
-                if (!tokens.length) {
-                    message.channel.send('Who\'s who? Who\'s on first?');
-                    return;
-                }
-
-                let searchType = tokens.shift().toLowerCase();
-                if (!isNaN(parseInt(searchType, 10))) {
-                    // hid lookup of 1 or more IDs.
-                    tokens.unshift(searchType);
-                    findHunter(message, tokens, 'hid');
-                    return;
-                } else if (searchType.substring(0, 3) === 'snu') {
-                    // snuid lookup of 1 or more IDs.
-                    findHunter(message, tokens, 'snuid');
-                    return;
-                } else if (!tokens.length) {
-                    // Display name or user mention lookup.
-                    tokens.unshift(searchType);
-                    findHunter(message, tokens, 'name');
-                    return;
-                } else {
-                    // Rank or location lookup. tokens[] contains the terms to search
-                    let search = tokens.join(' ').toLowerCase();
-                    if (searchType === 'in') {
-                        if (nicknames.get('locations')[search]) {
-                            search = nicknames.get('locations')[search];
-                        }
-                        searchType = 'location';
-                    } else if (['rank', 'title', 'a', 'an'].indexOf(searchType) !== -1) {
-                        if (nicknames.get('ranks')[search]) {
-                            search = nicknames.get('ranks')[search];
-                        }
-                        searchType = 'rank';
-                    } else {
-                        const prefix = settings.botPrefix;
-                        const commandSyntax = [
-                            'I\'m not sure what to do with that. Try:',
-                            `\`${prefix} whois [#### | <mention>]\` to look up specific hunters`,
-                            `\`${prefix} whois [in <location> | a <rank>]\` to find up to 5 random new friends`,
-                        ];
-                        message.channel.send(commandSyntax.join('\n\t'));
-                        return;
-                    }
-                    const hunters = getHuntersByProperty(searchType, search);
-                    message.channel.send(hunters.length
-                        // eslint-disable-next-line no-useless-escape
-                        ? `${hunters.length} random hunters: \`${hunters.join('\`, \`')}\``
-                        : `I couldn't find any hunters with \`${searchType}\` matching \`${search}\``,
-                    );
-                }
-                break;
-            }
             case 'reset':
                 if (message.author.id === settings.owner) {
                     if (!tokens.length) {
@@ -1587,7 +1526,6 @@ function buildSchedule(timer_request) {
  * @returns {string} The desired help text.
  */
 function getHelpMessage(tokens) {
-    // TODO: dynamic help text - iterate known keyword commands and their arguments.
     const keywordArray = [ 'whois', 'remind', 'next', 'find', 'ifind', 'schedule' ];
     keywordArray.push(client.commands.map(command => command.name));
     const keywords = oxfordStringifyValues(keywordArray.map(name => `\`${name}\``));
@@ -1604,7 +1542,6 @@ function getHelpMessage(tokens) {
 
     const areaInfo = 'Areas are Seasonal Garden (**sg**), Forbidden Grove (**fg**), Toxic Spill (**ts**), Balack\'s Cove (**cove**), and the daily **reset**.';
     const subAreaInfo = 'Sub areas are the seasons, open/close, spill ranks, and tide levels';
-    const privacyWarning = '\nSetting your location and rank means that when people search for those things, you can be randomly added to the results.';
     const dbFilters = filters.reduce((acc, filter) => `${acc}\`${filter.code_name}\`, `, '') + 'and `current`';
     const command = tokens[0].toLowerCase();
 
@@ -1663,16 +1600,6 @@ function getHelpMessage(tokens) {
             `Use of \`-e <filter>\` is optional and adds a time filter. Known filters are: ${dbFilters}`,
             'All drop rate data is from <https://mhhunthelper.agiletravels.com/>.',
             'Help populate the database for better information!',
-        ].join('\n');
-    }
-    else if (tokens[0] === 'whois') {
-        return [
-            '**whois**',
-            `Usage \`${prefix} whois <####>\` will try to look up a Discord user by MH ID. Only works if they set their ID.`,
-            `  \`${prefix} whois <user>\` will try to look up a hunter ID based on a user in the server.`,
-            `  \`${prefix} whois in <location>\` will find up to 5 random hunters in that location.`,
-            `  \`${prefix} whois rank <rank>\` will find up to 5 random hunters with that rank.`,
-            privacyWarning,
         ].join('\n');
     }
     else
