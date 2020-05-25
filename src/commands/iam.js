@@ -4,7 +4,7 @@ const { Message } = require('discord.js');
 
 const CommandResult = require('../interfaces/command-result');
 const Logger = require('../modules/logger');
-const { unsetHunterID, setHunterID, setHunterProperty } = require('../modules/hunter-registry');
+const { unsetHunterID, setHunterID, setHunterProperty, initialize, save } = require('../modules/hunter-registry');
 
 /**
  * @param {Message} message
@@ -73,4 +73,6 @@ module.exports = {
     ].join('\n\t'),
     description: 'Identify yourself so others can find/friend you',
     execute: doIAM,
+    initialize: initialize,
+    save: save,
 };

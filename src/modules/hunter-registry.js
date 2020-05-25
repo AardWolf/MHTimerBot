@@ -1,8 +1,94 @@
 // Type-hinting imports
 // eslint-disable-next-line no-unused-vars
 const { Message } = require('discord.js');
+// eslint-disable-next-line no-unused-vars
+const version = 1.00;
+const { DateTime, Duration } = require('luxon');
 
 const Logger = require('./logger');
+const { loadDataFromJSON, saveDataAsJSON } = require('../modules/file-utils');
+const hunter_ids_filename = 'data/hunters.json';
+const hunters = {};
+// eslint-disable-next-line no-unused-vars
+let last_save_time = DateTime.utc();
+// eslint-disable-next-line no-unused-vars
+let hunterSaveInterval;
+const save_frequency = Duration.fromObject({ minutes: 5 });
+
+/**
+ * Meant to be called when commands that muck with the hunter registry get loaded
+ *
+ * @returns {Promise<boolean>}
+ */
+async function initialize() {
+    if (Object.keys(hunters).length > 0) {
+        Logger.log('Hunters already loaded');
+        return true;
+    }
+    const hasHunters = loadHunterData()
+        .then(hunterData => {
+            Object.assign(hunters, hunterData);
+            Logger.log(`Hunters: imported ${Object.keys(hunterData).length} from file.`);
+            return Object.keys(hunters).length > 0;
+        });
+    hasHunters.then(() => migrateData())
+        .then(() => {
+            Logger.log(`Hunters: Configuring save every ${save_frequency / (60 * 1000)} min.`);
+            hunterSaveInterval = setInterval(saveHunters, save_frequency);
+        });
+}
+
+/**
+ * Function that is called when the bot is shutting down or unloading a command
+ */
+async function save() {
+    saveHunters().catch((err) => {
+        Logger.error(`Error saving hunters on save call: ${err}`);
+    });
+    return true;
+}
+
+/**
+ * Checks the saved version of the hunters object with the current version and performs upgrades if needed
+ */
+function migrateData() {
+    if (Object.keys(hunters).length === 0) {
+        return false;
+    }
+    if (!hunters.version) {
+        //First version of the object is version 1.
+        hunters.version = 1.00;
+    }
+}
+
+/**
+ * Load hunter data from the input path, defaulting to the value of 'hunter_ids_filename'.
+ * Returns the hunter data contained in the given file.
+ *
+ * @param {string} [path] The path to a JSON file to read data from. Default is the 'hunter_ids_filename'.
+ * @returns {Promise <{}>} Data from the given file, as an object to be consumed by the caller.
+ */
+async function loadHunterData(path = hunter_ids_filename) {
+    return loadDataFromJSON(path).catch(err => {
+        Logger.error(`Hunters: Error loading data from '${path}':\n`, err);
+        return {};
+    });
+}
+
+/**
+ * Serialize the hunters object to the given path, defaulting to the value of 'hunter_ids_filename'
+ *
+ * @param {string} [path] The path to a file to write JSON data to. Default is the 'hunter_ids_filename'.
+ * @returns {Promise <boolean>} Whether the save operation completed without error.
+ */
+async function saveHunters(path = hunter_ids_filename) {
+    return saveDataAsJSON(path, hunters).then(didSave => {
+        Logger.log(`Hunters: ${didSave ? 'Saved' : 'Failed to save'} ${Object.keys(hunters).length} to '${path}'.`);
+        last_save_time = DateTime.utc();
+        return didSave;
+    });
+}
+
 
 /**
  * Unset the hunter's id (and all other friend-related settings), and messages the user back.
@@ -13,8 +99,8 @@ const Logger = require('./logger');
 function unsetHunterID(message) {
     const hunter = message.author.id;
     let response = '';
-    if (message.client.hunters[hunter]) {
-        delete message.client.hunters[hunter];
+    if (hunters[hunter]) {
+        delete hunters[hunter];
         response = '*POOF*, you\'re gone!';
     } else
         response = 'I didn\'t do anything but that\'s because you didn\'t do anything either.';
@@ -32,17 +118,17 @@ function setHunterID(message, hid) {
     let message_str = '';
 
     // Initialize the data for any new registrants.
-    if (!message.client.hunters[discordId]) {
-        message.client.hunters[discordId] = {};
+    if (!hunters[discordId]) {
+        hunters[discordId] = {};
         Logger.log(`Hunters: OMG! A new hunter id '${discordId}'`);
     }
 
     // If they already registered a hunter ID, update it.
-    if (message.client.hunters[discordId]['hid']) {
-        message_str = `You used to be known as \`${message.client.hunters[discordId]['hid']}\`. `;
-        Logger.log(`Hunters: Updating hid ${message.client.hunters[discordId]['hid']} to ${hid}`);
+    if (hunters[discordId]['hid']) {
+        message_str = `You used to be known as \`${hunters[discordId]['hid']}\`. `;
+        Logger.log(`Hunters: Updating hid ${hunters[discordId]['hid']} to ${hid}`);
     }
-    message.client.hunters[discordId]['hid'] = hid;
+    hunters[discordId]['hid'] = hid;
     message_str += `If people look you up they'll see \`${hid}\`.`;
 
     return message_str;
@@ -57,13 +143,13 @@ function setHunterID(message, hid) {
  */
 function setHunterProperty(message, property, value) {
     const discordId = message.author.id;
-    if (!message.client.hunters[discordId] || !message.client.hunters[discordId]['hid']) {
+    if (!hunters[discordId] || !hunters[discordId]['hid']) {
         return 'I don\'t know who you are so you can\'t set that now; set your hunter ID first.';
     }
 
-    let message_str = !message.client.hunters[discordId][property] ? '' :
-        `Your ${property} used to be \`${message.client.hunters[discordId][property]}\`. `;
-    message.client.hunters[discordId][property] = value;
+    let message_str = !hunters[discordId][property] ? '' :
+        `Your ${property} used to be \`${hunters[discordId][property]}\`. `;
+    hunters[discordId][property] = value;
 
     message_str += `Your ${property} is set to \`${value}\``;
     return message_str;
@@ -79,9 +165,9 @@ function setHunterProperty(message, property, value) {
  * @returns {string[]} an array of up to 5 hunter ids where the property value matched the user's criterion
  */
 function getHuntersByProperty(message, property, criterion, limit = 5) {
-    const valid = Object.keys(message.client.hunters)
-        .filter(key => message.client.hunters[key][property] === criterion)
-        .map(key => message.client.hunters[key].hid);
+    const valid = Object.keys(hunters)
+        .filter(key => hunters[key][property] === criterion)
+        .map(key => hunters[key].hid);
 
     return valid.sort(() => 0.5 - Math.random()).slice(0, limit);
 }
@@ -95,8 +181,8 @@ function getHuntersByProperty(message, property, criterion, limit = 5) {
  * @returns {string?} the hunter ID of the registered hunter having that Discord ID.
  */
 function getHunterByDiscordID(message, discordId) {
-    if (message.client.hunters[discordId])
-        return message.client.hunters[discordId]['hid'];
+    if (hunters[discordId])
+        return hunters[discordId]['hid'];
 }
 
 /**
@@ -110,8 +196,8 @@ function getHunterByDiscordID(message, discordId) {
  */
 function getHunterByID(message, input, type) {
     if (input)
-        for (const key in message.client.hunters)
-            if (message.client.hunters[key][type] === input)
+        for (const key in hunters)
+            if (hunters[key][type] === input)
                 return key;
 }
 
@@ -168,3 +254,5 @@ exports.getHuntersByProperty = getHuntersByProperty;
 exports.unsetHunterID = unsetHunterID;
 exports.setHunterID = setHunterID;
 exports.setHunterProperty = setHunterProperty;
+exports.initialize = initialize;
+exports.save = save;

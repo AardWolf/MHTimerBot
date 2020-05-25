@@ -1,5 +1,5 @@
 const CommandResult = require('../interfaces/command-result');
-const { findHunter, getHuntersByProperty } = require('../modules/hunter-registry');
+const { findHunter, getHuntersByProperty, initialize } = require('../modules/hunter-registry');
 const Logger = require('../modules/logger');
 
 async function WHOIS(message, tokens) {
@@ -95,4 +95,5 @@ module.exports = {
     ].join('\n\t'),
     description: 'Identify yourself so others can find/friend you',
     execute: WHOIS,
+    initialize: initialize,
 };

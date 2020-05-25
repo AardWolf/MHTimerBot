@@ -38,18 +38,14 @@ const client = new Client({ disabledEvents: ['TYPING_START'] });
 const textChannelTypes = new Set(['text', 'dm', 'group']);
 const main_settings_filename = 'data/settings.json',
     timer_settings_filename = 'data/timer_settings.json',
-    hunter_ids_filename = 'data/hunters.json',
     reminder_filename = 'data/reminders.json',
     dbgames_filename = 'data/dbgames_locations.json',
     nickname_urls_filename = 'data/nicknames.json';
 
-client.hunters = {};
 const settings = {},
     mice = [],
     items = [],
     filters = [],
-    // Moved hunters objects to client object
-    // hunters = {},
     dbgames_locations = {},
     relic_hunter = {
         location: 'unknown',
@@ -101,6 +97,12 @@ for (const file of commandFiles) {
     try {
         const command = require(`./commands/${file}`);
         if (command.name) {
+            if (command.initialize) {
+                command.initialize().catch((err) => {
+                    Logger.error(`Error initializing ${command.name}: ${err}`);
+                    throw err;
+                });
+            }
             client.commands.set(command.name, command);
         } else {
             Logger.error(`Error in ${file}: Command name property is missing`);
@@ -165,19 +167,6 @@ function Main() {
                     pruneExpiredReminders();
                     saveReminders();
                 }, saveInterval);
-            });
-
-            // Create hunters data from the hunters file.
-            const hasHunters = loadHunterData()
-                .then(hunterData => {
-                    Object.assign(client.hunters, hunterData);
-                    Logger.log(`Hunters: imported ${Object.keys(hunterData).length} from file.`);
-                    return Object.keys(client.hunters).length > 0;
-                })
-                .catch(err => failedLoad('Hunters: import error:\n', err));
-            hasHunters.then(() => {
-                Logger.log(`Hunters: Configuring save every ${saveInterval / (60 * 1000)} min.`);
-                dataTimers['hunters'] = setInterval(saveHunters, saveInterval);
             });
 
             // Register known nickname URIs
@@ -288,7 +277,6 @@ function Main() {
             // prior to bot login.
             return Promise.all([
                 hasFilters,
-                hasHunters,
                 hasNicknames,
                 hasReminders,
                 hasTimers,
@@ -345,8 +333,12 @@ function quit() {
  * @returns {boolean} Whether volatile data was serialized, or perhaps not serialized.
  */
 function doSaveAll() {
-    return saveHunters()
-        .then(() => saveReminders());
+    //TODO: This will call all commands with registered save functions
+
+    client.commands.filter(command => command.save).every((command => {
+        return command.save;
+    }));
+    return (saveReminders());
 }
 
 
@@ -569,7 +561,6 @@ function parseUserMessage(message) {
                     switch (tokens[0].toLowerCase()) {
                         case 'ronza':
                             message.channel.send('Don\'t let aardwolf see you ask or you\'ll get muted');
-                            // TODO: increment hunters[id] info? "X has delayed ronza by N years for asking M times"
                             break;
                         default:
                             message.channel.send(aboutTimers);
@@ -2086,34 +2077,6 @@ function getSearchedEntity(input, values) {
     // Keep only the top 10 results.
     matches.splice(10);
     return matches.map(m => m.entity);
-}
-
-/**
- * Load hunter data from the input path, defaulting to the value of 'hunter_ids_filename'.
- * Returns the hunter data contained in the given file.
- *
- * @param {string} [path] The path to a JSON file to read data from. Default is the 'hunter_ids_filename'.
- * @returns {Promise <{}>} Data from the given file, as an object to be consumed by the caller.
- */
-function loadHunterData(path = hunter_ids_filename) {
-    return loadDataFromJSON(path).catch(err => {
-        Logger.error(`Hunters: Error loading data from '${path}':\n`, err);
-        return {};
-    });
-}
-
-/**
- * Serialize the hunters object to the given path, defaulting to the value of 'hunter_ids_filename'
- *
- * @param {string} [path] The path to a file to write JSON data to. Default is the 'hunter_ids_filename'.
- * @returns {Promise <boolean>} Whether the save operation completed without error.
- */
-function saveHunters(path = hunter_ids_filename) {
-    return saveDataAsJSON(path, client.hunters).then(didSave => {
-        Logger.log(`Hunters: ${didSave ? 'Saved' : 'Failed to save'} ${Object.keys(client.hunters).length} to '${path}'.`);
-        last_timestamps.hunter_save = DateTime.utc();
-        return didSave;
-    });
 }
 
 /**
