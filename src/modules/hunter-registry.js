@@ -8,12 +8,11 @@ const { DateTime, Duration } = require('luxon');
 const Logger = require('./logger');
 const { loadDataFromJSON, saveDataAsJSON } = require('../modules/file-utils');
 const hunter_ids_filename = 'data/hunters.json';
-const hunters = {};
+const hunters = require('../../data/hunters.json');
 // eslint-disable-next-line no-unused-vars
 let last_save_time = DateTime.utc();
-// eslint-disable-next-line no-unused-vars
-let hunterSaveInterval;
 const save_frequency = Duration.fromObject({ minutes: 5 });
+let hunterSaveInterval = setInterval(saveHunters, save_frequency);
 
 /**
  * Meant to be called when commands that muck with the hunter registry get loaded
@@ -42,9 +41,13 @@ async function initialize() {
  * Function that is called when the bot is shutting down or unloading a command
  */
 async function save() {
-    saveHunters().catch((err) => {
+    Logger.log('hunter save called');
+    try {
+        await saveHunters();
+        clearInterval(hunterSaveInterval);
+    } catch (err) {
         Logger.error(`Error saving hunters on save call: ${err}`);
-    });
+    }
     return true;
 }
 
@@ -82,6 +85,7 @@ async function loadHunterData(path = hunter_ids_filename) {
  * @returns {Promise <boolean>} Whether the save operation completed without error.
  */
 async function saveHunters(path = hunter_ids_filename) {
+    Logger.log('Attempting to save hunter data');
     return saveDataAsJSON(path, hunters).then(didSave => {
         Logger.log(`Hunters: ${didSave ? 'Saved' : 'Failed to save'} ${Object.keys(hunters).length} to '${path}'.`);
         last_save_time = DateTime.utc();

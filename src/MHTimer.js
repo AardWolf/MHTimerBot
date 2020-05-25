@@ -333,10 +333,10 @@ function quit() {
  * @returns {boolean} Whether volatile data was serialized, or perhaps not serialized.
  */
 function doSaveAll() {
-    //TODO: This will call all commands with registered save functions
-
+    //TODO This is not currently saving hunter data (iam) even though it says it's trying to
     client.commands.filter(command => command.save).every((command => {
-        return command.save;
+        Logger.log(`Saving ${command.name}`);
+        Promise.resolve(command.save);
     }));
     return (saveReminders());
 }
