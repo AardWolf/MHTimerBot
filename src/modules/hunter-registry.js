@@ -126,7 +126,7 @@ function getHunterByID(message, input, type) {
  */
 function findHunter(message, searchValues, type) {
     const noPM = ['hid', 'snuid', 'name'];
-    if (!message.guild && noPM.indexOf(type) !== -1) {
+    if (message.channel.type === 'dm' && noPM.indexOf(type) !== -1) {
         message.channel.send(`Searching by ${type} isn't allowed via PM.`);
         return;
     }

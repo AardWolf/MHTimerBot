@@ -1,8 +1,9 @@
 const CommandResult = require('../interfaces/command-result');
 const { findHunter, getHuntersByProperty } = require('../modules/hunter-registry');
+const Logger = require('../modules/logger');
 
-function WHOIS(message, tokens) {
-    const theResult = new CommandResult({ message: message, success: true });
+async function WHOIS(message, tokens) {
+    const theResult = new CommandResult({ message, success: false });
     let reply = '';
     if (!tokens.length)
         reply = 'Who\'s who? Who\'s on first?';
@@ -14,15 +15,18 @@ function WHOIS(message, tokens) {
             tokens.unshift(searchType);
             findHunter(message, tokens, 'hid');
             theResult.replied = true;
-        } else if (searchType.substring(0, 3) === 'snu') {
+            theResult.success = true;
+        } else if (searchType.substring(0, 3) === 'snu' && tokens.length >= 1) {
             // snuid lookup of 1 or more IDs.
             findHunter(message, tokens, 'snuid');
             theResult.replied = true;
+            theResult.success = true;
         } else if (!tokens.length) {
             // Display name or user mention lookup.
             tokens.unshift(searchType);
             findHunter(message, tokens, 'name');
             theResult.replied = true;
+            theResult.success = true;
         } else {
             // Rank or location lookup. tokens[] contains the terms to search
             let search = tokens.join(' ').toLowerCase();
@@ -37,7 +41,7 @@ function WHOIS(message, tokens) {
                 }
                 searchType = 'rank';
             } else {
-                const prefix = message.settings.botPrefix;
+                const prefix = message.client.settings.botPrefix;
                 const commandSyntax = [
                     'I\'m not sure what to do with that. Try:',
                     `\`${prefix} whois [#### | <mention>]\` to look up specific hunters`,
@@ -47,7 +51,8 @@ function WHOIS(message, tokens) {
                 failed = true;
             }
             if (!failed) {
-                const hunters = getHuntersByProperty(message, searchType, search);
+                //TODO remove the array concat that was added because I got frustrated with tests
+                const hunters = [].concat(getHuntersByProperty(message, searchType, search) || []);
                 reply = hunters.length
                     // eslint-disable-next-line no-useless-escape
                     ? `${hunters.length} random hunters: \`${hunters.join('\`, \`')}\``
@@ -56,10 +61,15 @@ function WHOIS(message, tokens) {
         }
     }
     if (reply) {
-        message.channel.send(reply, { split: true })
-            .then(theResult.replied = true)
-            .then(theResult.success = true)
-            .catch(theResult.success = false);
+        try {
+            await message.channel.send(reply, { split: true });
+            theResult.replied = true;
+            if (message.channel.type === 'dm') theResult.sentDm = true;
+            theResult.success = true;
+        } catch (err) {
+            Logger.error('WHOIS: failed to send reply', err);
+            theResult.botError = true;
+        }
     }
     return theResult;
 }

@@ -15,10 +15,11 @@ const mockMessage = ({
     reactStub = sinon.stub(),
     replyStub = sinon.stub(),
     sendStub = sinon.stub(),
+    nicknameGetStub = sinon.stub().returns([1,2,3]),
     authorId = '123456789',
     clientStub = {},
 } = {}) => {
-    const clientWithSettings = Object.assign({}, { settings: { botPrefix: '-mh' } }, clientStub);
+    const clientWithSettings = Object.assign({}, { settings: { botPrefix: '-mh' }, nicknames: { get: nicknameGetStub } }, clientStub);
     const stub = {
         client: clientWithSettings,
         author: { id: authorId },
