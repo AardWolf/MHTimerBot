@@ -22,7 +22,8 @@ async function WHOIS(message, tokens) {
             theResult.replied = true;
             theResult.success = true;
         } else if (!tokens.length) {
-            // Display name or user mention lookup.
+            // Display name or user mention lookup, so restore the "searchType",
+            // which is actually the name or user mention to look up.
             tokens.unshift(searchType);
             findHunter(message, tokens, 'name');
             theResult.replied = true;
@@ -35,7 +36,7 @@ async function WHOIS(message, tokens) {
                     search = message.client.nicknames.get('locations')[search];
                 }
                 searchType = 'location';
-            } else if (['rank', 'title', 'a', 'an'].indexOf(searchType) !== -1) {
+            } else if (['rank', 'title', 'a', 'an'].includes(searchType)) {
                 if (message.client.nicknames.get('ranks')[search]) {
                     search = message.client.nicknames.get('ranks')[search];
                 }
@@ -51,8 +52,7 @@ async function WHOIS(message, tokens) {
                 failed = true;
             }
             if (!failed) {
-                //TODO remove the array concat that was added because I got frustrated with tests
-                const hunters = [].concat(getHuntersByProperty(message, searchType, search) || []);
+                const hunters = getHuntersByProperty(message, searchType, search);
                 reply = hunters.length
                     // eslint-disable-next-line no-useless-escape
                     ? `${hunters.length} random hunters: \`${hunters.join('\`, \`')}\``

@@ -15,11 +15,20 @@ const mockMessage = ({
     reactStub = sinon.stub(),
     replyStub = sinon.stub(),
     sendStub = sinon.stub(),
-    nicknameGetStub = sinon.stub().returns([1,2,3]),
+    locationNicknames = {},
+    rankNicknames = {},
     authorId = '123456789',
     clientStub = {},
 } = {}) => {
-    const clientWithSettings = Object.assign({}, { settings: { botPrefix: '-mh' }, nicknames: { get: nicknameGetStub } }, clientStub);
+    // Stub the client, and its nicknames Map.
+    const baseClient = {
+        settings: { botPrefix: '-mh' },
+        nicknames: { get: sinon.stub().returns({}) }, // Return an empty mapping object by default.
+    };
+    baseClient.nicknames.get.withArgs('locations').returns(locationNicknames);
+    baseClient.nicknames.get.withArgs('ranks').returns(rankNicknames);
+    const clientWithSettings = Object.assign({}, baseClient, clientStub);
+
     const stub = {
         client: clientWithSettings,
         author: { id: authorId },

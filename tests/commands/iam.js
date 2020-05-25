@@ -5,7 +5,7 @@ const sinon = require('sinon');
 const { stubLogger, restoreLogger } = require('../helpers/logging');
 // Stub hunter registry methods.
 const { stubHunterRegistry, restoreHunterRegistry } = require('../helpers/hunters');
-// We need a decently realistic Message stub
+// We need a decently realistic Message stub.
 const mockMessage = require('../helpers/mock-message');
 
 // Declaration of what we're testing.
@@ -26,17 +26,19 @@ test('commands - IAM', suite => {
 
     suite.test('when channel#send fails - logs error', async t => {
         t.plan(3);
+
         const messageStub = mockMessage({ sendStub: sinon.stub().rejects(Error('oops!')) });
         await IAM.execute(messageStub, []);
         t.strictEqual(logStubs.error.callCount, 1, 'should log error');
         const [description, err] = logStubs.error.getCall(0).args;
         t.match(description, /failed to send/, 'should indicate error source');
-        t.match(err.message, /oops!/, 'should log error from Message#react');
+        t.match(err.message, /oops!/, 'should log error from Message.channel#send');
 
         sinon.reset();
     });
     suite.test('when channel#send fails - flags bot error', async t => {
         t.plan(1);
+
         const messageStub = mockMessage({ sendStub: sinon.stub().rejects(Error('oops!')) });
         const result = await IAM.execute(messageStub, []);
         t.true(result.botError, 'should indicate bot error');
@@ -45,6 +47,7 @@ test('commands - IAM', suite => {
     });
     suite.test('when called with exactly "not" - calls unsetHunterID', async t => {
         t.plan(1);
+
         const messageStub = mockMessage();
         await IAM.execute(messageStub, ['not']);
         t.strictEqual(hunterStubs.unsetHunterID.callCount, 1, 'should call unsetHunterID');
@@ -53,6 +56,7 @@ test('commands - IAM', suite => {
     });
     suite.test('when first token is "not" - when multiple args - does nothing', async t => {
         t.plan(Object.values(hunterStubs).length);
+
         const messageStub = mockMessage();
         await IAM.execute(messageStub, ['not', 'cool']);
         Object.entries(hunterStubs).forEach(([name, stub]) => t.strictEqual(stub.callCount, 0, `should not call ${name}`));
