@@ -336,7 +336,7 @@ function doSaveAll() {
     //TODO This is not currently saving hunter data (iam) even though it says it's trying to
     client.commands.filter(command => command.save).every((command => {
         Logger.log(`Saving ${command.name}`);
-        Promise.resolve(command.save);
+        Promise.resolve(command.save());
     }));
     return (saveReminders());
 }
