@@ -8,10 +8,11 @@ const { DateTime, Duration } = require('luxon');
 const Logger = require('./logger');
 const { loadDataFromJSON, saveDataAsJSON } = require('../modules/file-utils');
 const hunter_ids_filename = 'data/hunters.json';
-const hunters = require('../../data/hunters.json');
+const hunters = {};
 // eslint-disable-next-line no-unused-vars
 let last_save_time = DateTime.utc();
 const save_frequency = Duration.fromObject({ minutes: 5 });
+let someone_initialized = 0;
 let hunterSaveInterval = setInterval(saveHunters, save_frequency);
 
 /**
@@ -20,6 +21,11 @@ let hunterSaveInterval = setInterval(saveHunters, save_frequency);
  * @returns {Promise<boolean>}
  */
 async function initialize() {
+    if (someone_initialized) {
+        //Initialize once only
+        return true;
+    }
+    someone_initialized = true;
     if (Object.keys(hunters).length > 0) {
         Logger.log('Hunters already loaded');
         return true;
