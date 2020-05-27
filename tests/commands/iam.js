@@ -88,5 +88,6 @@ test('commands - IAM', suite => {
         restoreHunterRegistry(hunterStubs);
         restoreLogger(logStubs);
         t.end();
+        IAM.save();
     });
 });

@@ -13,7 +13,7 @@ const hunters = {};
 let last_save_time = DateTime.utc();
 const save_frequency = Duration.fromObject({ minutes: 5 });
 let someone_initialized = 0;
-let hunterSaveInterval = setInterval(saveHunters, save_frequency);
+let hunterSaveInterval ;
 
 /**
  * Meant to be called when commands that muck with the hunter registry get loaded
@@ -46,15 +46,16 @@ async function initialize() {
 /**
  * Function that is called when the bot is shutting down or unloading a command
  */
-async function save() {
-    Logger.log('hunter save called');
-    try {
-        await saveHunters();
-        clearInterval(hunterSaveInterval);
-    } catch (err) {
-        Logger.error(`Error saving hunters on save call: ${err}`);
+function save() {
+    if (someone_initialized) {
+        Logger.log('hunter save called');
+        someone_initialized = 0;
+        return saveHunters()
+            .then(clearInterval(hunterSaveInterval))
+            .catch((err) => {
+                Logger.error(`Error saving hunters on save call: ${err}`);
+            });
     }
-    return true;
 }
 
 /**
