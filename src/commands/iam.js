@@ -18,7 +18,7 @@ async function doIAM(message, tokens) {
     else if (tokens.length === 1 && !isNaN(parseInt(tokens[0], 10)))
         reply = setHunterID(message, tokens[0]);
     else if (tokens.length === 1 && tokens[0].toLowerCase() === 'not')
-        reply = unsetHunterID(message);
+        reply = unsetHunterID(message.author.id);
     else {
         // received -mh iam <words>. The user can specify where they are hunting, their rank/title, or their in-game id.
         // Nobody should need this many tokens to specify their input, but someone is gonna try for more.
@@ -27,13 +27,13 @@ async function doIAM(message, tokens) {
         if (userCommand === 'in' && userText) {
             if (message.client.nicknames.get('locations')[userText])
                 userText = message.client.nicknames.get('locations')[userText];
-            reply = setHunterProperty(message, 'location', userText);
+            reply = setHunterProperty(message.author.id, 'location', userText);
         } else if (['rank', 'title', 'a'].indexOf(userCommand) !== -1 && userText) {
             if (message.client.nicknames.get('ranks')[userText])
                 userText = message.client.nicknames.get('ranks')[userText];
-            reply = setHunterProperty(message, 'rank', userText);
+            reply = setHunterProperty(message.author.id, 'rank', userText);
         } else if (userCommand.substring(0, 3) === 'snu' && userText)
-            reply = setHunterProperty(message, 'snuid', userText);
+            reply = setHunterProperty(message.author.id, 'snuid', userText);
         else {
             const prefix = message.client.settings.botPrefix;
             const commandSyntax = [
@@ -65,7 +65,7 @@ module.exports = {
     name: 'iam',
     requiresArgs: true,
     usage: [
-        '#### - provide a number to set your hunter ID',
+        '#### - provide a number to set your hunter ID (**Must be done first**)',
         'rank <rank> - identify your rank',
         'in <location> - identify where you\'re hunting / looking for friends',
         'snuid #### - sets your in-game user id',
