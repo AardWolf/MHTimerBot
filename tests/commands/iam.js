@@ -84,7 +84,7 @@ test('commands - IAM', suite => {
         sinon.reset();
     });
 
-    suite.test('Restore Loggers', t => {
+    suite.test('Restore Loggers - iam', t => {
         restoreHunterRegistry(hunterStubs);
         restoreLogger(logStubs);
         t.end();

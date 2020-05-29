@@ -148,11 +148,11 @@ test('commands - whois', suite => {
         t.strictEqual(message, messageStub, 'Called with original message');
         t.strictEqual(type, 'location', 'Called out to do a location lookup');
         t.strictEqual(searchStr, 'trouble', 'Called with original alpha argument');
-
+        hunterStubs.getHuntersByProperty.reset();
         sinon.reset();
     });
 
-    suite.test('Restore Loggers', t => {
+    suite.test('Restore Loggers - whois', t => {
         restoreHunterRegistry(hunterStubs);
         restoreLogger(logStubs);
         t.end();
