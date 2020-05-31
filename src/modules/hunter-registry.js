@@ -1,8 +1,6 @@
 // Type-hinting imports
 // eslint-disable-next-line no-unused-vars
 const { Message } = require('discord.js');
-// eslint-disable-next-line no-unused-vars
-const version = 1.00;
 const { DateTime, Duration } = require('luxon');
 // These two added to auto-populate some values
 const fetch = require('node-fetch');
@@ -17,7 +15,7 @@ const hunters = {};
 // eslint-disable-next-line no-unused-vars
 let last_save_time = DateTime.utc();
 const save_frequency = Duration.fromObject({ minutes: 5 });
-const refresh_frequency = Duration.fromObject({ minutes: 90 }); 
+const refresh_frequency = Duration.fromObject({ minutes: 90 });
 let someone_initialized = 0;
 let hunterSaveInterval ;
 let hunterRefreshInterval ;
@@ -69,6 +67,8 @@ function save() {
 
 /**
  * Checks the saved version of the hunters object with the current version and performs upgrades if needed
+ * 1.00 - previous object did not have versions
+ * 1.01 - Added a flag for manual refresh (default). Added (empty) array for guilds identified on.
  */
 function migrateData() {
     if (Object.keys(hunters).length === 0) {
@@ -78,6 +78,14 @@ function migrateData() {
         //First version of the object is version 1.
         hunters.version = 1.00;
     }
+    if (hunters.version < 1.01) {
+        Object.keys(hunters).forEach((discordId) => {
+            hunters[discordId]['manual'] = true;
+            hunters[discordId]['guilds'] = [];
+        });
+        hunters.version = 1.01;
+    }
+    Logger.log(`Hunters: Migrated hunters object to ${hunters.version}`);
 }
 
 /**
@@ -147,9 +155,9 @@ function setHunterID(discordId, hid) {
         Logger.log(`Hunters: Updating hid ${hunters[discordId]['hid']} to ${hid}`);
     }
     hunters[discordId]['hid'] = hid;
-    populateHunter(discordId); //This can finish whenever
-    message_str += `If people look you up they'll see \`${hid}\` and **I'm watching your rank and location**.`;
-
+    hunters[discordId]['manual'] = false;
+    populateHunter(discordId); // This is asynchronous and that is ok
+    message_str += `If people look you up they'll see \`${hid}\` and **I'm watching your rank and location**. (I will stop if you set them manually)`;
     return message_str;
 }
 
@@ -168,21 +176,23 @@ function setHunterProperty(discordId, property, value) {
     let message_str = !hunters[discordId][property] ? '' :
         `Your ${property} used to be \`${hunters[discordId][property]}\`. `;
     hunters[discordId][property] = value;
-
     message_str += `Your ${property} is set to \`${value}\``;
+    if (!hunters[discordId].manual) {
+        hunters[discordId].manual = true;
+        message_str += ' and I stopped tracking you.';
+    }
     return message_str;
 }
 
 /**
  * Find random hunter ids to befriend, based on the desired property and criterion.
  *
- * @param {Message} message a Discord message object
  * @param {string} property a hunter attribute, like "location" or "rank"
  * @param {string} criterion user-entered input.
  * @param {number} limit the maximum number of hunters to return.
- * @returns {string[]} an array of up to 5 hunter ids where the property value matched the user's criterion
+ * @returns {string[]} an array of 0 to "limit" hunter ids where the property value matched the user's criterion
  */
-function getHuntersByProperty(message, property, criterion, limit = 5) {
+function getHuntersByProperty(property, criterion, limit = 5) {
     const valid = Object.keys(hunters)
         .filter(key => hunters[key][property] === criterion)
         .map(key => hunters[key].hid);
@@ -198,73 +208,9 @@ function getHuntersByProperty(message, property, criterion, limit = 5) {
  * @param {string} discordId the Discord ID of a registered hunter.
  * @returns {string?} the hunter ID of the registered hunter having that Discord ID.
  */
-function getHunterByDiscordID(message, discordId) {
+function getHunterByDiscordID(discordId) {
     if (hunters[discordId])
         return hunters[discordId]['hid'];
-}
-
-/**
- * Find the first Discord account for the user with the given input property.
- * Returns undefined if no registered user has the given property.
- *
- * @param {message} message a Discord message object
- * @param {string} input The property value to attempt to match.
- * @param {string} type Any stored property type (typically fairly-unique ones such as 'snuid' or 'hid').
- * @returns {string?} The discord ID, or undefined if the hunter ID was not registered.
- */
-function getHunterByID(message, input, type) {
-    if (input)
-        for (const key in hunters)
-            if (hunters[key][type] === input)
-                return key;
-}
-
-
-/**
- * Interrogate the local 'hunters' data object to find self-registered hunters that match the requested
- * criteria. NOTE: Handles sending of messages
- *
- * @param {Message} message the Discord message that initiated this search
- * @param {string[]} searchValues an array of hids, snuids, or names/mentions to search for.
- * @param {string} type the method to use to find the member
- */
-function findHunter(message, searchValues, type) {
-    const noPM = ['hid', 'snuid', 'name'];
-    if (message.channel.type === 'dm' && noPM.indexOf(type) !== -1) {
-        message.channel.send(`Searching by ${type} isn't allowed via PM.`);
-        return;
-    }
-
-    let discordId;
-    if (type === 'name') {
-        // Use message text or mentions to obtain the discord ID.
-        const member = message.mentions.members.first() || message.guild.members
-            .filter(member => member.displayName.toLowerCase() === searchValues[0].toLowerCase()).first();
-        if (member) {
-            // Prevent mentioning this user in our reply.
-            searchValues[0] = member.displayName;
-            // Ensure only registered hunters get a link in our reply.
-            if (getHunterByDiscordID(message, member.id))
-                discordId = member.id;
-        }
-    } else if (searchValues[0]) {
-        // This is self-volunteered information that is tracked.
-        discordId = getHunterByID(message, searchValues[0], type);
-    }
-    if (!discordId) {
-        message.channel.send(`I did not find a registered hunter with **${searchValues[0]}** as a ${type === 'hid' ? 'hunter ID' : type}.`,
-            { disableEveryone: true });
-        return;
-    }
-    // The Discord ID belongs to a registered member of this server.
-    const link = `https://mshnt.ca/p/${getHunterByDiscordID(message, discordId)}`;
-    message.client.fetchUser(discordId).then(user => message.guild.fetchMember(user))
-        .then(member => message.channel.send(`**${searchValues[0]}** is ${member.displayName} ${link}`,
-            { disableEveryone: true }))
-        .catch(err => {
-            Logger.error(err);
-            message.channel.send('That person may not be on this server.');
-        });
 }
 
 /**
@@ -295,15 +241,16 @@ async function populateHunter(discordId) {
  * Simple function set in the interval to refresh the hunter locations and ranks
  */
 function refreshHunters() {
-    Logger.log(`Starting a refresh for ${Object.keys(hunters).length} hunters`);
-    Object.keys(hunters).forEach((discordId) => {
-        populateHunter(discordId);
-    });
-    Logger.log('Hunters: Refreshes dispatched');
+    Logger.log('Refreshing non-manual hunters');
+    Object.keys(hunters)
+        .filter(key => hunters[key]['manual'] === false)
+        .forEach((discordId) => {
+            populateHunter(discordId);
+        });
 }
 
-exports.findHunter = findHunter;
 exports.getHuntersByProperty = getHuntersByProperty;
+exports.getHunterByDiscordID = getHunterByDiscordID;
 exports.unsetHunterID = unsetHunterID;
 exports.setHunterID = setHunterID;
 exports.setHunterProperty = setHunterProperty;

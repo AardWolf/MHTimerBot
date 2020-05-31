@@ -97,6 +97,10 @@ for (const file of commandFiles) {
     try {
         const command = require(`./commands/${file}`);
         if (command.name) {
+            if (typeof(command.canDM) === 'undefined') {
+                command.canDM = true;
+                Logger.log(`Set canDM to true for ${command.name}`);
+            }
             if (command.initialize) {
                 command.initialize().catch((err) => {
                     Logger.error(`Error initializing ${command.name}: ${err}`);
@@ -523,6 +527,10 @@ function parseUserMessage(message) {
             const reply = 'You didn\'t provide arguments.\n' +
                 `\`\`\`\n${settings.botPrefix.trim()} ${dynCommand.name}:\n` +
                 `\t${dynCommand.usage.replace('\n', '\t\n')}\n\`\`\``;
+            message.reply(reply);
+        }
+        else if (!dynCommand.canDM && message.channel.type === 'dm') {
+            const reply = `\`${command.toLowerCase()}\` is not allowed in DMs`;
             message.reply(reply);
         }
         else {

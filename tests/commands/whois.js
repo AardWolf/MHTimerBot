@@ -24,16 +24,6 @@ test('commands - whois', suite => {
         t.end();
     });
 
-    suite.test('when channel is dm - when replying - signals caller', async t => {
-        t.plan(2);
-
-        const messageStub = mockMessage({ channelType: 'dm' });
-        const result = await WHOIS.execute(messageStub, []);
-        t.true(result.replied, 'should reply');
-        t.true(result.sentDm, 'should indicate DM was sent');
-
-        sinon.reset();
-    });
     suite.test('when channel is text - when replying - signals caller', async t => {
         t.plan(2);
 
@@ -65,89 +55,91 @@ test('commands - whois', suite => {
 
         sinon.reset();
     });
-    suite.test('when called with a number - calls findHunter with type "hid"', async t => {
+    suite.test('when called with a number - calls getHuntersByProperty with type "hid"', async t => {
         t.plan(4);
 
         const messageStub = mockMessage();
         const sendToken = ['1'];
+        hunterStubs.getHuntersByProperty.returns([]);
         await WHOIS.execute(messageStub, sendToken);
-        t.strictEqual(hunterStubs.findHunter.callCount, 1, 'should call findHunter');
-        const [message, tokens, type] = hunterStubs.findHunter.getCall(0).args;
-        t.strictEqual(message, messageStub, 'Called with original message');
-        t.deepEqual(tokens, ['1'], 'Called with original token argument');
+        t.strictEqual(hunterStubs.getHuntersByProperty.callCount, 1, 'should call getHuntersByProperty');
+        const [type, tokens, limit] = hunterStubs.getHuntersByProperty.getCall(0).args;
+        t.deepEqual(tokens, sendToken[0], 'Called with first token argument');
         t.strictEqual(type, 'hid', 'Called out to do a hunter id lookup');
+        t.strictEqual(limit, 1, 'Limited to one answer');
 
         sinon.reset();
     });
-    suite.test('when first token starts with "snu" - when numeric arg - calls findHunter with type "snuid"', async t => {
+    suite.test('when first token starts with "snu" - calls getHuntersByProperty with type "snuid"', async t => {
         t.plan(4);
 
         const messageStub = mockMessage();
         const sendToken = ['snuid', 1];
+        hunterStubs.getHuntersByProperty.returns([]);
         await WHOIS.execute(messageStub, sendToken);
-        t.strictEqual(hunterStubs.findHunter.callCount, 1, 'should call findHunter');
-        const [message, tokens, type] = hunterStubs.findHunter.getCall(0).args;
-        t.strictEqual(message, messageStub, 'Called with original message');
-        t.deepEqual(tokens, [1], 'Called with original token argument');
+        t.strictEqual(hunterStubs.getHuntersByProperty.callCount, 1, 'should call getHuntersByProperty');
+        const [type, tokens, limit] = hunterStubs.getHuntersByProperty.getCall(0).args;
+        t.deepEqual(tokens, 1, 'Called with second token argument');
         t.strictEqual(type, 'snuid', 'Called out to do a snuid lookup');
+        t.strictEqual(limit, 1, 'Limited to one answer');
 
         sinon.reset();
     });
-    suite.test('when first token starts with "snu" - when alpha input - calls findHunter with type "snuid"', async t => {
+    suite.test('when first token starts with "snu" - when alpha input - calls getHuntersByProperty with type "snuid"', async t => {
         t.plan(4);
 
         const messageStub = mockMessage();
         const sendToken = ['snuid', 'a'];
+        hunterStubs.getHuntersByProperty.returns([]);
         await WHOIS.execute(messageStub, sendToken);
-        t.strictEqual(hunterStubs.findHunter.callCount, 1, 'should call findHunter with alpha arg');
-        const [message, tokens, type] = hunterStubs.findHunter.getCall(0).args;
-        t.strictEqual(message, messageStub, 'Called with original message');
-        t.deepEqual(tokens, ['a'], 'Called with original alpha argument');
+        t.strictEqual(hunterStubs.getHuntersByProperty.callCount, 1, 'should call getHuntersByProperty with alpha arg');
+        const [type, tokens, limit] = hunterStubs.getHuntersByProperty.getCall(0).args;
+        t.deepEqual(tokens, 'a', 'Called with original alpha argument');
         t.strictEqual(type, 'snuid', 'Called out to do a snuid lookup');
+        t.strictEqual(limit, 1, 'Limited to one answer');
 
         sinon.reset();
     });
-    suite.test('when first token starts with "snu" - when multiple args - calls findHunter with type "snuid"', async t => {
+    suite.test('when first token starts with "snu" - when multiple args - calls getHuntersByProperty with type "snuid"', async t => {
         t.plan(4);
 
         const messageStub = mockMessage();
         const sendToken = ['snuid', 1, 3, 'a'];
-        await WHOIS.execute(messageStub, sendToken);
-        t.strictEqual(hunterStubs.findHunter.callCount, 1, 'should call findHunter with both args');
-        const [message, tokens, type] = hunterStubs.findHunter.getCall(0).args;
-        t.strictEqual(message, messageStub, 'Called with original message');
-        t.deepEqual(tokens, [1, 3, 'a'], 'Called with original token arguments');
-        t.strictEqual(type, 'snuid', 'Called out to do a snuid lookup');
-
-        sinon.reset();
-    });
-    suite.test('when only one token and it\'s not a keyword - calls findHunter with type "name"', async t => {
-        t.plan(4);
-
-        const messageStub = mockMessage();
-        const sendToken = ['aku aku'];
-        await WHOIS.execute(messageStub, sendToken);
-        t.strictEqual(hunterStubs.findHunter.callCount, 1, 'should call findHunter');
-        const [message, tokens, type] = hunterStubs.findHunter.getCall(0).args;
-        t.strictEqual(message, messageStub, 'Called with original message');
-        t.deepEqual(tokens, ['aku aku'], 'Called with original alpha argument');
-        t.strictEqual(type, 'name', 'Called out to do a name lookup');
-
-        sinon.reset();
-    });
-
-    suite.test('when first token is "in" - calls getHuntersByProperty with type "location" ', async t => {
-        t.plan(4);
-
         hunterStubs.getHuntersByProperty.returns([]);
+        await WHOIS.execute(messageStub, sendToken);
+        t.strictEqual(hunterStubs.getHuntersByProperty.callCount, 1, 'should call findHunter with both args');
+        const [type, tokens, limit] = hunterStubs.getHuntersByProperty.getCall(0).args;
+        t.deepEqual(tokens, 1, 'Called with only the first token');
+        t.strictEqual(type, 'snuid', 'Called out to do a snuid lookup');
+        t.strictEqual(limit, 1, 'Limited to one answer');
+
+        sinon.reset();
+    });
+    suite.test('when first token is "in" - calls getHuntersByProperty with type "location" ', async t => {
+        t.plan(3);
+
         const messageStub = mockMessage();
         const sendToken = ['in', 'trouble'];
+        hunterStubs.getHuntersByProperty.returns([]);
         await WHOIS.execute(messageStub, sendToken);
         t.strictEqual(hunterStubs.getHuntersByProperty.callCount, 1, 'should call getHuntersByProperty');
-        const [message, type, searchStr] = hunterStubs.getHuntersByProperty.getCall(0).args;
-        t.strictEqual(message, messageStub, 'Called with original message');
+        const [type, tokens] = hunterStubs.getHuntersByProperty.getCall(0).args;
         t.strictEqual(type, 'location', 'Called out to do a location lookup');
-        t.strictEqual(searchStr, 'trouble', 'Called with original alpha argument');
+        t.strictEqual(tokens, 'trouble', 'Called with original alpha argument');
+        hunterStubs.getHuntersByProperty.reset();
+        sinon.reset();
+    });
+    suite.test('when first token is "a" - calls getHuntersByProperty with type "rank" ', async t => {
+        t.plan(3);
+
+        const messageStub = mockMessage();
+        const sendToken = ['a', 'nerd'];
+        hunterStubs.getHuntersByProperty.returns([]);
+        await WHOIS.execute(messageStub, sendToken);
+        t.strictEqual(hunterStubs.getHuntersByProperty.callCount, 1, 'should call getHuntersByProperty');
+        const [type, tokens] = hunterStubs.getHuntersByProperty.getCall(0).args;
+        t.strictEqual(type, 'rank', 'Called out to do a location lookup');
+        t.strictEqual(tokens, 'nerd', 'Called with original alpha argument');
         hunterStubs.getHuntersByProperty.reset();
         sinon.reset();
     });
