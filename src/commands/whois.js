@@ -64,7 +64,10 @@ async function doWHOIS(message, tokens) {
                 foundHunters = getHuntersByProperty(searchType, search);
             }
         }
-        if (typeof(foundHunters) === 'string') {
+        if (!foundHunters) {
+            reply = 'No hunters matched that search';
+        }
+        else if (typeof(foundHunters) === 'string') {
             reply = `${tokens[0]} is https://mshnt.ca/p/${foundHunters}`;
         } else if (foundHunters.length === 0) {
             reply = 'No hunters matched that search';
