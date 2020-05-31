@@ -1525,7 +1525,7 @@ function buildSchedule(timer_request) {
  * @returns {string} The desired help text.
  */
 function getHelpMessage(tokens) {
-    const keywordArray = [ 'whois', 'remind', 'next', 'find', 'ifind', 'schedule' ];
+    const keywordArray = [ 'remind', 'next', 'find', 'ifind', 'schedule' ];
     keywordArray.push(client.commands.map(command => command.name));
     const keywords = oxfordStringifyValues(keywordArray.map(name => `\`${name}\``));
     const prefix = settings.botPrefix;
