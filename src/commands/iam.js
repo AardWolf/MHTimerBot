@@ -16,7 +16,7 @@ async function doIAM(message, tokens) {
     if (!tokens.length)
         reply = 'Yes, you are. Provide a hunter ID number to set that.';
     else if (tokens.length === 1 && !isNaN(parseInt(tokens[0], 10)))
-        reply = setHunterID(message, tokens[0]);
+        reply = setHunterID(message.author.id, tokens[0]);
     else if (tokens.length === 1 && tokens[0].toLowerCase() === 'not')
         reply = unsetHunterID(message.author.id);
     else {

@@ -5,16 +5,22 @@ const { Message } = require('discord.js');
 const version = 1.00;
 const { DateTime, Duration } = require('luxon');
 // These two added to auto-populate some values
+const fetch = require('node-fetch');
+const jsdom = require('jsdom');
+const { JSDOM } = jsdom;
 
 const Logger = require('./logger');
 const { loadDataFromJSON, saveDataAsJSON } = require('../modules/file-utils');
 const hunter_ids_filename = 'data/hunters.json';
 const hunters = {};
+//const hunters = require('../../data/hunters.json');
 // eslint-disable-next-line no-unused-vars
 let last_save_time = DateTime.utc();
 const save_frequency = Duration.fromObject({ minutes: 5 });
+const refresh_frequency = Duration.fromObject({ minutes: 90 }); 
 let someone_initialized = 0;
 let hunterSaveInterval ;
+let hunterRefreshInterval ;
 
 /**
  * Meant to be called when commands that muck with the hunter registry get loaded
@@ -41,6 +47,7 @@ async function initialize() {
         .then(() => {
             Logger.log(`Hunters: Configuring save every ${save_frequency / (60 * 1000)} min.`);
             hunterSaveInterval = setInterval(saveHunters, save_frequency);
+            hunterRefreshInterval = setInterval(refreshHunters, refresh_frequency);
         });
 }
 
@@ -53,6 +60,7 @@ function save() {
         someone_initialized = 0;
         return saveHunters()
             .then(clearInterval(hunterSaveInterval))
+            .then(clearInterval(hunterRefreshInterval))
             .catch((err) => {
                 Logger.error(`Error saving hunters on save call: ${err}`);
             });
@@ -139,7 +147,8 @@ function setHunterID(discordId, hid) {
         Logger.log(`Hunters: Updating hid ${hunters[discordId]['hid']} to ${hid}`);
     }
     hunters[discordId]['hid'] = hid;
-    message_str += `If people look you up they'll see \`${hid}\`.`;
+    populateHunter(discordId); //This can finish whenever
+    message_str += `If people look you up they'll see \`${hid}\` and **I'm watching your rank and location**.`;
 
     return message_str;
 }
@@ -256,6 +265,41 @@ function findHunter(message, searchValues, type) {
             Logger.error(err);
             message.channel.send('That person may not be on this server.');
         });
+}
+
+/**
+ * Populates some values based on the discordId
+ * @param hunterId
+ */
+async function populateHunter(discordId) {
+    if (!hunters[discordId] || !hunters[discordId]['hid'])
+        return false;
+
+    const url = `https://www.mousehuntgame.com/p.php?id=${hunters[discordId]['hid']}`;
+    try {
+        const response = await fetch(url);
+        const body = await response.text();
+        const dom = new JSDOM(body);
+        const description = dom.window.document.querySelector('meta[property=\'og:description\']').getAttribute('content');
+        const lines = description.split('\n');
+        // Pull the title from line 0
+        hunters[discordId]['rank'] = /an* (.*) in MouseHunt./.exec(lines[0])[1].toLowerCase();
+        hunters[discordId]['location'] = /Location: (.*)$/.exec(lines[5])[1].toLowerCase();
+    } catch (error) {
+        Logger.error(`Hunter: Populating for ${discordId} failed: ${error.message}`);
+    }
+
+}
+
+/**
+ * Simple function set in the interval to refresh the hunter locations and ranks
+ */
+function refreshHunters() {
+    Logger.log(`Starting a refresh for ${Object.keys(hunters).length} hunters`);
+    Object.keys(hunters).forEach((discordId) => {
+        populateHunter(discordId);
+    });
+    Logger.log('Hunters: Refreshes dispatched');
 }
 
 exports.findHunter = findHunter;
