@@ -68,7 +68,7 @@ function save() {
 /**
  * Checks the saved version of the hunters object with the current version and performs upgrades if needed
  * 1.00 - previous object did not have versions
- * 1.01 - Added a flag for manual refresh (default). Added (empty) array for guilds identified on.
+ * 1.01 - Added a flag for manual refresh (default). Added (empty) array for guilds identified on. Added failureCount
  */
 function migrateData() {
     if (Object.keys(hunters).length === 0) {
@@ -82,6 +82,7 @@ function migrateData() {
         Object.keys(hunters).forEach((discordId) => {
             hunters[discordId]['manual'] = true;
             hunters[discordId]['guilds'] = [];
+            hunters[discordId]['failureCount'] = 0;
         });
         hunters.version = 1.01;
     }
@@ -156,6 +157,7 @@ function setHunterID(discordId, hid) {
     }
     hunters[discordId]['hid'] = hid;
     hunters[discordId]['manual'] = false;
+    hunters[discordId]['failureCount'] = 0;
     populateHunter(discordId); // This is asynchronous and that is ok
     message_str += `If people look you up they'll see \`${hid}\` and **I'm watching your rank and location**. (I will stop if you set them manually)`;
     return message_str;
@@ -231,8 +233,14 @@ async function populateHunter(discordId) {
         // Pull the title from line 0
         hunters[discordId]['rank'] = /an* (.*) in MouseHunt./.exec(lines[0])[1].toLowerCase();
         hunters[discordId]['location'] = /Location: (.*)$/.exec(lines[5])[1].toLowerCase();
+        hunters[discordId]['failureCount'] = 0;
     } catch (error) {
+        hunters[discordId].failureCount += 1;
         Logger.error(`Hunter: Populating for ${discordId} failed: ${error.message}`);
+        if (hunters[discordId].failureCount >= 5) {
+            delete hunters[discordId];
+            Logger.log(`5 strikes, ${discordId} is forgotten`);
+        }
     }
 
 }
