@@ -238,7 +238,7 @@ function Main() {
                 Logger.log(`Timers: Initialized ${timer_config.size} timers on channels ${announcables}.`);
 
                 // If we disconnect and then reconnect, do not bother rescheduling the already-scheduled timers.
-                // client.on('ready', () => Logger.log('I am inVINCEeble!'));
+                client.on('ready', () => Logger.log('I am inVINCEeble!'));
             });
 
             // Message handling.
