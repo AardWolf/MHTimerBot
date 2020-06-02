@@ -83,7 +83,19 @@ test('commands - IAM', suite => {
 
         sinon.reset();
     });
+    suite.test('when called with exactly "auto" - calls setHunterProperty', async t => {
+        t.plan(4);
 
+        const messageStub = mockMessage();
+        await IAM.execute(messageStub, ['auto']);
+        t.strictEqual(hunterStubs.setHunterProperty.callCount, 1, 'should call setHunterID');
+        const [author, type, tokens] = hunterStubs.setHunterProperty.getCall(0).args;
+        t.strictEqual(author, messageStub.author.id, 'Sets for the calling author');
+        t.strictEqual(type, 'auto', 'Called to turn on auto lookup');
+        t.strictEqual(tokens, true, 'Called with true');
+
+        sinon.reset();
+    });
     suite.test('Restore Loggers - iam', t => {
         restoreHunterRegistry(hunterStubs);
         restoreLogger(logStubs);

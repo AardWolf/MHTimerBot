@@ -20,6 +20,9 @@ let someone_initialized = 0;
 let hunterSaveInterval ;
 let hunterRefreshInterval ;
 
+//If a user sets these they go into manual mode
+const manual_properties = ['rank', 'location'];
+
 /**
  * Meant to be called when commands that muck with the hunter registry get loaded
  *
@@ -180,10 +183,11 @@ function setHunterProperty(discordId, property, value) {
         `Your ${property} used to be \`${hunters[discordId][property]}\`. `;
     hunters[discordId][property] = value;
     message_str += `Your ${property} is set to \`${value}\``;
-    if (!hunters[discordId].manual) {
-        hunters[discordId].manual = true;
-        message_str += ' and I stopped tracking you.';
-    }
+    if (manual_properties.includes(property))
+        if (!hunters[discordId].manual) {
+            hunters[discordId].manual = true;
+            message_str += ' and I stopped tracking you.';
+        }
     return message_str;
 }
 

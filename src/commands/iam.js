@@ -21,6 +21,8 @@ async function doIAM(message, tokens) {
         reply = await setHunterID(message.author.id, tokens[0]);
     else if (tokens.length === 1 && tokens[0].toLowerCase() === 'not')
         reply = unsetHunterID(message.author.id);
+    else if (tokens.length === 1 && tokens[0].toLowerCase() === 'auto')
+        reply = setHunterProperty(message.author.id, 'auto', true);
     else {
         // received -mh iam <words>. The user can specify where they are hunting, their rank/title, or their in-game id.
         // Nobody should need this many tokens to specify their input, but someone is gonna try for more.
