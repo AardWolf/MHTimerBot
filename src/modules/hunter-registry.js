@@ -232,7 +232,7 @@ async function populateHunter(discordId) {
         const description = dom.window.document.querySelector('meta[property=\'og:description\']').getAttribute('content');
         const lines = description.split('\n');
         // Pull the title from line 0
-        hunters[discordId]['rank'] = /an* (.*) in MouseHunt./.exec(lines[0])[1].toLowerCase() || 'unknown';
+        hunters[discordId]['rank'] = / an* (.*) in MouseHunt./.exec(lines[0])[1].toLowerCase() || 'unknown';
         hunters[discordId]['location'] = /Location: (.*)$/.exec(lines[5])[1].toLowerCase() || 'unknown';
         hunters[discordId]['failureCount'] = 0;
     } catch (error) {
