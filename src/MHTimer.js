@@ -1526,7 +1526,7 @@ function buildSchedule(timer_request) {
  */
 function getHelpMessage(tokens) {
     const keywordArray = [ 'remind', 'next', 'find', 'ifind', 'schedule' ];
-    keywordArray.push(client.commands.map(command => command.name));
+    keywordArray.push(...client.commands.map(command => command.name));
     const keywords = oxfordStringifyValues(keywordArray.map(name => `\`${name}\``));
     const prefix = settings.botPrefix;
     if (!tokens || !tokens.length) {

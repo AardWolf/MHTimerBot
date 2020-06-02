@@ -151,6 +151,7 @@ async function setHunterID(discordId, hid) {
         hunters[discordId]['hid'] = hid;
         hunters[discordId]['manual'] = false;
         hunters[discordId]['failureCount'] = 0;
+        hunters[discordId]['guilds'] = [];
         await populateHunter(discordId); // This is asynchronous and that is ok
         message_str += `If people look you up they'll see \`${hid}\` and find you for rank \`${hunters[discordId]['rank']}\` in \`${hunters[discordId]['location']}\`.`;
     } else if (hunters[discordId]['hid']) {
