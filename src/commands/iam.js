@@ -6,6 +6,8 @@ const CommandResult = require('../interfaces/command-result');
 const Logger = require('../modules/logger');
 const { unsetHunterID, setHunterID, setHunterProperty, initialize, save } = require('../modules/hunter-registry');
 
+// TODO: Should be able to enable/disable lookups of yourself on a server
+
 /**
  * @param {Message} message
  * @param {string[]} tokens
@@ -16,7 +18,7 @@ async function doIAM(message, tokens) {
     if (!tokens.length)
         reply = 'Yes, you are. Provide a hunter ID number to set that.';
     else if (tokens.length === 1 && !isNaN(parseInt(tokens[0], 10)))
-        reply = setHunterID(message.author.id, tokens[0]);
+        reply = await setHunterID(message.author.id, tokens[0]);
     else if (tokens.length === 1 && tokens[0].toLowerCase() === 'not')
         reply = unsetHunterID(message.author.id);
     else {

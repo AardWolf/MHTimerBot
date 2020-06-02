@@ -8,7 +8,7 @@ const fs = require('fs');
 
 // Extract type-hinting definitions for Discord classes.
 // eslint-disable-next-line no-unused-vars
-const { Client, Collection, Guild, Message, MessageReaction, RichEmbed, TextChannel, User } = Discord;
+const { Client, Collection, Guild, Message, MessageReaction, MessageEmbed, TextChannel, User } = Discord;
 
 // Import our own local classes and functions.
 const Timer = require('./modules/timers.js');
@@ -222,8 +222,8 @@ function Main() {
                 Logger.log('I am alive!');
 
                 // Find all text channels on which to send announcements.
-                const announcables = client.guilds.reduce((channels, guild) => {
-                    const candidates = guild.channels
+                const announcables = client.guilds.cache.reduce((channels, guild) => {
+                    const candidates = guild.channels.cache
                         .filter(c => settings.timedAnnouncementChannels.has(c.name) && textChannelTypes.has(c.type))
                         .map(tc => tc);
                     if (candidates.length)
@@ -270,9 +270,9 @@ function Main() {
             //    quit(); // Should we? or just let it attempt to reconnect?
             });
 
-            client.on('reconnecting', () => Logger.log('Connection lost, reconnecting to Discord...'));
+            client.on('shardReconnecting', () => Logger.log('Connection lost, reconnecting to Discord...'));
             // WebSocket disconnected and is no longer trying to reconnect.
-            client.on('disconnect', event => {
+            client.on('shardDisconnect', event => {
                 Logger.log(`Client socket closed: ${event.reason || 'No reason given'}`);
                 Logger.log(`Socket close code: ${event.code} (${event.wasClean ? '' : 'not '}cleanly closed)`);
                 quit();
@@ -1038,10 +1038,10 @@ function parseTokenForCount(token, newReminder) {
 }
 
 /**
- * Returns the next occurrence of the desired class of timers as a RichEmbed.
+ * Returns the next occurrence of the desired class of timers as a MessageEmbed.
  *
  * @param {ReminderRequest} validTimerData Validated input that is known to match an area and subarea
- * @returns {RichEmbed} A rich snippet summary of the next occurrence of the matching timer.
+ * @returns {MessageEmbed} A rich snippet summary of the next occurrence of the matching timer.
  */
 function nextTimer(validTimerData) {
     // Inspect all known timers to determine the one that matches the requested area, and occurs soonest.
@@ -1056,7 +1056,7 @@ function nextTimer(validTimerData) {
                 nextTimer = timer;
 
     const sched_syntax = `${settings.botPrefix} remind ${area}${sub ? ` ${sub}` : ''}`;
-    return (new RichEmbed()
+    return (new MessageEmbed()
         .setDescription(nextTimer.getDemand()
             + `\n${timeLeft(nextTimer.getNext())}`
             // Putting here makes it look nicer and fit in portrait mode
@@ -1231,7 +1231,7 @@ function doRemind(timer) {
         const uid = reminder.user;
         if (!sent.has(uid)) {
             sent.add(uid);
-            client.fetchUser(uid).then(user => sendRemind(user, reminder, timer))
+            client.users.fetch(uid).then(user => sendRemind(user, reminder, timer))
                 .catch(err => {
                     reminder.fail = (reminder.fail || 0) + 1;
                     Logger.error(`Reminders: Error during notification of user <@${uid}>:\n`, err);
@@ -1242,7 +1242,7 @@ function doRemind(timer) {
 
 /**
  * Takes a user object and a reminder "object" and sends
- * the reminder as a RichEmbed via PM.
+ * the reminder as a MessageEmbed via PM.
  * MAYBE: Add ReminderInfo class, let Timers ID one, and have timer definitions provide additional information
  *      to improve the appearance of the reminders.
  * @param {User} user The Discord user to be reminded
@@ -1258,7 +1258,7 @@ function sendRemind(user, remind, timer) {
     if (remind.count === 0)
         return;
     // TODO: better timer title info - no markdown formatting in the title.
-    const output = new RichEmbed({ title: timer.getAnnouncement() });
+    const output = new MessageEmbed({ title: timer.getAnnouncement() });
 
     if (timer.getArea() === 'relic_hunter') {
         output.addField('Current Location', `She's in **${relic_hunter.location}**`, true);
@@ -1468,7 +1468,7 @@ async function listRemind(message) {
 /**
  * Compute which timers are coming up in the next bit of time, for the requested area.
  * Returns a ready-to-print string listing up to 24 of the found timers, with their "demand" and when they will activate.
- * TODO: should this return a RichEmbed?
+ * TODO: should this return a MessageEmbed?
  *
  * @param {{area: string, count: number}} timer_request A request that indicates the number of hours to search ahead, and the area in which to search
  * @returns {string} a ready-to-print string containing the timer's demand, and how soon it will occur.
@@ -1518,7 +1518,7 @@ function buildSchedule(timer_request) {
 
 /**
  * Get the help text.
- * TODO: Should this be a RichEmbed?
+ * TODO: Should this be a MessageEmbed?
  * TODO: Dynamically generate this information based on timers, etc.
  *
  * @param {string[]} [tokens] An array of user text, the first of which is the specific command to get help for.
@@ -1526,7 +1526,7 @@ function buildSchedule(timer_request) {
  */
 function getHelpMessage(tokens) {
     const keywordArray = [ 'remind', 'next', 'find', 'ifind', 'schedule' ];
-    keywordArray.push(client.commands.map(command => command.name));
+    keywordArray.push(...client.commands.map(command => command.name));
     const keywords = oxfordStringifyValues(keywordArray.map(name => `\`${name}\``));
     const prefix = settings.botPrefix;
     if (!tokens || !tokens.length) {
@@ -2010,8 +2010,8 @@ function findItem(channel, args, command) {
 function sendInteractiveSearchResult(searchResults, channel, dataCallback, isDM, urlInfo, searchInput) {
     // Associate each search result with a "numeric" emoji.
     const matches = searchResults.map((sr, i) => ({ emojiId: emojis[i].id, match: sr }));
-    // Construct a RichEmbed with the search result information, unless this is for a PM with a single response.
-    const embed = new RichEmbed({
+    // Construct a MessageEmbed with the search result information, unless this is for a PM with a single response.
+    const embed = new MessageEmbed({
         title: `Search Results for '${searchInput}'`,
         thumbnail: { url: 'https://cdn.discordapp.com/emojis/359244526688141312.png' }, // :clue:
         footer: { text: `For any reaction you select, I'll ${isDM ? 'send' : 'PM'} you that information.` },
@@ -2046,14 +2046,14 @@ function sendInteractiveSearchResult(searchResults, channel, dataCallback, isDM,
                 allowed = msgRxns.map(mr => mr.emoji.name),
                 filter = (reaction, user) => allowed.includes(reaction.emoji.name) && !user.bot,
                 rc = msg.createReactionCollector(filter, { time: 5 * 60 * 1000 });
-            rc.on('collect', mr => {
+            rc.on('collect', (mr, user) => {
                 // Fetch the response and send it to the user.
                 const match = matches.filter(m => m.emojiId === mr.emoji.identifier)[0];
                 if (match) dataCallback(true, match.match, urlInfo.qsParams).then(
-                    result => mr.users.last().send(result, { split: { prepend: '```', append: '```' } }),
-                    result => mr.users.last().send(result),
+                    result => user.send(result, { split: { prepend: '```', append: '```' } }),
+                    result => user.send(result),
                 ).catch(err => Logger.error(err));
-            }).on('end', () => rc.message.clearReactions().catch(() => rc.message.delete()));
+            }).on('end', () => rc.message.delete().catch(() => Logger.log('Unable to delete reaction message')));
         }).catch(err => Logger.error('Reactions: error setting reactions:\n', err));
 
     // Always send one result to the channel.

@@ -85,8 +85,8 @@ function migrateData() {
             hunters[discordId]['failureCount'] = 0;
         });
         hunters.version = 1.01;
+        Logger.log(`Hunters: Migrated hunters object to ${hunters.version}`);
     }
-    Logger.log(`Hunters: Migrated hunters object to ${hunters.version}`);
 }
 
 /**
@@ -141,25 +141,26 @@ function unsetHunterID(hunter) {
  * @param {Snowflake} discordId a Discord id Snowflake
  * @param {string} hid a "Hunter ID" string, which is known to parse to a number.
  */
-function setHunterID(discordId, hid) {
+async function setHunterID(discordId, hid) {
     let message_str = '';
 
     // Initialize the data for any new registrants.
     if (!hunters[discordId]) {
         hunters[discordId] = {};
         Logger.log(`Hunters: OMG! A new hunter id '${discordId}'`);
-    }
-
-    // If they already registered a hunter ID, update it.
-    if (hunters[discordId]['hid']) {
-        message_str = `You used to be known as \`${hunters[discordId]['hid']}\`. `;
+        hunters[discordId]['hid'] = hid;
+        hunters[discordId]['manual'] = false;
+        hunters[discordId]['failureCount'] = 0;
+        hunters[discordId]['guilds'] = [];
+        await populateHunter(discordId); // This is asynchronous and that is ok
+        message_str += `If people look you up they'll see \`${hid}\` and find you for rank \`${hunters[discordId]['rank']}\` in \`${hunters[discordId]['location']}\`.`;
+    } else if (hunters[discordId]['hid']) {
+        message_str = `You used to be known as \`${hunters[discordId]['hid']}\`.`;
         Logger.log(`Hunters: Updating hid ${hunters[discordId]['hid']} to ${hid}`);
     }
-    hunters[discordId]['hid'] = hid;
-    hunters[discordId]['manual'] = false;
-    hunters[discordId]['failureCount'] = 0;
-    populateHunter(discordId); // This is asynchronous and that is ok
-    message_str += `If people look you up they'll see \`${hid}\` and **I'm watching your rank and location**. (I will stop if you set them manually)`;
+    if (!hunters[discordId]['manual']) {
+        message_str += ' I am automatically updating your rank and location, set them manually and I will stop.';
+    }
     return message_str;
 }
 
@@ -231,8 +232,8 @@ async function populateHunter(discordId) {
         const description = dom.window.document.querySelector('meta[property=\'og:description\']').getAttribute('content');
         const lines = description.split('\n');
         // Pull the title from line 0
-        hunters[discordId]['rank'] = /an* (.*) in MouseHunt./.exec(lines[0])[1].toLowerCase();
-        hunters[discordId]['location'] = /Location: (.*)$/.exec(lines[5])[1].toLowerCase();
+        hunters[discordId]['rank'] = /an* (.*) in MouseHunt./.exec(lines[0])[1].toLowerCase() || 'unknown';
+        hunters[discordId]['location'] = /Location: (.*)$/.exec(lines[5])[1].toLowerCase() || 'unknown';
         hunters[discordId]['failureCount'] = 0;
     } catch (error) {
         hunters[discordId].failureCount += 1;

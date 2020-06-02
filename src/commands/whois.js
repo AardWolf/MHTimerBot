@@ -29,7 +29,7 @@ async function doWHOIS(message, tokens) {
             // which is actually the name or user mention to look up.
             // Use message text or mentions to obtain the discord ID.
             tokens.unshift(searchType);
-            const member = message.mentions.members.first() || message.guild.members
+            const member = message.mentions.members.first() || message.guild.members.cache
                 .filter(member => member.displayName.toLowerCase() === tokens[0].toLowerCase()).first();
             if (member) {
                 // Prevent mentioning this user in our reply.
