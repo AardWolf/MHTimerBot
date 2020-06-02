@@ -1,22 +1,11 @@
 // Required test imports
 const test = require('tape');
-const sinon = require('sinon');
 
 // Functionality to be tested.
-const Timer = require('../../src/modules/timerClass');
+const Timer = require('../../src/modules/timers');
 
 // Stub Logger methods to minimize crosstalk.
-const Logger = require('../../src/modules/logger');
-const stubLogger = () => {
-    return {
-        log: sinon.stub(Logger, 'log'),
-        warn: sinon.stub(Logger, 'warn'),
-        error: sinon.stub(Logger, 'error'),
-    };
-};
-const restoreLogger = ({ ...stubs }) => {
-    Object.values(stubs).forEach(stub => stub.restore());
-};
+const { stubLogger, restoreLogger } = require('../helpers/logging');
 
 test('Timer ctor', function (suite) {
     let logStubs;

@@ -1,20 +1,14 @@
 // Required test imports
 const test = require('tape');
 const sinon = require('sinon');
+// const mock = require('mock-fs');
 
 // Stub IO
+// Just in case modules are already loaded, including promisified versions
+delete require.cache[require.resolve('fs')];
+delete require.cache[require.resolve('../../src/modules/file-utils')];
 const fs = require('fs');
-const Logger = require('../../src/modules/logger');
-const stubLogger = () => {
-    return {
-        log: sinon.stub(Logger, 'log'),
-        warn: sinon.stub(Logger, 'warn'),
-        error: sinon.stub(Logger, 'error'),
-    };
-};
-const restoreLogger = ({ ...stubs }) => {
-    Object.values(stubs).forEach(stub => stub.restore());
-};
+const { stubLogger, restoreLogger } = require('../helpers/logging');
 let logStubs;
 
 // Functionality to be tested.
@@ -22,7 +16,7 @@ let load;
 let readStub;
 let save;
 let writeStub;
-test('Module Setup', t => {
+test('Module Setup - file-utils', t => {
     logStubs = stubLogger();
 
     // (The test stubs must be created before require-ing the test module,
