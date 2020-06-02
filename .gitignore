@@ -1,6 +1,7 @@
 # MH Timer Bot
 node_modules
 .nyc_output
+coverage/
 settings.json
 /project.geany
 timer_settings.json.bak

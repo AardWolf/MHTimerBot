@@ -1,6 +1,6 @@
 {
   "name": "MHTimerBot",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "A Discord bot that understands Mousehunt timers",
   "author": {
     "name": "AardWolf",
@@ -23,6 +23,7 @@
   "dependencies": {
     "csv-parse": "^4.9.1",
     "discord.js": "^11.6.4",
+    "jsdom": "^16.2.2",
     "luxon": "^1.24.1",
     "node-fetch": "^2.6.0"
   },
@@ -32,12 +33,13 @@
     "restart": "bash ./scripts/restart.sh",
     "dev": "node src/MHTimer.js",
     "lint": "eslint --fix --quiet src tests",
-    "test": "tape tests/**/*.js"
+    "test": "tape ./tests/**/*.js"
   },
   "peerDependencies": {
     "eslint": "^6.8.0"
   },
   "devDependencies": {
+    "mock-fs": "^4.12.0",
     "sinon": "^9.0.2",
     "tape": "^5.0.0"
   }
