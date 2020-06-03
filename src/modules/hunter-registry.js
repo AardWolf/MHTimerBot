@@ -20,6 +20,9 @@ let someone_initialized = 0;
 let hunterSaveInterval ;
 let hunterRefreshInterval ;
 
+//If a user sets these they go into manual mode
+const manual_properties = ['rank', 'location'];
+
 /**
  * Meant to be called when commands that muck with the hunter registry get loaded
  *
@@ -180,10 +183,34 @@ function setHunterProperty(discordId, property, value) {
         `Your ${property} used to be \`${hunters[discordId][property]}\`. `;
     hunters[discordId][property] = value;
     message_str += `Your ${property} is set to \`${value}\``;
-    if (!hunters[discordId].manual) {
-        hunters[discordId].manual = true;
-        message_str += ' and I stopped tracking you.';
+    if (manual_properties.includes(property))
+        if (!hunters[discordId].manual) {
+            hunters[discordId].manual = true;
+            message_str += ' and I stopped tracking you.';
+        }
+    return message_str;
+}
+
+/**
+ * Returns a stringified version of the hunter's object
+ *
+ * @param {bigint} hunter the discordId for the user to look up
+ * @returns {string} The property string for that ID
+ */
+function getHunterProperties(hunter) {
+    if (!(hunter in hunters))
+        return 'I\'ve never met you before in my life';
+    let message_str = 'Here\'s what I know\n';
+    const properties = ['Rank', 'Location', 'snuid'];
+    for (const property of properties) {
+        if (property.toLowerCase() in hunters[hunter])
+            message_str += `\t**${property}**: ${hunters[hunter][property.toLowerCase()]}\n`;
+        else
+            message_str+= `\t**${property}**: Not Set\n`;
     }
+    if ('manual' in hunters[hunter])
+        message_str += hunters[hunter]['manual'] ? 'You set your rank and/or location' :
+            '**I am updating your rank and location**';
     return message_str;
 }
 
@@ -263,5 +290,6 @@ exports.getHunterByDiscordID = getHunterByDiscordID;
 exports.unsetHunterID = unsetHunterID;
 exports.setHunterID = setHunterID;
 exports.setHunterProperty = setHunterProperty;
+exports.getHunterProperties = getHunterProperties;
 exports.initialize = initialize;
 exports.save = save;
