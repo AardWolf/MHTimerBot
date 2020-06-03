@@ -8,6 +8,7 @@ const stubHunterRegistry = () => {
         unsetHunterID: sinon.stub(hunters, 'unsetHunterID'),
         setHunterProperty: sinon.stub(hunters, 'setHunterProperty'),
         getHuntersByProperty: sinon.stub(hunters, 'getHuntersByProperty'),
+        getHunterProperties: sinon.stub(hunters, 'getHunterProperties'),
     };
 };
 

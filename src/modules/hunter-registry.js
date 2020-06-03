@@ -192,6 +192,29 @@ function setHunterProperty(discordId, property, value) {
 }
 
 /**
+ * Returns a stringified version of the hunter's object
+ *
+ * @param {bigint} hunter the discordId for the user to look up
+ * @returns {string} The property string for that ID
+ */
+function getHunterProperties(hunter) {
+    if (!(hunter in hunters))
+        return 'I\'ve never met you before in my life';
+    let message_str = 'Here\'s what I know\n';
+    const properties = ['Rank', 'Location', 'snuid'];
+    for (const property of properties) {
+        if (property.toLowerCase() in hunters[hunter])
+            message_str += `\t**${property}**: ${hunters[hunter][property.toLowerCase()]}\n`;
+        else
+            message_str+= `\t**${property}**: Not Set\n`;
+    }
+    if ('manual' in hunters[hunter])
+        message_str += hunters[hunter]['manual'] ? 'You set your rank and/or location' :
+            '**I am updating your rank and location**';
+    return message_str;
+}
+
+/**
  * Find random hunter ids to befriend, based on the desired property and criterion.
  *
  * @param {string} property a hunter attribute, like "location" or "rank"
@@ -267,5 +290,6 @@ exports.getHunterByDiscordID = getHunterByDiscordID;
 exports.unsetHunterID = unsetHunterID;
 exports.setHunterID = setHunterID;
 exports.setHunterProperty = setHunterProperty;
+exports.getHunterProperties = getHunterProperties;
 exports.initialize = initialize;
 exports.save = save;

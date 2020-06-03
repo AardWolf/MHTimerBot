@@ -4,9 +4,16 @@ const { Message } = require('discord.js');
 
 const CommandResult = require('../interfaces/command-result');
 const Logger = require('../modules/logger');
-const { unsetHunterID, setHunterID, setHunterProperty, initialize, save } = require('../modules/hunter-registry');
-
-// TODO: Should be able to enable/disable lookups of yourself on a server
+const { unsetHunterID, setHunterID, setHunterProperty, initialize, save, getHunterProperties } = require('../modules/hunter-registry');
+const usage = [
+    '#### - provide a number to set your hunter ID (**Must be done first**)',
+    'rank <rank> - identify your rank',
+    'in <location> - identify where you\'re hunting / looking for friends',
+    'snuid #### - sets your in-game user id',
+    'not - removes you from the registry',
+    'status - shows you what the bot knows about you',
+    'auto - turns on automatic updating of rank and location. Set either of those to turn it off.',
+].join('\n\t');
 
 /**
  * @param {Message} message
@@ -22,7 +29,9 @@ async function doIAM(message, tokens) {
     else if (tokens.length === 1 && tokens[0].toLowerCase() === 'not')
         reply = unsetHunterID(message.author.id);
     else if (tokens.length === 1 && tokens[0].toLowerCase() === 'auto')
-        reply = setHunterProperty(message.author.id, 'auto', true);
+        reply = setHunterProperty(message.author.id, 'manual', false);
+    else if (tokens.length === 1 && tokens[0].toLowerCase() === 'status')
+        reply = getHunterProperties(message.author.id);
     else {
         // received -mh iam <words>. The user can specify where they are hunting, their rank/title, or their in-game id.
         // Nobody should need this many tokens to specify their input, but someone is gonna try for more.
@@ -32,7 +41,7 @@ async function doIAM(message, tokens) {
             if (message.client.nicknames.get('locations')[userText])
                 userText = message.client.nicknames.get('locations')[userText];
             reply = setHunterProperty(message.author.id, 'location', userText);
-        } else if (['rank', 'title', 'a'].indexOf(userCommand) !== -1 && userText) {
+        } else if (['rank', 'title', 'a', 'an'].indexOf(userCommand) !== -1 && userText) {
             if (message.client.nicknames.get('ranks')[userText])
                 userText = message.client.nicknames.get('ranks')[userText];
             reply = setHunterProperty(message.author.id, 'rank', userText);
@@ -40,15 +49,7 @@ async function doIAM(message, tokens) {
             reply = setHunterProperty(message.author.id, 'snuid', userText);
         else {
             const prefix = message.client.settings.botPrefix;
-            const commandSyntax = [
-                'I\'m not sure what to do with that. Try:',
-                `\`${prefix} iam ####\` to set a hunter ID.`,
-                `\`${prefix} iam rank <rank>\` to set a rank.`,
-                `\`${prefix} iam in <location>\` to set a location`,
-                `\`${prefix} iam snuid ####\` to set your in-game user id`,
-                `\`${prefix} iam not\` to unregister (and delete your data)`,
-            ];
-            reply = commandSyntax.join('\n\t');
+            reply = `I'm not sure what to do with that. Try \`${prefix} iam\`:\n${usage}`;
         }
     }
     if (reply) {
@@ -68,13 +69,7 @@ async function doIAM(message, tokens) {
 module.exports = {
     name: 'iam',
     requiresArgs: true,
-    usage: [
-        '#### - provide a number to set your hunter ID (**Must be done first**)',
-        'rank <rank> - identify your rank',
-        'in <location> - identify where you\'re hunting / looking for friends',
-        'snuid #### - sets your in-game user id',
-        'not - removes you from the registry',
-    ].join('\n\t'),
+    usage: usage,
     description: 'Identify yourself so others can find/friend you',
     execute: doIAM,
     initialize: initialize,

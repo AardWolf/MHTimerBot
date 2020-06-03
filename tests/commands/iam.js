@@ -88,11 +88,20 @@ test('commands - IAM', suite => {
 
         const messageStub = mockMessage();
         await IAM.execute(messageStub, ['auto']);
-        t.strictEqual(hunterStubs.setHunterProperty.callCount, 1, 'should call setHunterID');
+        t.strictEqual(hunterStubs.setHunterProperty.callCount, 1, 'should call setHunterProperty');
         const [author, type, tokens] = hunterStubs.setHunterProperty.getCall(0).args;
         t.strictEqual(author, messageStub.author.id, 'Sets for the calling author');
-        t.strictEqual(type, 'auto', 'Called to turn on auto lookup');
-        t.strictEqual(tokens, true, 'Called with true');
+        t.strictEqual(type, 'manual', 'Called to turn off manual mode');
+        t.strictEqual(tokens, false, 'Called with false');
+
+        sinon.reset();
+    });
+    suite.test('when called with "auto" and more tokens - does not calls setHunterProperty', async t => {
+        t.plan(1);
+
+        const messageStub = mockMessage();
+        await IAM.execute(messageStub, ['auto', 'anything', 'else']);
+        t.strictEqual(hunterStubs.setHunterProperty.callCount, 0, 'should not call setHunterProperty');
 
         sinon.reset();
     });
