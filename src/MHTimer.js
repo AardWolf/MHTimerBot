@@ -220,11 +220,13 @@ function Main() {
             // Configure the bot behavior.
             client.once('ready', () => {
                 Logger.log('I am alive!');
+                //Migrate settings at this point since connection required for some pieces
+                migrateSettings(client.settings);
 
                 // Find all text channels on which to send announcements.
                 const announcables = client.guilds.cache.reduce((channels, guild) => {
                     const candidates = guild.channels.cache
-                        .filter(c => settings.timedAnnouncementChannels.has(c.name) && textChannelTypes.has(c.type))
+                        .filter(c => client.settings.guilds[guild.id].timedAnnouncementChannels.has(c.name) && textChannelTypes.has(c.type))
                         .map(tc => tc);
                     if (candidates.length)
                         Array.prototype.push.apply(channels, candidates);
@@ -242,7 +244,11 @@ function Main() {
             });
 
             // Message handling.
-            const re = new RegExp('^' + settings.botPrefix + '\\s');
+            const re = {};
+            for (const guild in client.settings.guilds) {
+                if (client.settings.guilds[guild].botPrefix)
+                    re[guild] = new RegExp('^' + client.settings.guilds[guild].botPrefix.trim() + '\\s');
+            }
             client.on('message', message => {
                 if (message.author.id === client.user.id)
                     return;
@@ -258,7 +264,7 @@ function Main() {
                     default:
                         if (message.channel.type === 'dm')
                             parseUserMessage(message);
-                        else if (re.test(message.content))
+                        else if (re[message.guild.id].test(message.content))
                             parseUserMessage(message);
                         break;
                 }
@@ -337,15 +343,37 @@ function quit() {
  * @returns {boolean} Whether volatile data was serialized, or perhaps not serialized.
  */
 function doSaveAll() {
-    //TODO This is not currently saving hunter data (iam) even though it says it's trying to
     client.commands.filter(command => command.save).every((command => {
         Logger.log(`Saving ${command.name}`);
         Promise.resolve(command.save());
     }));
-    return (saveReminders());
+    return (saveSettings().then(saveReminders()));
 }
 
-
+/**
+ * Takes a settings object and performs whatever migration tasks are needed to get them to current version
+ * @param {Object} original_settings The settings read from disk
+ *
+ * Doesn't return anything; throws on errors
+ */
+function migrateSettings(original_settings) {
+    if (!('version' in original_settings)) {
+        //OG Settings file detected
+        Logger.log('SETTINGS: Migrating from version 0');
+        const guild_settings = {
+            timedAnnouncementChannels: Array.from(original_settings.timedAnnouncementChannels),
+            linkConversionChannel: original_settings.linkConversionChannel,
+            botPrefix: original_settings.botPrefix.trim(),
+        };
+        //Logger.log(`SETTINGS: ${typeof(client.guilds.cache)} - ${JSON.stringify(client.guilds.cache)}`);
+        const guilds = client.guilds.cache;
+        original_settings.guilds = {};
+        guilds.forEach((guild, id) => {
+            original_settings.guilds[guild.id] = guild_settings;
+        });
+        original_settings.version = '1.00';
+    }
+}
 
 /**
  * Load (or reload) settings from the input path, defaulting to the value of 'main_settings_filename'.
@@ -358,22 +386,31 @@ function loadSettings(path = main_settings_filename) {
     return loadDataFromJSON(path).then(data => {
         // (Re)initialize any keys to the value specified in the file.
         Object.assign(settings, data);
-        // Set defaults if they were not specified.
-        if (!settings.linkConversionChannel)
-            settings.linkConversionChannel = 'larrys-freebies';
+        // Pre version 1.00 logic
+        if (!('version' in settings)) {
+            // Set defaults if they were not specified.
+            if (!settings.linkConversionChannel)
+                settings.linkConversionChannel = 'larrys-freebies';
 
-        if (!settings.timedAnnouncementChannels)
-            settings.timedAnnouncementChannels = ['timers'];
-        if (!Array.isArray(settings.timedAnnouncementChannels))
-            settings.timedAnnouncementChannels = settings.timedAnnouncementChannels.split(',').map(s => s.trim());
-        settings.timedAnnouncementChannels = new Set(settings.timedAnnouncementChannels);
+            if (!settings.timedAnnouncementChannels)
+                settings.timedAnnouncementChannels = ['timers'];
+            Logger.log(`TAC: ${JSON.stringify(settings.timedAnnouncementChannels)}`);
+            if (!Array.isArray(settings.timedAnnouncementChannels)) {
+                settings.timedAnnouncementChannels = settings.timedAnnouncementChannels.split(',').map(s => s.trim());
+                Logger.log('Not an array so we turned it into one, sort of');
+            }
+            settings.timedAnnouncementChannels = new Set(settings.timedAnnouncementChannels);
 
-        settings.relic_hunter_webhook = settings.relic_hunter_webhook || '283571156236107777';
+            settings.relic_hunter_webhook = settings.relic_hunter_webhook || '283571156236107777';
 
-        settings.botPrefix = settings.botPrefix ? settings.botPrefix.trim() : '-mh';
+            settings.botPrefix = settings.botPrefix ? settings.botPrefix.trim() : '-mh';
 
-        settings.owner = settings.owner || '0'; // So things don't fail if it's unset
-
+            settings.owner = settings.owner || '0'; // So things don't fail if it's unset
+        } else {
+            for (const guild in settings.guilds) {
+                settings.guilds[guild].timedAnnouncementChannels = new Set(settings.guilds[guild].timedAnnouncementChannels);
+            }
+        }
         if (settings.DBGames && !isValidURL(settings.DBGames)) {
             settings.DBGames = false;
             Logger.log('Settings: invalid value for DBGames, set to false');
@@ -385,6 +422,21 @@ function loadSettings(path = main_settings_filename) {
         Logger.error(`Settings: error while reading settings from '${path}':\n`, err);
         return false;
     });
+}
+
+/**
+ * Writes out the current settings to a file
+ *
+ * @param {string} [path] The file to save to
+ * @returns {Promise<boolean>}
+ */
+function saveSettings(path = main_settings_filename) {
+    const outobj = {};
+    Object.assign(outobj, client.settings);
+    for (const guild in outobj.guilds) {
+        outobj.guilds[guild].timedAnnouncementChannels = Array.from(outobj.guilds[guild].timedAnnouncementChannels);
+    }
+    return saveDataAsJSON(path, outobj);
 }
 
 /**
@@ -509,7 +561,9 @@ function parseUserMessage(message) {
     }
 
     // Messages that come in from public chat channels will be prefixed with the bot's command prefix.
-    if (tokens[0] === settings.botPrefix.trim())
+    const prefix = message.guild ? message.client.settings.guilds[message.guild.id].botPrefix.trim() :
+        message.client.settings.botPrefix.trim();
+    if (message.guild && tokens[0] === prefix)
         tokens.shift();
 
     const command = tokens.shift();
@@ -522,10 +576,12 @@ function parseUserMessage(message) {
     const reminderRequest = tokens.length ? timerAliases(tokens) : {};
     const dynCommand = client.commands.get(command.toLowerCase())
         || client.commands.find(cmd => cmd.aliases && cmd.aliases.includes(command));
+    const botPrefix = message.guild ? message.client.settings.guilds[message.guild.id].botPrefix.trim() :
+        message.client.settings.botPrefix.trim();
     if (dynCommand) {
         if (dynCommand.requiresArgs && !tokens.length) {
             const reply = 'You didn\'t provide arguments.\n' +
-                `\`\`\`\n${settings.botPrefix.trim()} ${dynCommand.name}:\n` +
+                `\`\`\`\n${botPrefix} ${dynCommand.name}:\n` +
                 `\t${dynCommand.usage.replace('\n', '\t\n')}\n\`\`\``;
             message.reply(reply);
         }
@@ -1431,11 +1487,13 @@ async function listRemind(message) {
     let usage_str;
 
     const userReminders = reminders.filter(r => r.user === user && r.count);
+    const botPrefix = message.guild ? message.client.settings.guilds[message.guild.id].botPrefix.trim() :
+        message.client.settings.botPrefix.trim();
     userReminders.forEach(reminder => {
         // TODO: prettyPrint this info.
         const name = `${reminder.area}${reminder.sub_area ? ` (${reminder.sub_area})` : ''}`;
         timer_str += `\nTimer:\t**${name}**`;
-        usage_str = `\`${settings.botPrefix} remind ${reminder.area}`;
+        usage_str = `\`${botPrefix} remind ${reminder.area}`;
         if (reminder.sub_area)
             usage_str += ` ${reminder.sub_area}`;
 
@@ -1520,6 +1578,7 @@ function buildSchedule(timer_request) {
  * Get the help text.
  * TODO: Should this be a MessageEmbed?
  * TODO: Dynamically generate this information based on timers, etc.
+ * TODO: Needs to take a message argument in order to show proper bot prefix or have botprefix as argument
  *
  * @param {string[]} [tokens] An array of user text, the first of which is the specific command to get help for.
  * @returns {string} The desired help text.
@@ -1528,7 +1587,7 @@ function getHelpMessage(tokens) {
     const keywordArray = [ 'remind', 'next', 'find', 'ifind', 'schedule' ];
     keywordArray.push(...client.commands.map(command => command.name));
     const keywords = oxfordStringifyValues(keywordArray.map(name => `\`${name}\``));
-    const prefix = settings.botPrefix;
+    const prefix = settings.botPrefix.trim();
     if (!tokens || !tokens.length) {
         return [
             '**help**',
@@ -1548,7 +1607,7 @@ function getHelpMessage(tokens) {
         || client.commands.find(cmd => cmd.aliases && cmd.aliases.includes(command));
     if (dynCommand) {
         if (dynCommand.usage)
-            return `\`\`\`\n${settings.botPrefix.trim()} ${dynCommand.name}:\n` +
+            return `\`\`\`\n${prefix} ${dynCommand.name}:\n` +
                 `\t${dynCommand.usage.replace('\n', '\t\n')}\n\`\`\``;
         else
             return `I know how to ${command} but I don't know how to tell you how to ${command}`;
