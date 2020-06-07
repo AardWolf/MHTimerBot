@@ -8,7 +8,7 @@ const fs = require('fs');
 
 // Extract type-hinting definitions for Discord classes.
 // eslint-disable-next-line no-unused-vars
-const { Client, Collection, Guild, Message, MessageReaction, MessageEmbed, TextChannel, User } = Discord;
+const { Client, Collection, Guild, GuildMember, Message, MessageReaction, MessageEmbed, TextChannel, User } = Discord;
 
 // Import our own local classes and functions.
 const Timer = require('./modules/timers.js');
@@ -26,6 +26,7 @@ const Logger = require('./modules/logger');
 const {
     addMessageReaction,
 } = require('./modules/message-utils');
+const security = require('./modules/security.js');
 
 // Access external URIs, like @devjacksmith 's tools.
 const fetch = require('node-fetch');
@@ -368,7 +369,7 @@ function migrateSettings(original_settings) {
         //Logger.log(`SETTINGS: ${typeof(client.guilds.cache)} - ${JSON.stringify(client.guilds.cache)}`);
         const guilds = client.guilds.cache;
         original_settings.guilds = {};
-        guilds.forEach((guild, id) => {
+        guilds.forEach((guild) => {
             original_settings.guilds[guild.id] = guild_settings;
         });
         original_settings.version = '1.00';
@@ -590,23 +591,44 @@ function parseUserMessage(message) {
             message.reply(reply);
         }
         else {
-            // Wrap in a promise, in case the dynamic command does not return a promise / is not async.
-            Promise.resolve(dynCommand.execute(message, tokens))
-                // Ideally our dynamic commands will never throw (i.e. they will catch and handle any errors
-                // that occur during their execution) and instead just return the appropriate command result.
-                // In case they leak an exception, catch it here.
-                .catch((commandErr) => {
-                    Logger.error(`Error executing dynamic command ${command.toLowerCase()}`, commandErr);
-                    return message.reply(`Sorry, I couldn't do ${command.toLowerCase()} for ... reasons.`)
-                        .then(() => new CommandResult({ replied: true, botError: true, message }))
-                        .catch((replyErr) => {
-                            Logger.error('Furthermore, replying caused more problems.', replyErr);
-                            return new CommandResult({ botError: true, message });
-                        });
-                })
-                // Whether or not there was an exception executing the command, we now have a CommandResult
-                // we can process further.
-                .then((cmdResult) => addMessageReaction(cmdResult));
+            let canRun = true;
+            if ('minPerm' in dynCommand) {
+                canRun = false;
+                //Protected command, confirm they're allowed to run it
+                if (message.author.id === message.client.settings.owner)
+                    canRun = true;
+                else if (('member' in message) && security.checkPerms(message.member, message.minPerm))
+                    canRun = true;
+            }
+            if (canRun) {
+                // Wrap in a promise, in case the dynamic command does not return a promise / is not async.
+                Promise.resolve(dynCommand.execute(message, tokens))
+                    // Ideally our dynamic commands will never throw (i.e. they will catch and handle any errors
+                    // that occur during their execution) and instead just return the appropriate command result.
+                    // In case they leak an exception, catch it here.
+                    .catch((commandErr) => {
+                        Logger.error(`Error executing dynamic command ${command.toLowerCase()}`, commandErr);
+                        return message.reply(`Sorry, I couldn't do ${command.toLowerCase()} for ... reasons.`)
+                            .then(() => new CommandResult({
+                                replied: true,
+                                botError: true,
+                                message,
+                            }))
+                            .catch((replyErr) => {
+                                Logger.error('Furthermore, replying caused more problems.', replyErr);
+                                return new CommandResult({
+                                    botError: true,
+                                    message,
+                                });
+                            });
+                    })
+                    // Whether or not there was an exception executing the command, we now have a CommandResult
+                    // we can process further.
+                    .then((cmdResult) => addMessageReaction(cmdResult));
+            } else {
+                const reply = `You do not have permission to use \`${command.toLowerCase}\``;
+                message.reply(reply);
+            }
         }
     }
     else
