@@ -626,7 +626,7 @@ function parseUserMessage(message) {
                     // we can process further.
                     .then((cmdResult) => addMessageReaction(cmdResult));
             } else {
-                const reply = `You do not have permission to use \`${command.toLowerCase}\``;
+                const reply = `You do not have permission to use \`${command.toLowerCase()}\``;
                 message.reply(reply);
             }
         }
