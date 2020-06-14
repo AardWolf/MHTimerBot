@@ -29,12 +29,15 @@ async function doNOT_IAM(message, tokens) {
         const subCommand = tokens.shift().toLowerCase();
         // Find the discordID to act on
         let hunter;
-        if (message.mentions && message.mentions.members) {
+        Logger.log(`Triggered for ${message.mentions.members.first()}`);
+        if (message.mentions && message.mentions.members.first()) {
             hunter = message.mentions.members.first().id;
+            Logger.log(`hunter set by mention ${hunter}`);
         }
         else if (tokens[0]) {
             hunter = message.guild.member(tokens[0]);
-            if ('id' in hunter) {
+            Logger.log(`hunter resolved to ${hunter}`);
+            if (hunter && hunter.id) {
                 hunter = hunter.id;
             } else {
                 reply = `I was not able to find a member for ${tokens[0]}`;
@@ -42,13 +45,13 @@ async function doNOT_IAM(message, tokens) {
             }
         }
         if (subCommand === 'user' && hunter) {
-            reply = unsetHunterID(hunter);
+            reply = await unsetHunterID(hunter);
         }
         else if (subCommand === 'block' && hunter) {
-            reply = setHunterProperty(hunter, 'block', 1);
+            reply = await setHunterProperty(hunter, 'block', 1);
         }
         else if (subCommand === 'hid' && hunter && tokens.length > 1) {
-            reply = setHunterProperty(hunter, 'hid', tokens[1]);
+            reply = await setHunterID(hunter, tokens[1]);
         }
         else {
             const prefix = message.client.settings.botPrefix;

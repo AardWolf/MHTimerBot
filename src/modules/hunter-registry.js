@@ -277,12 +277,12 @@ async function populateHunter(discordId) {
 function cleanHunters(message) {
     const author = message.author;
     Logger.log(`Hunter: cleaning cycle triggered by ${author.id} for guild ${message.guild.id}`);
-    hunters.foreach((hunter, discordID) => {
-        if ('hid' in hunter) {
-            // Only look at hunter objects
-            Logger.log(`I'd clean ${hunter} - ${discordID}`);
-        }
-    });
+    Object.keys(hunters)
+        .filter(key => hunters[key].hid)
+        .forEach((discordID) => {
+            Logger.log(`I'd clean ${discordID}`);
+        });
+    return 'Clean cycle complete';
 }
 
 /**
