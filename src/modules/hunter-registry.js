@@ -129,7 +129,7 @@ function unsetHunterID(hunter) {
     let response = '';
     if (hunters[hunter]) {
         delete hunters[hunter];
-        response = '*POOF*, you\'re gone!';
+        response = '*POOF*, all gone!';
     } else
         response = 'I didn\'t do anything but that\'s because you didn\'t do anything either.';
     return response;
@@ -221,7 +221,7 @@ function getHunterProperties(hunter) {
  */
 function getHuntersByProperty(property, criterion, limit = 5) {
     const valid = Object.keys(hunters)
-        .filter(key => hunters[key][property] === criterion)
+        .filter(key => hunters[key][property] === criterion && !('block' in hunters[key]))
         .map(key => hunters[key].hid);
 
     return valid.sort(() => 0.5 - Math.random()).slice(0, limit);
@@ -236,7 +236,7 @@ function getHuntersByProperty(property, criterion, limit = 5) {
  * @returns {string?} the hunter ID of the registered hunter having that Discord ID.
  */
 function getHunterByDiscordID(discordId) {
-    if (hunters[discordId])
+    if (hunters[discordId] && !('block' in hunters[discordId]))
         return hunters[discordId]['hid'];
 }
 
@@ -271,6 +271,21 @@ async function populateHunter(discordId) {
 }
 
 /**
+ * Clean up hunters who are no longer in the server
+ * @param message message that triggered the action
+ */
+function cleanHunters(message) {
+    const author = message.author;
+    Logger.log(`Hunter: cleaning cycle triggered by ${author.id} for guild ${message.guild.id}`);
+    hunters.foreach((hunter, discordID) => {
+        if ('hid' in hunter) {
+            // Only look at hunter objects
+            Logger.log(`I'd clean ${hunter} - ${discordID}`);
+        }
+    });
+}
+
+/**
  * Simple function set in the interval to refresh the hunter locations and ranks
  */
 function refreshHunters() {
@@ -290,3 +305,4 @@ exports.setHunterProperty = setHunterProperty;
 exports.getHunterProperties = getHunterProperties;
 exports.initialize = initialize;
 exports.save = save;
+exports.cleanHunters = cleanHunters;
