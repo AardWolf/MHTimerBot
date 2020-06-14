@@ -1,7 +1,7 @@
 // Type-hinting imports
 // eslint-disable-next-line no-unused-vars
 const { Message } = require('discord.js');
-const { DateTime, Duration } = require('luxon');
+const { Duration } = require('luxon');
 // These two added to auto-populate some values
 const fetch = require('node-fetch');
 const jsdom = require('jsdom');
@@ -12,8 +12,6 @@ const { loadDataFromJSON, saveDataAsJSON } = require('../modules/file-utils');
 const hunter_ids_filename = 'data/hunters.json';
 const hunters = {};
 //const hunters = require('../../data/hunters.json');
-// eslint-disable-next-line no-unused-vars
-let last_save_time = DateTime.utc();
 const save_frequency = Duration.fromObject({ minutes: 5 });
 const refresh_frequency = Duration.fromObject({ minutes: 90 });
 let someone_initialized = 0;
@@ -116,7 +114,6 @@ async function saveHunters(path = hunter_ids_filename) {
     Logger.log('Attempting to save hunter data');
     return saveDataAsJSON(path, hunters).then(didSave => {
         Logger.log(`Hunters: ${didSave ? 'Saved' : 'Failed to save'} ${Object.keys(hunters).length} to '${path}'.`);
-        last_save_time = DateTime.utc();
         return didSave;
     });
 }
