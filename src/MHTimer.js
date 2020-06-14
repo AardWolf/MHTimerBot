@@ -410,6 +410,11 @@ function loadSettings(path = main_settings_filename) {
         } else {
             for (const guild in settings.guilds) {
                 settings.guilds[guild].timedAnnouncementChannels = new Set(settings.guilds[guild].timedAnnouncementChannels);
+                if (settings.guilds[guild].newBotPrefix) {
+                    Logger.log(`Migrating bot prefix to ${settings.guilds[guild].newBotPrefix} for ${guild}`);
+                    settings.guilds[guild].botPrefix = settings.guilds[guild].newBotPrefix;
+                    delete settings.guilds[guild].newBotPrefix;
+                }
             }
         }
         if (settings.DBGames && !isValidURL(settings.DBGames)) {
@@ -735,7 +740,7 @@ function parseUserMessage(message) {
             case 'arrg':
             case 'aarg':
             default: {
-                const helpMessage = getHelpMessage(tokens);
+                const helpMessage = getHelpMessage(message, tokens);
                 // TODO: Send help to PM?
                 message.channel.send(helpMessage ? helpMessage : 'Whoops! That\'s a bug.');
             }
@@ -743,7 +748,7 @@ function parseUserMessage(message) {
     }
 }
 /**
- * Convert a HitGrab shortlink into a BitLy shortlink that does not send the clicker to Facebook.
+ * Convert a HitGrab short link into a BitLy short link that does not send the clicker to Facebook.
  * If successful, sends the converted link to the same channel that received the input message.
  *
  * @param {Message} message a Discord message containing at least one htgb.co URL.
@@ -1600,14 +1605,26 @@ function buildSchedule(timer_request) {
  * Get the help text.
  * TODO: Should this be a MessageEmbed?
  * TODO: Dynamically generate this information based on timers, etc.
- * TODO: Needs to take a message argument in order to show proper bot prefix or have botprefix as argument
  *
+ * @param {Message} message The message that triggered the command
  * @param {string[]} [tokens] An array of user text, the first of which is the specific command to get help for.
  * @returns {string} The desired help text.
  */
-function getHelpMessage(tokens) {
+function getHelpMessage(message, tokens) {
+    // TODO: Remove these as external commands are added
     const keywordArray = [ 'remind', 'next', 'find', 'ifind', 'schedule' ];
-    keywordArray.push(...client.commands.map(command => command.name));
+    keywordArray.push(...client.commands
+        .filter(command => {
+            let canRun = false;
+            if (!command.minPerm)
+                canRun = true;
+            else if (message.author.id === message.client.settings.owner)
+                canRun = true;
+            else if (('member' in message) && security.checkPerms(message.member, command.minPerm))
+                canRun = true;
+            return canRun;
+        })
+        .map(command => command.name));
     const keywords = oxfordStringifyValues(keywordArray.map(name => `\`${name}\``));
     const prefix = settings.botPrefix.trim();
     if (!tokens || !tokens.length) {
@@ -1627,7 +1644,7 @@ function getHelpMessage(tokens) {
 
     const dynCommand = client.commands.get(command)
         || client.commands.find(cmd => cmd.aliases && cmd.aliases.includes(command));
-    if (dynCommand) {
+    if (dynCommand && security.checkPerms(message.member, dynCommand.minPerm)) {
         if (dynCommand.usage)
             return `\`\`\`\n${prefix} ${dynCommand.name}:\n` +
                 `\t${dynCommand.usage.replace('\n', '\t\n')}\n\`\`\``;

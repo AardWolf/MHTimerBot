@@ -10,6 +10,7 @@ const usage = [
     'modrole - define the role on this server for moderation level',
     'adminrole - define the role on this server for admin level',
     'prefix - change the prefix on this server',
+    'timers [add|remove] [<channel>] - add or remove a channel to announce timers in',
 ].join('\n\t');
 
 /**
@@ -21,6 +22,7 @@ const usage = [
 async function doSet(message, tokens) {
     const theResult = new CommandResult({ message, success: false });
     const guild = message.guild;
+    const guildSettings = message.client.settings.guilds[guild.id];
     let reply = '';
     if (!tokens.length)
         tokens = ['view'];
@@ -30,8 +32,8 @@ async function doSet(message, tokens) {
     }
     else if (action === 'view' && guild) {
         // Show current settings
-        reply = `\`adminrole\` - ${message.client.settings.guilds[guild.id].adminrole}\n`;
-        reply += `\`modrole\` - ${message.client.settings.guilds[guild.id].modrole}`;
+        reply = `\`adminrole\` - ${guildSettings.adminrole}\n`;
+        reply += `\`modrole\` - ${guildSettings.modrole}`;
     }
     else if (action === 'modrole' || action === 'adminrole') {
         // Set the moderator role on this server
@@ -42,12 +44,73 @@ async function doSet(message, tokens) {
             const role = guild.roles.cache.get(roleKey);
             Logger.log(`Received ${role}`);
             if (role && role.name) {
-                message.client.settings.guilds[guild.id][action] = role.name;
+                guildSettings[action] = role.name;
                 reply = `${action} set to ${role.name}`;
             }
         }
         Logger.log(`Guild: ${guild.available}\nRole ${newRole}: ${guild.roles.cache.findKey(r => r.name === newRole)}`);
         Logger.log(`Roles: ${guild.roles.cache.array()}`);
+    }
+    else if (action === 'timers') {
+        let subAction = '';
+        if (tokens.length)
+            subAction = tokens.shift().toLowerCase();
+        if (subAction === 'add') {
+            // Next argument should be a channel reference, add it to the array of timer channels.
+            const channels = message.mentions.channels.array();
+            if (channels && channels.length > 0) {
+                const channel = channels.shift();
+                if (!channel)
+                    reply = 'I don\'t think you gave me a channel to add';
+                else if (channel.type !== 'text')
+                    reply = `Didn't add ${channel.toString()} because it's not a text channel`;
+                else if (!channel.name)
+                    reply = `Didn't add ${channel.toString()} because I couldn't figure out its name`;
+                else if (guildSettings.timedAnnouncementChannels.has(channel.name))
+                    reply = `Didn't add ${channel.name} because it's already in the list`;
+                else {
+                    guildSettings.timedAnnouncementChannels.add(channel.name);
+                    reply = `I added ${channel.name} but because Aard is lazy it won't be used until next restart`;
+                }
+            } else {
+                reply = 'I only work with mentions of channels and none were mentioned';
+            }
+        }
+        else if (subAction === 'remove') {
+            // Next argument should be a channel reference, remove it from the array of timer channels.
+            const channels = message.mentions.channels.array();
+            if (channels && channels.length > 0) {
+                const channel = channels.shift();
+                if (!channel)
+                    reply = 'I don\'t think you gave me a channel to remove';
+                else if (!channel.name)
+                    reply = `Didn't remove ${channel.toString()} because I couldn't figure out its name`;
+                else if (guildSettings.timedAnnouncementChannels.has(channel.name)) {
+                    guildSettings.timedAnnouncementChannels.delete(channel.name);
+                    reply = `Removed ${channel.name} but because Aard is lazy it won't stop being used until next restart`;
+                }
+                else {
+                    reply = `I didn't remove ${channel.name} because it's not in use`;
+                }
+            } else {
+                reply = 'I only work with mentions of channels and none was mentioned';
+            }
+        }
+        else {
+            const timers = Array.from(guildSettings.timedAnnouncementChannels);
+            reply = `Timer channels for this server: ${timers.join(', ')}`;
+        }
+    }
+    else if (action === 'prefix') {
+        if (tokens.length) {
+            guildSettings.newBotPrefix = tokens.shift();
+            reply = `New prefix for this server after the bot restarts: \`${guildSettings.newBotPrefix}\``;
+        } else {
+            reply = `Current prefix for this server: \`${guildSettings.botPrefix}\``;
+            if (guildSettings.newBotPrefix) {
+                reply += `\nAfter restart the prefix will be \`${guildSettings.newBotPrefix}\``;
+            }
+        }
     }
     if (reply) {
         try {
