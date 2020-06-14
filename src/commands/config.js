@@ -133,4 +133,5 @@ module.exports = {
     description: 'Configure settings per server',
     execute: doSet,
     minPerm: 'admin',
+    canDM: false,
 };

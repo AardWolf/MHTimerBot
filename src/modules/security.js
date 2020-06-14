@@ -3,8 +3,6 @@ const Discord = require('discord.js');
 // Extract type-hinting definitions for Discord classes.
 // eslint-disable-next-line no-unused-vars
 const { Client, Collection, Guild, GuildMember, User } = Discord;
-const Logger = require('../modules/logger');
-
 
 /**
  * Checks the permissions of the member to see if they're at the minimum level
