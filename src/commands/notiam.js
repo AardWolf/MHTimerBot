@@ -4,7 +4,7 @@ const { Message, GuildMember, Snowflake } = require('discord.js');
 
 const CommandResult = require('../interfaces/command-result');
 const Logger = require('../modules/logger');
-const { unsetHunterID, setHunterID, setHunterProperty, getHunterProperties, cleanHunters } = require('../modules/hunter-registry');
+const { unsetHunterID, setHunterID, setHunterProperty, cleanHunters } = require('../modules/hunter-registry');
 const usage = [
     'user USER - Removes the user from the registry',
     'block USER - Removes and blocks the user from re-registering, `user` undoes the block',
@@ -29,14 +29,11 @@ async function doNOT_IAM(message, tokens) {
         const subCommand = tokens.shift().toLowerCase();
         // Find the discordID to act on
         let hunter;
-        Logger.log(`Triggered for ${message.mentions.members.first()}`);
         if (message.mentions && message.mentions.members.first()) {
             hunter = message.mentions.members.first().id;
-            Logger.log(`hunter set by mention ${hunter}`);
         }
         else if (tokens[0]) {
             hunter = message.guild.member(tokens[0]);
-            Logger.log(`hunter resolved to ${hunter}`);
             if (hunter && hunter.id) {
                 hunter = hunter.id;
             } else {
@@ -44,7 +41,7 @@ async function doNOT_IAM(message, tokens) {
                 hunter = '';
             }
         }
-        if (subCommand === 'user' && hunter) {
+        if ((subCommand === 'user' || subCommand === 'remove') && hunter) {
             reply = await unsetHunterID(hunter);
         }
         else if (subCommand === 'block' && hunter) {
@@ -55,7 +52,7 @@ async function doNOT_IAM(message, tokens) {
         }
         else {
             const prefix = message.client.settings.botPrefix;
-            reply = `I'm not sure what to do with that. Try \`${prefix} notiam\`:\n${usage}`;
+            reply = `I'm not sure what to do with that. Try \`${prefix} notiam\`:\n\t${usage}`;
         }
     }
     if (reply) {

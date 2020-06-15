@@ -272,6 +272,7 @@ async function populateHunter(discordId) {
 
 /**
  * Clean up hunters who are no longer in the server
+ * TODO: This needs to work with multiple servers -- might be handled in unsetHunterID
  * @param message message that triggered the action
  */
 function cleanHunters(message) {
@@ -280,7 +281,10 @@ function cleanHunters(message) {
     Object.keys(hunters)
         .filter(key => hunters[key].hid)
         .forEach((discordID) => {
-            Logger.log(`I'd clean ${discordID}`);
+            if(!message.guild.member(discordID)) {
+                Logger.log(`Cleaning up ${discordID} from ${message.guild.id}`);
+                unsetHunterID(discordID);
+            }
         });
     return 'Clean cycle complete';
 }
