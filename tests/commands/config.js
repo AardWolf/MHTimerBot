@@ -104,12 +104,12 @@ test('commands - config', suite => {
     });
     suite.test('when user is admin; prefix, 1 token shows current prefix', async t => {
         t.plan(3);
-
         const messageStub = mockMessage();
         const memberStub = mockMember();
-        messageStub.guild = memberStub.guild;
-        messageStub.client = memberStub.client;
         memberStub.hasPermission.withArgs('ADMINISTRATOR').returns(true);
+        memberStub.hasPermission.withArgs('MANAGE_MESSAGES').returns(false);
+        messageStub.client = memberStub.client;
+        messageStub.guild = memberStub.guild;
         messageStub.member = memberStub;
         const result = await CONFIG.execute(messageStub, ['prefix']);
         t.true(result.replied, 'should reply to admin');
