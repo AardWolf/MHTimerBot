@@ -569,7 +569,7 @@ function parseUserMessage(message) {
     // Messages that come in from public chat channels will be prefixed with the bot's command prefix.
     const prefix = message.guild ? message.client.settings.guilds[message.guild.id].botPrefix.trim() :
         message.client.settings.botPrefix.trim();
-    if (message.guild && tokens[0] === prefix)
+    if (tokens[0] === prefix)
         tokens.shift();
 
     const command = tokens.shift();
@@ -1627,7 +1627,8 @@ function getHelpMessage(message, tokens) {
     keywordArray.push(...allowedCommands.map(command => command.name));
     const keywords = oxfordStringifyValues(keywordArray.map(name => `\`${name}\``));
     const prefix = settings.botPrefix.trim();
-    if (!tokens || !tokens.length) {
+    Logger.log(`called with tokens: ${JSON.stringify(tokens)}`);
+    if (!tokens || !tokens.length || tokens.length === 1) {
         return [
             '**help**',
             `I know the keywords ${keywords}.`,
