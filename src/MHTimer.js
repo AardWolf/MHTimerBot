@@ -1987,11 +1987,23 @@ function getFilterList() {
 }
 
 /**
+ * Consistently format a rate
+ * @param denominator
+ * @param numerator
+ * @returns a string representation of the rate
+ */
+function calculateRate(denominator, numerator) {
+    const value = denominator ? Number(numerator / denominator) : 0;
+    const value2 = value.toPrecision(Math.max(Math.ceil(Math.log10(value)), 4));
+    return Number.parseFloat(value2).toFixed(value2 > 1 ? 0 : 4);
+}
+
+/**
  * Check the input args for a known item that can be looked up.
  * If no result is found, retries with a mouse search.
  *
  * @param {TextChannel} channel the channel on which to respond.
- * @param {string} args a lowercased string of search criteria.
+ * @param {string} args a lower cased string of search criteria.
  * @param {string} command the command switch used to initiate the request.
  */
 function findItem(channel, args, command) {
@@ -1999,7 +2011,7 @@ function findItem(channel, args, command) {
      * Request the latest information about the valid item.
      * @param {boolean} canSpam Whether the long or short response should be sent back.
      * @param {DatabaseEntity} item The valid item to query for
-     * @param {Object <string, string>} opts Additional querystring parameters for the request, like 'timefilter'
+     * @param {Object <string, string>} opts Additional querystring parameters for the request, like 'time filter'
      * @returns {Promise<string>} The result of the lookup.
      */
     function _getQueryResult(canSpam, item, opts) {
@@ -2014,7 +2026,7 @@ function findItem(channel, args, command) {
                         location: setup.location,
                         stage: setup.stage === null ? ' N/A ' : setup.stage,
                         total_hunts: integerComma(setup.total_catches),
-                        rate: setup.rate_per_catch * 1.0 / 1000, // Divide by 1000? should this be 100?
+                        rate: calculateRate(setup.total_catches, setup.total_drops) || 0,
                         cheese: setup.cheese,
                     };
                 });
