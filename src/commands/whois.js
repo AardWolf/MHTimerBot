@@ -72,6 +72,7 @@ async function doWHOIS(message, tokens) {
         } else if (foundHunters.length === 0) {
             reply = 'No hunters matched that search';
         } else if (foundHunters.length === 1) {
+            //TODO: Make this a reference to a user in the server.
             reply = `1 match for '${tokens.join(' ')}' is https://mshnt.ca/p/${foundHunters[0]}`;
         } else {
             // eslint-disable-next-line no-useless-escape
