@@ -30,7 +30,7 @@ const security = require('./modules/security.js');
 
 // Access external URIs, like @devjacksmith 's tools.
 const fetch = require('node-fetch');
-const { URLSearchParams } = require('url');
+const { URLSearchParams } = require('url'); // Not used once find/ifind were moved?
 // We need more robust CSV handling
 const csv_parse = require('csv-parse');
 
@@ -1627,8 +1627,7 @@ function getHelpMessage(message, tokens) {
     keywordArray.push(...allowedCommands.map(command => command.name));
     const keywords = oxfordStringifyValues(keywordArray.map(name => `\`${name}\``));
     const prefix = settings.botPrefix.trim();
-    Logger.log(`called with tokens: ${JSON.stringify(tokens)}`);
-    if (!tokens || !tokens.length || tokens.length === 1) {
+    if (!tokens || !tokens.length) {
         return [
             '**help**',
             `I know the keywords ${keywords}.`,
@@ -1704,119 +1703,6 @@ function getHelpMessage(message, tokens) {
         return `I don't know that one, but I do know ${keywords}.`;
 }
 
-/**
- * @typedef {Object} DatabaseEntity
- * @property {string} id The ID of the entity
- * @property {string} value The entity's proper name
- * @property {string} lowerValue A lowercased version of the entity's name
- */
-
-/**
- * Query @devjacksmith's database for information about the given "item"
- *
- * @param {'loot'|'mouse'} queryType The type of "item" whose data is requested.
- * @param {DatabaseEntity} dbEntity Identifying information about the "item"
- * @param {Object <string, string>} [options] Any additional querystring options that should be set
- * @returns {Promise <any>} Result of the query to @devjacksmiths database
- */
-function getQueriedData(queryType, dbEntity, options) {
-    // TODO: fetch each value once, cache, and try to first serve cached content.
-    if (!dbEntity || !dbEntity.id || !dbEntity.value)
-        return Promise.reject({ error: `Could not perform a '${queryType}' query`, response: null });
-    // Check cache
-    /**
-     * Replace with actual cache checking:
-     * let cache_result = Cache.get(queryType, dbEntity.id, options)
-     * if (cache_result)
-     *   return Promise.resolve(cache_result);
-     */
-
-    // No result in cache, requery.
-    const qsOptions = new URLSearchParams(options);
-    qsOptions.append('item_type', queryType);
-    qsOptions.append('item_id', dbEntity.id);
-
-    return fetch('https://mhhunthelper.agiletravels.com/searchByItem.php?' + qsOptions.toString())
-        .then((response) => {
-            if (response.ok) {
-                /**
-                 * Replace with actual cache storage:
-                 * Cache.put(queryType, dbEntity.id, options, body);
-                 */
-                return response.json();
-            } else {
-                throw { error: `HTTP ${response.status}`, response };
-            }
-        });
-}
-
-/**
- * Process args for flags, like the -e event filter. Returns the args without any processed flags.
- *
- * @param {string} args a lowercased string of search criteria that may contain flags that map to querystring parameters
- * @param {Object <string, string>} qsParams an object which will have any discovered querystring parameters added
- * @returns {string} args, after stripping out any tokens associated with querystring parameters.
- */
-function removeQueryStringParams(args, qsParams) {
-    const tokens = args.split(/\s+/);
-    if (tokens.length > 2) {
-        if (tokens[0] === '-e') {
-            // Allow shorthand specifications instead of only the literal `last3days`.
-            // TODO: discover valid shorthands on startup.
-            // TODO: parse flag and argument even if given after the query.
-            switch (tokens[1].toLowerCase()) {
-                case '3':
-                case '3d':
-                    tokens[1] = '3_days';
-                    break;
-                case 'current':
-                    // Default to last 3 days, but if there is an ongoing event, use that instead.
-                    tokens[1] = '1_month';
-                    for (const filter of filters) {
-                        if (filter.start_time && !filter.end_time && filter.code_name !== tokens[1]) {
-                            tokens[1] = filter.code_name;
-                            break;
-                        }
-                    }
-                    break;
-            }
-            qsParams.timefilter = tokens[1].toString();
-            tokens.splice(0, 2);
-        }
-        // TODO: other querystring params (once supported).
-        args = tokens.join(' ');
-    }
-    return args;
-}
-
-/**
- * Initialize (or refresh) the known mice lists from @devjacksmith's tools.
- * @returns {Promise<void>}
- */
-function getMouseList() {
-    const now = DateTime.utc();
-    // Only request a mouse list update every so often.
-    if (last_timestamps.mouse_refresh) {
-        const next_refresh = last_timestamps.mouse_refresh.plus(refresh_rate);
-        if (now < next_refresh)
-            return Promise.resolve();
-    }
-    last_timestamps.mouse_refresh = now;
-
-    // Query @devjacksmith's tools for mouse lists.
-    Logger.log('Mice: Requesting a new mouse list.');
-    const url = 'https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=mouse&item_id=all';
-    return fetch(url).then(response => (response.status === 200) ? response.json() : '').then((body) => {
-        if (body) {
-            Logger.log('Mice: Got a new mouse list.');
-            mice.length = 0;
-            Array.prototype.push.apply(mice, body);
-            mice.forEach(mouse => mouse.lowerValue = mouse.value.toLowerCase());
-        } else {
-            Logger.warn('Mice: request returned non-200 response');
-        }
-    }).catch(err => Logger.error('Mice: request returned error:', err));
-}
 
 /**
  * Check the input args for a known mouse that can be looked up.
@@ -1960,32 +1846,6 @@ function getItemList() {
     }).catch(err => Logger.error('Mice: request returned error:', err));
 }
 
-/**
- * Initialize (or refresh) the known filters from @devjacksmith's tools.
- * @returns {Promise<void>}
- */
-function getFilterList() {
-    const now = DateTime.utc();
-    if (last_timestamps.filter_refresh) {
-        const next_refresh = last_timestamps.filter_refresh.plus(refresh_rate);
-        if (now < next_refresh)
-            return Promise.resolve();
-    }
-    last_timestamps.filter_refresh = now;
-
-    Logger.log('Filters: Requesting a new filter list.');
-    const url = 'https://mhhunthelper.agiletravels.com/filters.php';
-    return fetch(url).then(response => (response.status === 200) ? response.json() : '').then((body) => {
-        if (body) {
-            Logger.log('Filters: Got a new filter list');
-            filters.length = 0;
-            Array.prototype.push.apply(filters, body);
-            filters.forEach(filter => filter.lowerValue = filter.code_name.toLowerCase());
-        } else {
-            Logger.warn('Filters: request returned non-200 response');
-        }
-    }).catch(err => Logger.error('Filters: request returned error:', err));
-}
 
 /**
  * Consistently format a rate
