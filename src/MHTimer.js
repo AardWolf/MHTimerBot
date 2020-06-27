@@ -569,7 +569,7 @@ function parseUserMessage(message) {
     // Messages that come in from public chat channels will be prefixed with the bot's command prefix.
     const prefix = message.guild ? message.client.settings.guilds[message.guild.id].botPrefix.trim() :
         message.client.settings.botPrefix.trim();
-    if (message.guild && tokens[0] === prefix)
+    if (tokens[0] === prefix)
         tokens.shift();
 
     const command = tokens.shift();
@@ -1613,7 +1613,7 @@ function buildSchedule(timer_request) {
 function getHelpMessage(message, tokens) {
     // TODO: Remove these as external commands are added
     const keywordArray = [ 'remind', 'next', 'find', 'ifind', 'schedule' ];
-    keywordArray.push(...client.commands
+    const allowedCommands = client.commands
         .filter(command => {
             let canRun = false;
             if (!command.minPerm)
@@ -1623,11 +1623,12 @@ function getHelpMessage(message, tokens) {
             else if (('member' in message) && security.checkPerms(message.member, command.minPerm))
                 canRun = true;
             return canRun;
-        })
-        .map(command => command.name));
+        });
+    keywordArray.push(...allowedCommands.map(command => command.name));
     const keywords = oxfordStringifyValues(keywordArray.map(name => `\`${name}\``));
     const prefix = settings.botPrefix.trim();
-    if (!tokens || !tokens.length) {
+    Logger.log(`called with tokens: ${JSON.stringify(tokens)}`);
+    if (!tokens || !tokens.length || tokens.length === 1) {
         return [
             '**help**',
             `I know the keywords ${keywords}.`,
@@ -1642,9 +1643,9 @@ function getHelpMessage(message, tokens) {
     const dbFilters = filters.reduce((acc, filter) => `${acc}\`${filter.code_name}\`, `, '') + 'and `current`';
     const command = tokens[0].toLowerCase();
 
-    const dynCommand = client.commands.get(command)
-        || client.commands.find(cmd => cmd.aliases && cmd.aliases.includes(command));
-    if (dynCommand && security.checkPerms(message.member, dynCommand.minPerm)) {
+    const dynCommand = allowedCommands.get(command)
+        || allowedCommands.find(cmd => cmd.aliases && cmd.aliases.includes(command));
+    if (dynCommand) {
         if (dynCommand.usage)
             return `\`\`\`\n${prefix} ${dynCommand.name}:\n` +
                 `\t${dynCommand.usage.replace('\n', '\t\n')}\n\`\`\``;
