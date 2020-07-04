@@ -2,14 +2,7 @@ const fetch = require('node-fetch');
 const { URLSearchParams } = require('url');
 const Logger = require('../modules/logger');
 const { DateTime, Duration } = require('luxon');
-const {
-    oxfordStringifyValues,
-    prettyPrintArrayAsString,
-    splitString,
-    timeLeft,
-    unescapeEntities,
-    isValidURL,
-} = require('../modules/format-utils');
+const { calculateRate, prettyPrintArrayAsString, intToHuman } = require('../modules/format-utils');
 
 const refresh_rate = Duration.fromObject({ minutes: 5 });
 const refresh_list = {
@@ -23,10 +16,68 @@ const filters = [],
 let someone_initialized = 0;
 
 /**
+ * @param {Object} loot A loot object - it has an id and a value
+ * @param {Object} opts Options property. It has filter and DM information
+ * @returns {Promise<string>} Formatted loot table
+ */
+async function formatLoot(loot, opts) {
+    const results = await findThing('loot', loot.id, opts);
+    const no_stage = ' N/A ';
+    const drops = results.filter(loot => loot.total_catches > 99)
+        .map(loot => {
+            return {
+                location: loot.location,
+                stage: loot.stage === null ? no_stage : loot.stage,
+                cheese: loot.cheese,
+                total_catches: intToHuman(loot.total_catches),
+                dr: calculateRate(loot.total_catches, loot.total_drops),
+                pct: loot.drop_pct,
+            };
+        });
+    if (!drops.length)
+        return '';
+    const order = ['location', 'stage', 'cheese', 'pct', 'dr', 'total_catches'];
+    const labels = { location: 'Location', stage: 'Stage', total_catches: 'Catches',
+        dr: '/Catch', cheese: 'Cheese', pct: 'Chance' };
+    //Sort the results
+    drops.sort((a, b) => parseFloat(b.dr) - parseFloat(a.dr));
+    drops.splice(opts.isDM ? 100 : 10);
+    if (drops.every(row => row.stage === no_stage))
+        order.splice(order.indexOf('stage'), 1);
+    // Column Formatting specification.
+    /** @type {Object <string, ColumnFormatOptions>} */
+    const columnFormatting = {};
+    const headers = order.map(key => {
+        columnFormatting[key] = {
+            columnWidth: labels[key].length,
+            alignRight: !isNaN(parseInt(drops[0][key], 10)),
+        };
+        return { 'key': key, 'label': labels[key] };
+    });
+    // Give the numeric column proper formatting.
+    // TODO: toLocaleString - can it replace integerComma too?
+    columnFormatting['dr'] = {
+        alignRight: true,
+        isFixedWidth: true,
+        columnWidth: 7,
+    };
+    columnFormatting['pct'] = {
+        alignRight: true,
+        isFixedWidth: true,
+        suffix: '%',
+        columnWidth: 7,
+    };
+    let reply = `${loot.value} (loot) can be found the following ways:\n\`\`\``;
+    reply += prettyPrintArrayAsString(drops, columnFormatting, headers, '=');
+    return reply;
+}
+
+
+/**
  * Return a sorted list of approximate matches to the given input and container
  *
  * @param {string} input The text to match against
- * @param {DatabaseEntity[]} values The known values.
+ * @param {Array} values An array of objects with a lowerValue property.
  * @returns {Array <number>[]} Up to 10 indices and their search score.
  */
 function getSearchedEntity(input, values) {
@@ -51,8 +102,35 @@ function getSearchedEntity(input, values) {
  * @param {String} tester String to check if it's a filter
  * @returns {boolean} whether the filter is known
  */
-function isFilter(tester) {
-    return !!getSearchedEntity(tester, filters).length;
+function getFilter(tester) {
+    // Process filter-y nicknames
+    if (tester.startsWith('3'))
+        tester = '3_days';
+    else if (tester.startsWith('all'))
+        tester = 'alltime';
+    else if (tester === 'current') {
+        tester = '1_month';
+        for (const filter of filters) {
+            if (filter.start_time && !filter.end_time && filter.code_name !== tester) {
+                tester = filter.code_name;
+                break;
+            }
+        }
+    }
+    return getSearchedEntity(tester, filters)[0];
+}
+
+/**
+ * Checks if the loot listed is one we know about. Returns the highest scoring match
+ *
+ * @param {string} tester The loot we're looking for
+ * @param {Array} nicknames The nicknames for loot
+ * @returns {Array<number>} The first loot that matched
+ */
+function getLoot(tester, nicknames) {
+    if (nicknames[tester])
+        tester = nicknames[tester];
+    return getSearchedEntity(tester, loot)[0];
 }
 
 /**
@@ -70,9 +148,9 @@ async function findThing(type, id, options) {
     const qsOptions = new URLSearchParams(options);
     qsOptions.append('item_type', type);
     qsOptions.append('item_id', id);
-    const url = 'https:////mhhunthelper.agiletravels.com/searchByItem.php?' + qsOptions.toString();
+    const url = 'https://mhhunthelper.agiletravels.com/searchByItem.php?' + qsOptions.toString();
     return await fetch(url)
-        .then(response => response.ok ? response.json() : [])
+        .then(response => response.json())
         .catch(err => {
             Logger.log(`findThings: Error getting item ${qsOptions.toString()} - ${err}`);
         });
@@ -188,4 +266,6 @@ module.exports.removeQueryStringParams = removeQueryStringParams;
 module.exports.getMHCTList = getMHCTList;
 module.exports.initialize = initialize;
 module.exports.findThing = findThing;
-module.exports.isFilter = isFilter;
+module.exports.getFilter = getFilter;
+module.exports.getLoot = getLoot;
+module.exports.formatLoot = formatLoot;

@@ -30,7 +30,6 @@ const security = require('./modules/security.js');
 
 // Access external URIs, like @devjacksmith 's tools.
 const fetch = require('node-fetch');
-const { URLSearchParams } = require('url'); // Not used once find/ifind were moved?
 // We need more robust CSV handling
 const csv_parse = require('csv-parse');
 
@@ -189,19 +188,6 @@ function Main() {
                     dataTimers['nicknames'] = setInterval(refreshNicknameData, saveInterval);
                 });
 
-            // Register filters
-            const hasFilters = Promise.resolve()
-                .then(getFilterList)
-                .then(() => {
-                    return Object.keys(filters).length > 0;
-                })
-                .catch(err => failedLoad('Filters: import error:\n', err));
-            hasFilters
-                .then(() => {
-                    Logger.log(`Filters: Configuring refresh every ${saveInterval / (60 * 1000)} min.`);
-                    dataTimers['filters'] = setInterval(getFilterList, saveInterval);
-                });
-
             // Register DBGames short -> long mappings
             const hasDBGamesLocations = loadDBGamesLocations()
                 .then(DBGamesLocationData => {
@@ -213,8 +199,6 @@ function Main() {
 
             // Start loading remote data.
             const remoteData = [
-                getMouseList(),
-                getItemList(),
                 getRHLocation(),
             ];
 
@@ -287,7 +271,6 @@ function Main() {
             // Configuration complete. Using Promise.all() requires these tasks to complete
             // prior to bot login.
             return Promise.all([
-                hasFilters,
                 hasNicknames,
                 hasReminders,
                 hasTimers,
@@ -705,18 +688,6 @@ function parseUserMessage(message) {
                 }
                 break;
 
-            // Display information about the desired item.
-            case 'ifind':
-                if (!tokens.length)
-                    message.channel.send('You have to supply an item to find');
-                else {
-                    const criteria = tokens.join(' ').trim().toLowerCase();
-                    if (criteria.length < 2)
-                        message.channel.send('Your search string was too short, try again.');
-                    else
-                        findItem(message.channel, criteria, 'ifind');
-                }
-                break;
             case 'reset':
                 if (message.author.id === settings.owner) {
                     if (!tokens.length) {
