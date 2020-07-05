@@ -1,5 +1,5 @@
 const Logger = require('../modules/logger');
-const { initialize, getFilter, getLoot, formatLoot } = require('../modules/mhct-lookup');
+const { initialize, getFilter, getLoot, formatLoot, sendInteractiveSearchResult } = require('../modules/mhct-lookup');
 const CommandResult = require('../interfaces/command-result');
 
 /**
@@ -12,34 +12,42 @@ async function doIFIND(message, tokens) {
     const theResult = new CommandResult({ message, success: false, sentDM: false });
     let reply = '';
     const opts = {};
+    const urlInfo = {
+        qsParams: {},
+        uri: 'https://mhhunthelper.agiletravels.com/loot.php',
+        type: 'item',
+    };
     if (!tokens)
         reply = 'I just cannot find what you\'re looking for (since you didn\'t tell me what it was).';
     else {
         //Set the filter if it's requested
+        if (tokens[0] === '-e')
+            tokens.shift();
         const filter = getFilter(tokens[0]);
         if (filter && 'code_name' in filter) {
             opts.timefilter = filter.code_name;
             tokens.shift();
         }
-        CommandResult.sentDM = opts.isDM;
         // Figure out what they're searching for
         const searchString = tokens.join(' ');
         // TODO: When I put the reaction menu back it goes here
-        const loot = getLoot(searchString, message.client.nicknames.get('loot'));
-        if (loot && 'id' in loot) {
-            reply = await formatLoot(loot, opts);
-            if (reply) {
-                reply += '```\n' + `HTML version at: <https://mhhunthelper.agiletravels.com/?loot=${loot.id}&timefilter=${opts.timefilter ? opts.timefilter : 'all_time'}>`;
-            }
-            else
-                reply = `There weren't enough valuable results for ${loot.value}`;
+        const all_loot = getLoot(searchString, message.client.nicknames.get('loot'));
+        if (all_loot && all_loot.length) {
+            // We have multiple options, show the interactive menu
+            urlInfo.qsParams = opts;
+            sendInteractiveSearchResult(all_loot, message.channel, formatLoot,
+                ['dm', 'group'].includes(message.channel.type), urlInfo, tokens);
+            theResult.replied = true;
+            theResult.success = true;
+            theResult.sentDM = ['dm', 'group'].includes(message.channel.type);
         } else {
-            reply = `I don't know anything about ${searchString}`;
+            reply = `I don't know anything about the loot "${searchString}", is it a mouse?`;
         }
     }
     if (reply) {
         try {
-            await message.channel.send(reply, { split: { prepend: '```', append: '```' } });
+            // Note that a lot of this is handled by sendInteractiveSearchResult
+            await message.channel.send(reply, { split: { prepend: '```\n', append: '\n```' } });
             theResult.replied = true;
             theResult.success = true;
             theResult.sentDM = ['dm', 'group'].includes(message.channel.type);

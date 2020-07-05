@@ -3,6 +3,7 @@ const { URLSearchParams } = require('url');
 const Logger = require('../modules/logger');
 const { DateTime, Duration } = require('luxon');
 const { calculateRate, prettyPrintArrayAsString, intToHuman } = require('../modules/format-utils');
+const { MessageEmbed } = require('discord.js');
 
 const refresh_rate = Duration.fromObject({ minutes: 5 });
 const refresh_list = {
@@ -15,33 +16,115 @@ const filters = [],
     loot = [];
 let someone_initialized = 0;
 
+const emojis = [
+    { id: '1%E2%83%A3', text: ':one:' },
+    { id: '2%E2%83%A3', text: ':two:' },
+    { id: '3%E2%83%A3', text: ':three:' },
+    { id: '4%E2%83%A3', text: ':four:' },
+    { id: '5%E2%83%A3', text: ':five:' },
+    { id: '6%E2%83%A3', text: ':six:' },
+    { id: '7%E2%83%A3', text: ':seven:' },
+    { id: '8%E2%83%A3', text: ':eight:' },
+    { id: '9%E2%83%A3', text: ':nine:' },
+    { id: '%F0%9F%94%9F', text: ':keycap_ten:' },
+];
+
+
 /**
+ * Construct and dispatch a reaction-enabled message for interactive "search result" display.
+ *
+ * @param {DatabaseEntity[]} searchResults An ordered array of objects that resulted from a search.
+ * @param {TextChannel} channel The channel on which the client received the find request.
+ * @param {Function} dataCallback a Promise-returning function that converts the local entity data into the desired text response.
+ * @param {boolean} isDM Whether the response will be to a private message (i.e. if the response can be spammy).
+ * @param {{qsParams: Object <string, string>, uri: string, type: string}} urlInfo Information about the query that returned the given matches, including querystring parameters, uri, and the type of search.
+ * @param {string} searchInput a lower-cased representation of the user's input.
+ */
+function sendInteractiveSearchResult(searchResults, channel, dataCallback, isDM, urlInfo, searchInput) {
+    // Associate each search result with a "numeric" emoji.
+    const matches = searchResults.map((sr, i) => ({ emojiId: emojis[i].id, match: sr }));
+    // Construct a MessageEmbed with the search result information, unless this is for a PM with a single response.
+    const embed = new MessageEmbed({
+        title: `Search Results for '${searchInput}'`,
+        thumbnail: { url: 'https://cdn.discordapp.com/emojis/359244526688141312.png' }, // :clue:
+        footer: { text: `For any reaction you select, I'll ${isDM ? 'send' : 'PM'} you that information.` },
+    });
+
+    // Pre-compute the url prefix & suffix for each search result. Assumption: single-valued querystring params.
+    const urlPrefix = `${urlInfo.uri}?${urlInfo.type}=`;
+    const urlSuffix = Object.keys(urlInfo.qsParams).reduce((acc, key) => `${acc}&${key}=${urlInfo.qsParams[key]}`, '');
+    // Generate the description to include the reaction, name, and link to HTML data on @devjacksmith's website.
+    const description = matches.reduce((acc, entity, i) => {
+        const url = `${urlPrefix}${entity.match.id}${urlSuffix}`;
+        const row = `\n\t${emojis[i].text}:\t[${entity.match.value}](${url})`;
+        return acc + row;
+    }, `I found ${matches.length === 1 ? 'a single result' : `${matches.length} good results`}:`);
+    embed.setDescription(description);
+
+    const searchResponse = (isDM && matches.length === 1)
+        ? `I found a single result for '${searchInput}':`
+        : embed;
+    const sent = channel.send(searchResponse);
+    // To ensure a sensible order of emojis, we have to await the previous react's resolution.
+    if (!isDM || matches.length > 1)
+        sent.then(async (msg) => {
+            /** @type MessageReaction[] */
+            const mrxns = [];
+            for (const m of matches)
+                mrxns.push(await msg.react(m.emojiId).catch(err => Logger.error(err)));
+            return mrxns;
+        }).then(msgRxns => {
+            // Set a 5-minute listener on the message for these reactions.
+            const msg = msgRxns[0].message,
+                allowed = msgRxns.map(mr => mr.emoji.name),
+                filter = (reaction, user) => allowed.includes(reaction.emoji.name) && !user.bot,
+                rc = msg.createReactionCollector(filter, { time: 5 * 60 * 1000 });
+            rc.on('collect', (mr, user) => {
+                // Fetch the response and send it to the user.
+                const match = matches.filter(m => m.emojiId === mr.emoji.identifier)[0];
+                if (match) dataCallback(true, match.match, urlInfo.qsParams).then(
+                    result => user.send(result || `Not enough quality data for ${searchInput}`, { split: { prepend: '```', append: '```' } }),
+                    result => user.send(result || 'Not enough quality data to display this 4'),
+                ).catch(err => Logger.error(err));
+            }).on('end', () => rc.message.delete().catch(() => Logger.log('Unable to delete reaction message')));
+        }).catch(err => Logger.error('Reactions: error setting reactions:\n', err));
+
+    // Always send one result to the channel.
+    sent.then(() => dataCallback(isDM, matches[0].match, urlInfo.qsParams).then(
+        result => channel.send(result || `Not enough quality data for ${searchInput}`, { split: { prepend: '```\n', append: '\n```' } }),
+        result => channel.send(result)),
+    ).catch(err => Logger.error(err));
+}
+
+/**
+ * @param {boolean} isDM Whether the command came as a DM
  * @param {Object} loot A loot object - it has an id and a value
  * @param {Object} opts Options property. It has filter and DM information
  * @returns {Promise<string>} Formatted loot table
  */
-async function formatLoot(loot, opts) {
+async function formatLoot(isDM, loot, opts) {
     const results = await findThing('loot', loot.id, opts);
     const no_stage = ' N/A ';
+    const target_url = `<https://mhhunthelper.agiletravels.com/loot.php?item=${loot.id}&timefilter=${opts.timefilter ? opts.timefilter : 'all_time'}>`;
     const drops = results.filter(loot => loot.total_catches > 99)
         .map(loot => {
             return {
-                location: loot.location,
-                stage: loot.stage === null ? no_stage : loot.stage,
-                cheese: loot.cheese,
+                location: loot.location.substring(0, 20),
+                stage: loot.stage === null ? no_stage : loot.stage.substring(0, 20),
+                cheese: loot.cheese.substring(0,15),
                 total_catches: intToHuman(loot.total_catches),
                 dr: calculateRate(loot.total_catches, loot.total_drops),
                 pct: loot.drop_pct,
             };
         });
     if (!drops.length)
-        return '';
+        return `There were no results with 100 or more catches for ${loot.value}, see more at ${target_url}`;
     const order = ['location', 'stage', 'cheese', 'pct', 'dr', 'total_catches'];
     const labels = { location: 'Location', stage: 'Stage', total_catches: 'Catches',
         dr: '/Catch', cheese: 'Cheese', pct: 'Chance' };
     //Sort the results
     drops.sort((a, b) => parseFloat(b.dr) - parseFloat(a.dr));
-    drops.splice(opts.isDM ? 100 : 10);
+    drops.splice(isDM ? 100 : 10);
     if (drops.every(row => row.stage === no_stage))
         order.splice(order.indexOf('stage'), 1);
     // Column Formatting specification.
@@ -69,6 +152,7 @@ async function formatLoot(loot, opts) {
     };
     let reply = `${loot.value} (loot) can be found the following ways:\n\`\`\``;
     reply += prettyPrintArrayAsString(drops, columnFormatting, headers, '=');
+    reply += '```\n' + `HTML version at: ${target_url}`;
     return reply;
 }
 
@@ -128,9 +212,9 @@ function getFilter(tester) {
  * @returns {Array<number>} The first loot that matched
  */
 function getLoot(tester, nicknames) {
-    if (nicknames[tester])
+    if (nicknames && (tester in nicknames) && nicknames[tester])
         tester = nicknames[tester];
-    return getSearchedEntity(tester, loot)[0];
+    return getSearchedEntity(tester, loot);
 }
 
 /**
@@ -269,3 +353,4 @@ module.exports.findThing = findThing;
 module.exports.getFilter = getFilter;
 module.exports.getLoot = getLoot;
 module.exports.formatLoot = formatLoot;
+module.exports.sendInteractiveSearchResult = sendInteractiveSearchResult;
