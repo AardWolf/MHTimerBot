@@ -55,3 +55,4 @@ _ReSharper*/
 /.vs
 .vs
 .vscode
+src/quick.js
