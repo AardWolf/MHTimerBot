@@ -165,7 +165,7 @@ async function formatLoot(isDM, loot, opts) {
  * @returns {Array <number>[]} Up to 10 indices and their search score.
  */
 function getSearchedEntity(input, values) {
-    if (!input.length || !Array.isArray(values) || !values.length)
+    if (!input.length || !Array.isArray(values) || !values || !values.length)
         return [];
 
     const matches = values.filter(v => v.lowerValue.includes(input)).map(v => {
@@ -184,10 +184,13 @@ function getSearchedEntity(input, values) {
 /**
  * Determines if a string is a filter
  * @param {String} tester String to check if it's a filter
- * @returns {boolean} whether the filter is known
+ * @returns {String} the filter as an object with code_name being the important attribute
  */
 function getFilter(tester) {
     // Process filter-y nicknames
+    if (!tester)
+        return;
+    tester = `${tester}`;
     if (tester.startsWith('3'))
         tester = '3_days';
     else if (tester.startsWith('all'))
@@ -238,45 +241,6 @@ async function findThing(type, id, options) {
         .catch(err => {
             Logger.log(`findThings: Error getting item ${qsOptions.toString()} - ${err}`);
         });
-}
-
-/**
- * Process args for flags, like the -e event filter. Returns the args without any processed flags.
- *
- * @param {string} args a lowercased string of search criteria that may contain flags that map to querystring parameters
- * @param {Object <string, string>} qsParams an object which will have any discovered querystring parameters added
- * @returns {string} args, after stripping out any tokens associated with querystring parameters.
- */
-function removeQueryStringParams(args, qsParams) {
-    const tokens = args.split(/\s+/);
-    if (tokens.length > 2) {
-        if (tokens[0] === '-e') {
-            // Allow shorthand specifications instead of only the literal `last3days`.
-            // TODO: discover valid shorthands on startup.
-            // TODO: parse flag and argument even if given after the query.
-            switch (tokens[1].toLowerCase()) {
-                case '3':
-                case '3d':
-                    tokens[1] = '3_days';
-                    break;
-                case 'current':
-                    // Default to last 3 days, but if there is an ongoing event, use that instead.
-                    tokens[1] = '1_month';
-                    for (const filter of filters) {
-                        if (filter.start_time && !filter.end_time && filter.code_name !== tokens[1]) {
-                            tokens[1] = filter.code_name;
-                            break;
-                        }
-                    }
-                    break;
-            }
-            qsParams.timefilter = tokens[1].toString();
-            tokens.splice(0, 2);
-        }
-        // TODO: other querystring params (once supported).
-        args = tokens.join(' ');
-    }
-    return args;
 }
 
 /**
@@ -346,7 +310,6 @@ async function initialize() {
     return true;
 }
 
-module.exports.removeQueryStringParams = removeQueryStringParams;
 module.exports.getMHCTList = getMHCTList;
 module.exports.initialize = initialize;
 module.exports.findThing = findThing;
@@ -354,3 +317,4 @@ module.exports.getFilter = getFilter;
 module.exports.getLoot = getLoot;
 module.exports.formatLoot = formatLoot;
 module.exports.sendInteractiveSearchResult = sendInteractiveSearchResult;
+module.exports.getSearchedEntity = getSearchedEntity;
