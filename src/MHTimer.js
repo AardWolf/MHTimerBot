@@ -674,20 +674,6 @@ function parseUserMessage(message) {
                 message.channel.send(usage_str, { split: true });
                 break;
             }
-            // Display information about the desired mouse.
-            case 'find':
-            case 'mfind':
-                if (!tokens.length)
-                    message.channel.send('You have to supply mice to find.');
-                else {
-                    const criteria = tokens.join(' ').trim().toLowerCase().replace(/ mouse$/, '');
-                    if (criteria.length < 2)
-                        message.channel.send('Your search string was too short, try again.');
-                    else
-                        findMouse(message.channel, criteria, 'find');
-                }
-                break;
-
             case 'reset':
                 if (message.author.id === settings.owner) {
                     if (!tokens.length) {
@@ -1583,7 +1569,7 @@ function buildSchedule(timer_request) {
  */
 function getHelpMessage(message, tokens) {
     // TODO: Remove these as external commands are added
-    const keywordArray = [ 'remind', 'next', 'find', 'ifind', 'schedule' ];
+    const keywordArray = [ 'remind', 'next', 'schedule' ];
     const allowedCommands = client.commands
         .filter(command => {
             let canRun = false;
@@ -1650,24 +1636,6 @@ function getHelpMessage(message, tokens) {
             `Usage: \`${prefix} schedule [<area>] [<number>]\` will tell you the timers scheduled for the next \`<number>\` of hours. Default is 24, max is 240.`,
             'If you provide an area, I will only report on that area.',
             areaInfo,
-        ].join('\n');
-    }
-    else if (tokens[0] === 'find') {
-        return [
-            '**find**',
-            `Usage \`${prefix} find [-e <filter>] <mouse>\` will print the top attractions for the mouse, capped at 10.`,
-            `Use of \`-e <filter>\` is optional and adds a time filter. Known filters are: ${dbFilters}`,
-            'All attraction data is from <https://mhhunthelper.agiletravels.com/>.',
-            'Help populate the database for better information!',
-        ].join('\n');
-    }
-    else if (tokens[0] === 'ifind') {
-        return [
-            '**ifind**',
-            `Usage \`${prefix} ifind [-e <filter>] <item>\` will print the top 10 drop rates (per catch) for the item.`,
-            `Use of \`-e <filter>\` is optional and adds a time filter. Known filters are: ${dbFilters}`,
-            'All drop rate data is from <https://mhhunthelper.agiletravels.com/>.',
-            'Help populate the database for better information!',
         ].join('\n');
     }
     else

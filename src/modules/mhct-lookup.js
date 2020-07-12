@@ -97,6 +97,7 @@ function sendInteractiveSearchResult(searchResults, channel, dataCallback, isDM,
 }
 
 /**
+ * Formats loot into a nice table
  * @param {boolean} isDM Whether the command came as a DM
  * @param {Object} loot A loot object - it has an id and a value
  * @param {Object} opts Options property. It has filter and DM information
@@ -156,6 +157,61 @@ async function formatLoot(isDM, loot, opts) {
     return reply;
 }
 
+
+/**
+ * Formats mice into a nice table
+ * @param {boolean} isDM Whether the command came as a DM
+ * @param {Object} loot A mouse object - it has an id and a value
+ * @param {Object} opts Options property. It has filter and DM information
+ * @returns {Promise<string>} Formatted mouse AR table
+ */
+async function formatMice(isDM, mouse, opts) {
+    const results = await findThing('mouse', mouse.id, opts);
+    const no_stage = ' N/A ';
+    const target_url = `<https://mhhunthelper.agiletravels.com/?mouse=${mouse.id}&timefilter=${opts.timefilter ? opts.timefilter : 'all_time'}>`;
+    const attracts = results.filter(mouse => mouse.total_hunts > 99)
+        .map(mice => {
+            return {
+                location: mice.location.substring(0, 20),
+                stage: mice.stage === null ? no_stage : mice.stage.substring(0, 20),
+                cheese: mice.cheese.substring(0,15),
+                total_hunts: intToHuman(mice.total_hunts),
+                ar: mice.rate / 100,
+            };
+        });
+    if (!attracts.length)
+        return `There were no results with 100 or more hunts for ${mouse.value}, see more at ${target_url}`;
+    const order = ['location', 'stage', 'cheese', 'ar', 'total_hunts'];
+    const labels = { location: 'Location', stage: 'Stage', total_hunts: 'Hunts',
+        ar: '/Hunt', cheese: 'Cheese' };
+    //Sort the results
+    attracts.sort((a, b) => parseFloat(b.ar) - parseFloat(a.ar));
+    attracts.splice(isDM ? 100 : 10);
+    if (attracts.every(row => row.stage === no_stage))
+        order.splice(order.indexOf('stage'), 1);
+    // Column Formatting specification.
+    /** @type {Object <string, ColumnFormatOptions>} */
+    const columnFormatting = {};
+    const headers = order.map(key => {
+        columnFormatting[key] = {
+            columnWidth: labels[key].length,
+            alignRight: !isNaN(parseInt(attracts[0][key], 10)),
+        };
+        return { 'key': key, 'label': labels[key] };
+    });
+    // Give the numeric column proper formatting.
+    // TODO: toLocaleString - can it replace integerComma too?
+    columnFormatting['ar'] = {
+        alignRight: true,
+        isFixedWidth: true,
+        suffix: '%',
+        columnWidth: 7,
+    };
+    let reply = `${mouse.value} (mouse) can be found the following ways:\n\`\`\``;
+    reply += prettyPrintArrayAsString(attracts, columnFormatting, headers, '=');
+    reply += '```\n' + `HTML version at: ${target_url}`;
+    return reply;
+}
 
 /**
  * Return a sorted list of approximate matches to the given input and container
@@ -218,6 +274,19 @@ function getLoot(tester, nicknames) {
     if (nicknames && (tester in nicknames) && nicknames[tester])
         tester = nicknames[tester];
     return getSearchedEntity(tester, loot);
+}
+
+/**
+ * Checks if the mouse requested is one we know about. Returns the highest scoring match
+ *
+ * @param {string} tester The mouse we're looking for
+ * @param {Array} nicknames The nicknames for mice
+ * @returns {Array<number>} The first mice that matched
+ */
+function getMice(tester, nicknames) {
+    if (nicknames && (tester in nicknames) && nicknames[tester])
+        tester = nicknames[tester];
+    return getSearchedEntity(tester, mice);
 }
 
 /**
@@ -315,6 +384,8 @@ module.exports.initialize = initialize;
 module.exports.findThing = findThing;
 module.exports.getFilter = getFilter;
 module.exports.getLoot = getLoot;
+module.exports.getMice = getMice;
 module.exports.formatLoot = formatLoot;
+module.exports.formatMice = formatMice;
 module.exports.sendInteractiveSearchResult = sendInteractiveSearchResult;
 module.exports.getSearchedEntity = getSearchedEntity;
