@@ -659,7 +659,7 @@ function parseUserMessage(message) {
                 break;
             }
             case 'findrh': {
-                message.channel.send(findRH(message.channel, { split: true }));
+                findRH(message.channel, { split: true });
                 break;
             }
             case 'reset':

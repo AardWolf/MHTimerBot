@@ -315,18 +315,18 @@ test('calculateRate', suite => {
             () => {},
         ];
         t.plan(inputs.length);
-        inputs.forEach(input => t.throws(
-            () => calculateRate(input, input),
-            TypeError,
-            `should throw for ${typeof input}`,
+        inputs.forEach(input => t.deepEqual(
+            calculateRate(input, input),
+            NaN,
+            `should return NaN for ${typeof input}`,
         ));
     });
-    suite.test('given zero denominator - returns formatted zero', t => {
+    suite.test('given zero denominator - returns NaN', t => {
         t.plan(1);
         t.deepEqual(
             calculateRate(0, 0),
-            '0.0000',
-            'should return zero for 0 denominator',
+            NaN,
+            'should return NaN for 0 denominator',
         );
     });
     suite.test('Given some known ratios, returns known results', t => {
@@ -395,15 +395,15 @@ test('intToHuman', suite => {
             'Happy',
         ];
         t.plan(inputs.length);
-        inputs.forEach(input => t.throws(
-            () => intToHuman(input),
-            TypeError,
-            `should throw for ${typeof input}`,
-        ));
+        inputs.forEach(input => {
+            const returned = intToHuman(input);
+            t.deepEqual(returned, NaN, `should return NaN for ${typeof input}`);
+        });
     });
 
     suite.test('Given some known numbers, returns specific formats', t => {
         const inputs = [
+            {  input: 0, expected: '0' },
             {  input: 1, expected: '1' },
             {  input: 10, expected: '10' },
             {  input: 100, expected: '100' },

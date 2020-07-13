@@ -269,10 +269,10 @@ function calculateRate(denominator, numerator) {
     if ((typeof denominator === 'undefined') ||
         (typeof numerator === 'undefined') ||
         isNaN(denominator) || isNaN(numerator)) {
-        throw new TypeError('CALCULATERATE: Did not receive numbers');
+        return NaN;
     }
     if (!denominator)
-        denominator = 0;
+        return NaN;
     if (!numerator)
         numerator = 0;
     const value = denominator ? Number(numerator / denominator) : 0;
@@ -299,10 +299,10 @@ function integerComma(number) {
  */
 function intToHuman(number) {
     // Billion, Million, K, end
-    if (!parseInt(number)) {
-        throw new TypeError(`intToHuman: Provided input was not a number ${number}`);
+    if (isNaN(parseInt(number, 10))) {
+        return NaN;
     }
-    number = parseInt(number);
+    number = parseInt(number, 10);
     let reply = '';
     if (number >= 1000000000)
         reply = Math.round(number / 10000000) / 100 + 'B';

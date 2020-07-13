@@ -1,5 +1,4 @@
 const fetch = require('node-fetch');
-const { URLSearchParams } = require('url');
 const Logger = require('../modules/logger');
 const { DateTime, Duration } = require('luxon');
 const { calculateRate, prettyPrintArrayAsString, intToHuman } = require('../modules/format-utils');
@@ -40,8 +39,9 @@ const emojis = [
  * @param {{qsParams: Object <string, string>, uri: string, type: string}} urlInfo Information about the query that returned the given matches, including querystring parameters, uri, and the type of search.
  * @param {string} searchInput a lower-cased representation of the user's input.
  */
-function sendInteractiveSearchResult(searchResults, channel, dataCallback, isDM, urlInfo, searchInput) {
+async function sendInteractiveSearchResult(searchResults, channel, dataCallback, isDM, urlInfo, searchInput) {
     // Associate each search result with a "numeric" emoji.
+    searchResults.slice(0, emojis.length);
     const matches = searchResults.map((sr, i) => ({ emojiId: emojis[i].id, match: sr }));
     // Construct a MessageEmbed with the search result information, unless this is for a PM with a single response.
     const embed = new MessageEmbed({
@@ -84,7 +84,7 @@ function sendInteractiveSearchResult(searchResults, channel, dataCallback, isDM,
                 const match = matches.filter(m => m.emojiId === mr.emoji.identifier)[0];
                 if (match) dataCallback(true, match.match, urlInfo.qsParams).then(
                     result => user.send(result || `Not enough quality data for ${searchInput}`, { split: { prepend: '```', append: '```' } }),
-                    result => user.send(result || 'Not enough quality data to display this 4'),
+                    result => user.send(result || 'Not enough quality data to display this'),
                 ).catch(err => Logger.error(err));
             }).on('end', () => rc.message.delete().catch(() => Logger.log('Unable to delete reaction message')));
         }).catch(err => Logger.error('Reactions: error setting reactions:\n', err));
@@ -372,9 +372,11 @@ async function initialize() {
     if (someone_initialized)
         return true;
     someone_initialized = true;
-    await getMHCTList('mouse', mice);
-    await getMHCTList('loot', loot);
-    await getFilterList();
+    await Promise.all([
+        getMHCTList('mouse', mice),
+        getMHCTList('loot', loot),
+        getFilterList(),
+    ]);
     Logger.log(`MHCT Initialized: Loot: ${loot.length}, mice: ${mice.length}, filters: ${filters.length}`);
     return true;
 }
