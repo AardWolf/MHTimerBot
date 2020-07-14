@@ -271,6 +271,9 @@ function getFilter(tester) {
  * @returns {Array<number>} The first loot that matched
  */
 function getLoot(tester, nicknames) {
+    if (!tester)
+        return;
+    tester = `${tester}`;
     if (nicknames && (tester in nicknames) && nicknames[tester])
         tester = nicknames[tester];
     return getSearchedEntity(tester, loot);
@@ -284,6 +287,9 @@ function getLoot(tester, nicknames) {
  * @returns {Array<number>} The first mice that matched
  */
 function getMice(tester, nicknames) {
+    if (!tester)
+        return;
+    tester = `${tester}`;
     if (nicknames && (tester in nicknames) && nicknames[tester])
         tester = nicknames[tester];
     return getSearchedEntity(tester, mice);
