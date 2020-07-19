@@ -22,6 +22,7 @@ test('getFilter', suite => {
             () => {},
         ];
         t.plan(inputs.length);
+        getSearchedEntityStub.returns([]);
         inputs.forEach(input => t.deepEqual(
             getFilter(input),
             undefined,
@@ -39,6 +40,7 @@ test('getFilter', suite => {
             { input: 'current', expected: '1_month', }, //NOTE this can only be asserted because we don't load the filter list
         ];
         t.plan(inputs.length*2);
+        getSearchedEntityStub.resetHistory();
         getSearchedEntityStub.returns([]);
         inputs.forEach(input => {
             const result = getFilter(input.input);
