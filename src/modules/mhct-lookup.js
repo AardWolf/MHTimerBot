@@ -351,6 +351,34 @@ async function getFilterList() {
     }).catch(err => Logger.error('Filters: request returned error:', err));
 }
 
+/**
+ * 
+ * @param {Object} accumulator -- string or something with code_name as a property
+ * @param {Object} current -- something with code_name as a property
+ * @returns {String} Grows a string, meant to be with Array.reduce
+ */
+function code_name_reduce (accumulator, current) {
+    if (accumulator.code_name) {
+        accumulator = `\`${accumulator.code_name}\``;
+    }
+    if (current.code_name) {
+        if (accumulator)
+            return accumulator + `, \`${current.code_name}\``;
+        else   
+            return `\`${current.code_name}\``;
+    } else {
+        return accumulator;
+    }
+}
+
+/**
+ * Returns all known filters as a comma-separated list with back-ticks for "code" designation
+ * @returns {String} Known filters, formatted for discord
+ */
+function listFilters() {
+    return filters.reduce(code_name_reduce);
+}
+
 async function initialize() {
     if (someone_initialized)
         return true;
@@ -374,3 +402,4 @@ module.exports.formatLoot = formatLoot;
 module.exports.formatMice = formatMice;
 module.exports.sendInteractiveSearchResult = sendInteractiveSearchResult;
 module.exports.getSearchedEntity = getSearchedEntity;
+module.exports.listFilters = listFilters;

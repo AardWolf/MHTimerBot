@@ -60,12 +60,20 @@ async function doIFIND(message, tokens) {
 
 }
 
+
+function helpFind() {
+    let reply = '-mh find [filter] loot:\nFind the drop rates for loot (nicknames allowed, filters optional).\n';
+    reply += 'Known filters: `current`, ' + listFilters();
+    return reply;
+}
+
 module.exports = {
     name: 'ifind',
     args: true,
     usage: 'Coming Soon',
     description: 'Find items sorted by their drop rates',
     canDM: true,
+    findFunction: helpFind,
     execute: doIFIND,
     initialize: initialize,
 };

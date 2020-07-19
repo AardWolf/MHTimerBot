@@ -1,5 +1,5 @@
 const Logger = require('../modules/logger');
-const { initialize, getFilter, getMice, formatMice, sendInteractiveSearchResult } = require('../modules/mhct-lookup');
+const { initialize, getFilter, getMice, formatMice, sendInteractiveSearchResult, listFilters } = require('../modules/mhct-lookup');
 const CommandResult = require('../interfaces/command-result');
 
 /**
@@ -59,10 +59,17 @@ async function doFIND(message, tokens) {
 
 }
 
+function helpFind() {
+    let reply = '-mh find [filter] mouse:\nFind the attraction rates for a mouse (nicknames allowed, filters optional).\n';
+    reply += 'Known filters: `current`, ' + listFilters();
+    return reply;
+}
+
 module.exports = {
     name: 'find',
     args: true,
     usage: 'Coming Soon',
+    helpFunction: helpFind,
     description: 'Find items sorted by their drop rates',
     canDM: true,
     aliases: [ 'mfind' ],

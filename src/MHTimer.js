@@ -1589,7 +1589,9 @@ function getHelpMessage(message, tokens) {
     const dynCommand = allowedCommands.get(command)
         || allowedCommands.find(cmd => cmd.aliases && cmd.aliases.includes(command));
     if (dynCommand) {
-        if (dynCommand.usage)
+        if ('helpFunction' in dynCommand)
+            return dynCommand.helpFunction();
+        else if (dynCommand.usage)
             return `\`\`\`\n${prefix} ${dynCommand.name}:\n` +
                 `\t${dynCommand.usage.replace('\n', '\t\n')}\n\`\`\``;
         else
