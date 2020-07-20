@@ -10,6 +10,9 @@ const {
     // timeLeft,
     unescapeEntities,
     isValidURL,
+    calculateRate,
+    integerComma,
+    intToHuman,
 } = require('../../src/modules/format-utils');
 
 test('oxfordStringifyValues', suite => {
@@ -299,6 +302,124 @@ test('isValidURL', suite => {
         inputs.forEach(input => t.true(
             isValidURL(input),
             'should return true for valid URLs',
+        ));
+    });
+});
+test('calculateRate', suite => {
+    suite.test('given non-numeric inputs - throws TypeError', t => {
+        const inputs = [
+            new Set(),
+            new Map(),
+            {},
+            undefined,
+            () => {},
+        ];
+        t.plan(inputs.length);
+        inputs.forEach(input => t.deepEqual(
+            calculateRate(input, input),
+            NaN,
+            `should return NaN for ${typeof input}`,
+        ));
+    });
+    suite.test('given zero denominator - returns NaN', t => {
+        t.plan(1);
+        t.deepEqual(
+            calculateRate(0, 0),
+            NaN,
+            'should return NaN for 0 denominator',
+        );
+    });
+    suite.test('Given some known ratios, returns known results', t => {
+        const inputs = [
+            {  denominator: 1, numerator: 100, expected: '100.00' },
+            {  denominator: 2, numerator: 100, expected: '50.00' },
+            {  denominator: 100, numerator: 100, expected: '1.0000' },
+            {  denominator: 200, numerator: 100, expected: '0.5000' },
+            {  denominator: 1000, numerator: 100, expected: '0.1000' },
+            {  denominator: 10000, numerator: 100, expected: '0.0100' },
+            {  denominator: 100000, numerator: 100, expected: '0.0010' },
+            {  denominator: 1000000, numerator: 100, expected: '0.0001' },
+            {  denominator: 10000000, numerator: 100, expected: '0.0000' },
+        ];
+        t.plan(inputs.length);
+        inputs.forEach(input => t.deepEqual(
+            calculateRate(input.denominator, input.numerator),
+            input.expected,
+            'should return consistent values',
+        ));
+    });
+});
+test('integerComma', suite => {
+    suite.test('given non-numeric inputs - returns undefined', t => {
+        const inputs = [
+            new Set(),
+            new Map(),
+            {},
+            () => {},
+            'Happy',
+        ];
+        t.plan(inputs.length);
+        inputs.forEach(input => t.deepEqual(
+            integerComma(input),
+            input.toString(),
+            `should return the stringified for ${typeof input}`,
+        ));
+    });
+    suite.test('Given some known numbers, returns specific formats', t => {
+        const inputs = [
+            {  input: 1, expected: '1' },
+            {  input: 10, expected: '10' },
+            {  input: 100, expected: '100' },
+            {  input: 1000, expected: '1,000' },
+            {  input: 10000, expected: '10,000' },
+            {  input: 100000, expected: '100,000' },
+            {  input: 1000000, expected: '1,000,000' },
+        ];
+        t.plan(inputs.length);
+        inputs.forEach(input => t.deepEqual(
+            integerComma(input.input),
+            input.expected,
+            'should return consistent values',
+        ));
+    });
+});
+
+test('intToHuman', suite => {
+    suite.test('given non-numeric inputs - throws TypeError', t => {
+        const inputs = [
+            new Set(),
+            new Map(),
+            {},
+            undefined,
+            () => {},
+            'Happy',
+        ];
+        t.plan(inputs.length);
+        inputs.forEach(input => {
+            const returned = intToHuman(input);
+            t.deepEqual(returned, NaN, `should return NaN for ${typeof input}`);
+        });
+    });
+
+    suite.test('Given some known numbers, returns specific formats', t => {
+        const inputs = [
+            {  input: 0, expected: '0' },
+            {  input: 1, expected: '1' },
+            {  input: 10, expected: '10' },
+            {  input: 100, expected: '100' },
+            {  input: 1001, expected: '1K' },
+            {  input: 10001, expected: '10K' },
+            {  input: 100001, expected: '100K' },
+            {  input: 1000001, expected: '1M' },
+            {  input: 1000000001, expected: '1B' },
+            {  input: 1200, expected: '1.2K' },
+            {  input: 1234, expected: '1.23K' },
+        ];
+        t.plan(inputs.length);
+        inputs.forEach(input => t.deepEqual(
+            intToHuman(input.input),
+            input.expected,
+            'should return consistent values',
         ));
     });
 });
