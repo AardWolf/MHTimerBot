@@ -1,5 +1,6 @@
 const Logger = require('../modules/logger');
-const { initialize, getFilter, getMice, formatMice, sendInteractiveSearchResult, listFilters } = require('../modules/mhct-lookup');
+const { initialize, getFilter, getMice, formatMice, sendInteractiveSearchResult, 
+    listFilters, getLoot, formatLoot } = require('../modules/mhct-lookup');
 const CommandResult = require('../interfaces/command-result');
 
 /**
@@ -35,12 +36,23 @@ async function doFIND(message, tokens) {
             // We have multiple options, show the interactive menu
             urlInfo.qsParams = opts;
             sendInteractiveSearchResult(all_mice, message.channel, formatMice,
-                ['dm', 'group'].includes(message.channel.type), urlInfo, tokens);
+                ['dm', 'group'].includes(message.channel.type), urlInfo, searchString);
             theResult.replied = true;
             theResult.success = true;
             theResult.sentDM = ['dm', 'group'].includes(message.channel.type);
         } else {
-            reply = `I don't know anything about the loot "${searchString}", is it loot?`;
+            const all_loot = getLoot(searchString, message.client.nicknames.get('loot'));
+            if (all_loot && all_loot.length) {
+                // We have multiple options, show the interactive menu
+                urlInfo.qsParams = opts;
+                sendInteractiveSearchResult(all_loot, message.channel, formatLoot,
+                    ['dm', 'group'].includes(message.channel.type), urlInfo, searchString);
+                theResult.replied = true;
+                theResult.success = true;
+                theResult.sentDM = ['dm', 'group'].includes(message.channel.type);
+            } else {
+                reply = `I don't know anything about "${searchString}"`;
+            }
         }
     }
     if (reply) {
