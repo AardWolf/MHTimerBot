@@ -1,5 +1,5 @@
 const Logger = require('../modules/logger');
-const { initialize, getFilter, getLoot, formatLoot,
+const { getFilter, getLoot, formatLoot, 
     sendInteractiveSearchResult, listFilters, getMice, formatMice } = require('../modules/mhct-lookup');
 const CommandResult = require('../interfaces/command-result');
 
@@ -79,6 +79,7 @@ function helpFind() {
     return reply;
 }
 
+// initialize and save are in find.js
 module.exports = {
     name: 'ifind',
     args: true,
@@ -87,6 +88,5 @@ module.exports = {
     canDM: true,
     findFunction: helpFind,
     execute: doIFIND,
-    initialize: initialize,
 };
 

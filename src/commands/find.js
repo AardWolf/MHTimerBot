@@ -1,6 +1,6 @@
 const Logger = require('../modules/logger');
 const { initialize, getFilter, getMice, formatMice, sendInteractiveSearchResult, 
-    listFilters, getLoot, formatLoot } = require('../modules/mhct-lookup');
+    listFilters, getLoot, formatLoot, save } = require('../modules/mhct-lookup');
 const CommandResult = require('../interfaces/command-result');
 
 /**
@@ -87,6 +87,7 @@ module.exports = {
     aliases: [ 'mfind' ],
     execute: doFIND,
     initialize: initialize,
+    save: save,
 };
 
 // Testing area
