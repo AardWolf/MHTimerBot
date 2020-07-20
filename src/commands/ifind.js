@@ -1,5 +1,5 @@
 const Logger = require('../modules/logger');
-const { initialize, getFilter, getLoot, formatLoot, sendInteractiveSearchResult } = require('../modules/mhct-lookup');
+const { initialize, getFilter, getLoot, formatLoot, sendInteractiveSearchResult, listFilters } = require('../modules/mhct-lookup');
 const CommandResult = require('../interfaces/command-result');
 
 /**

@@ -33,11 +33,11 @@ test('getFilter', suite => {
     });
     suite.test('given string input - returns known shortcuts', t => {
         const inputs = [
-            { input: '3', expected: '3_days', },
-            { input: '3day', expected: '3_days', },
-            { input: 'all', expected: 'alltime', },
-            { input: 'allowance', expected: 'alltime', },
-            { input: 'current', expected: '1_month', }, //NOTE this can only be asserted because we don't load the filter list
+            { input: '3', expected: '3_days' },
+            { input: '3day', expected: '3_days' },
+            { input: 'all', expected: 'alltime' },
+            { input: 'allowance', expected: 'alltime' },
+            { input: 'current', expected: '1_month' }, //NOTE this can only be asserted because we don't load the filter list
         ];
         t.plan(inputs.length*2);
         getSearchedEntityStub.resetHistory();

@@ -56,3 +56,4 @@ _ReSharper*/
 .vs
 .vscode
 src/quick.js
+jsconfig.json
