@@ -31,7 +31,7 @@ async function doFIND(message, tokens) {
         }
         // Figure out what they're searching for
         const searchString = tokens.join(' ');
-        const all_mice = getMice(searchString, message.client.nicknames.get('mouse'));
+        const all_mice = getMice(searchString, message.client.nicknames.get('mice'));
         if (all_mice && all_mice.length) {
             // We have multiple options, show the interactive menu
             urlInfo.qsParams = opts;
