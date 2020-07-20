@@ -1,5 +1,5 @@
 {
-  "name": "MHTimerBot",
+  "name": "mhtimerbot",
   "version": "0.6.0",
   "description": "A Discord bot that understands Mousehunt timers",
   "author": {
@@ -21,9 +21,9 @@
     "@devjacksmith"
   ],
   "dependencies": {
-    "csv-parse": "^4.9.1",
+    "csv-parse": "^4.11.1",
     "discord.js": "^12.2.0",
-    "jsdom": "^16.2.2",
+    "jsdom": "^16.3.0",
     "luxon": "^1.24.1",
     "node-fetch": "^2.6.0"
   },
@@ -41,6 +41,6 @@
   "devDependencies": {
     "mock-fs": "^4.12.0",
     "sinon": "^9.0.2",
-    "tape": "^5.0.0"
+    "tape": "^5.0.1"
   }
 }

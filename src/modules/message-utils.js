@@ -66,7 +66,7 @@ const addMessageReaction = async function addMessageReaction(executedCommand) {
 
     // This method's result is always a success, unless there was an issue reacting to
     // the original message or some other fundamental issue.
-    ourResult.success == !ourResult.botError;
+    ourResult.success = !ourResult.botError;
 
     return ourResult;
 };

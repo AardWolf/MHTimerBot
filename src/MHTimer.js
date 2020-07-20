@@ -15,7 +15,6 @@ const Timer = require('./modules/timers.js');
 const CommandResult = require('./interfaces/command-result');
 const {
     oxfordStringifyValues,
-    prettyPrintArrayAsString,
     splitString,
     timeLeft,
     unescapeEntities,
@@ -30,7 +29,6 @@ const security = require('./modules/security.js');
 
 // Access external URIs, like @devjacksmith 's tools.
 const fetch = require('node-fetch');
-const { URLSearchParams } = require('url');
 // We need more robust CSV handling
 const csv_parse = require('csv-parse');
 
@@ -44,9 +42,6 @@ const main_settings_filename = 'data/settings.json',
     nickname_urls_filename = 'data/nicknames.json';
 
 const settings = {},
-    mice = [],
-    items = [],
-    filters = [],
     dbgames_locations = {},
     relic_hunter = {
         location: 'unknown',
@@ -78,18 +73,6 @@ const last_timestamps = {
 const dataTimers = {};
 /** @type {Map <string, {active: boolean, channels: TextChannel[], inactiveChannels: TextChannel[]}>} */
 const timer_config = new Map();
-const emojis = [
-    { id: '1%E2%83%A3', text: ':one:' },
-    { id: '2%E2%83%A3', text: ':two:' },
-    { id: '3%E2%83%A3', text: ':three:' },
-    { id: '4%E2%83%A3', text: ':four:' },
-    { id: '5%E2%83%A3', text: ':five:' },
-    { id: '6%E2%83%A3', text: ':six:' },
-    { id: '7%E2%83%A3', text: ':seven:' },
-    { id: '8%E2%83%A3', text: ':eight:' },
-    { id: '9%E2%83%A3', text: ':nine:' },
-    { id: '%F0%9F%94%9F', text: ':keycap_ten:' },
-];
 
 // A collection to hold all the commands in the commands directory
 client.commands = new Collection();
@@ -189,19 +172,6 @@ function Main() {
                     dataTimers['nicknames'] = setInterval(refreshNicknameData, saveInterval);
                 });
 
-            // Register filters
-            const hasFilters = Promise.resolve()
-                .then(getFilterList)
-                .then(() => {
-                    return Object.keys(filters).length > 0;
-                })
-                .catch(err => failedLoad('Filters: import error:\n', err));
-            hasFilters
-                .then(() => {
-                    Logger.log(`Filters: Configuring refresh every ${saveInterval / (60 * 1000)} min.`);
-                    dataTimers['filters'] = setInterval(getFilterList, saveInterval);
-                });
-
             // Register DBGames short -> long mappings
             const hasDBGamesLocations = loadDBGamesLocations()
                 .then(DBGamesLocationData => {
@@ -213,8 +183,6 @@ function Main() {
 
             // Start loading remote data.
             const remoteData = [
-                getMouseList(),
-                getItemList(),
                 getRHLocation(),
             ];
 
@@ -287,7 +255,6 @@ function Main() {
             // Configuration complete. Using Promise.all() requires these tasks to complete
             // prior to bot login.
             return Promise.all([
-                hasFilters,
                 hasNicknames,
                 hasReminders,
                 hasTimers,
@@ -572,11 +539,16 @@ function parseUserMessage(message) {
     if (tokens[0] === prefix)
         tokens.shift();
 
-    const command = tokens.shift();
+    let command = tokens.shift(); // changed from const for RH case. TODO: Change back to const
     if (!command) {
         message.channel.send('I didn\'t understand, but you can ask me for help.');
         return;
     }
+    // Today's hack brought to you by laziness - haven't migrated notifications/timers yet
+    if (command.toLowerCase() === 'find' && tokens.length && 
+            (tokens[0].toLowerCase() === 'rh' || tokens[0].toLowerCase() === 'relic_hunter') ||
+            (tokens.length >= 2 && tokens[0].toLowerCase() === 'relic' && tokens[1].toLowerCase() == 'hunter'))
+        command = 'findrh';
 
     // Parse the message to see if it matches any known timer areas, sub-areas, or has count information.
     const reminderRequest = tokens.length ? timerAliases(tokens) : {};
@@ -691,32 +663,10 @@ function parseUserMessage(message) {
                 message.channel.send(usage_str, { split: true });
                 break;
             }
-            // Display information about the desired mouse.
-            case 'find':
-            case 'mfind':
-                if (!tokens.length)
-                    message.channel.send('You have to supply mice to find.');
-                else {
-                    const criteria = tokens.join(' ').trim().toLowerCase().replace(/ mouse$/, '');
-                    if (criteria.length < 2)
-                        message.channel.send('Your search string was too short, try again.');
-                    else
-                        findMouse(message.channel, criteria, 'find');
-                }
+            case 'findrh': {
+                findRH(message.channel, { split: true });
                 break;
-
-            // Display information about the desired item.
-            case 'ifind':
-                if (!tokens.length)
-                    message.channel.send('You have to supply an item to find');
-                else {
-                    const criteria = tokens.join(' ').trim().toLowerCase();
-                    if (criteria.length < 2)
-                        message.channel.send('Your search string was too short, try again.');
-                    else
-                        findItem(message.channel, criteria, 'ifind');
-                }
-                break;
+            }
             case 'reset':
                 if (message.author.id === settings.owner) {
                     if (!tokens.length) {
@@ -1612,7 +1562,7 @@ function buildSchedule(timer_request) {
  */
 function getHelpMessage(message, tokens) {
     // TODO: Remove these as external commands are added
-    const keywordArray = [ 'remind', 'next', 'find', 'ifind', 'schedule' ];
+    const keywordArray = [ 'remind', 'next', 'schedule' ];
     const allowedCommands = client.commands
         .filter(command => {
             let canRun = false;
@@ -1627,8 +1577,7 @@ function getHelpMessage(message, tokens) {
     keywordArray.push(...allowedCommands.map(command => command.name));
     const keywords = oxfordStringifyValues(keywordArray.map(name => `\`${name}\``));
     const prefix = settings.botPrefix.trim();
-    Logger.log(`called with tokens: ${JSON.stringify(tokens)}`);
-    if (!tokens || !tokens.length || tokens.length === 1) {
+    if (!tokens || !tokens.length) {
         return [
             '**help**',
             `I know the keywords ${keywords}.`,
@@ -1640,13 +1589,14 @@ function getHelpMessage(message, tokens) {
 
     const areaInfo = 'Areas are Seasonal Garden (**sg**), Forbidden Grove (**fg**), Toxic Spill (**ts**), Balack\'s Cove (**cove**), and the daily **reset**.';
     const subAreaInfo = 'Sub areas are the seasons, open/close, spill ranks, and tide levels';
-    const dbFilters = filters.reduce((acc, filter) => `${acc}\`${filter.code_name}\`, `, '') + 'and `current`';
     const command = tokens[0].toLowerCase();
 
     const dynCommand = allowedCommands.get(command)
         || allowedCommands.find(cmd => cmd.aliases && cmd.aliases.includes(command));
     if (dynCommand) {
-        if (dynCommand.usage)
+        if ('helpFunction' in dynCommand)
+            return dynCommand.helpFunction();
+        else if (dynCommand.usage)
             return `\`\`\`\n${prefix} ${dynCommand.name}:\n` +
                 `\t${dynCommand.usage.replace('\n', '\t\n')}\n\`\`\``;
         else
@@ -1682,521 +1632,11 @@ function getHelpMessage(message, tokens) {
             areaInfo,
         ].join('\n');
     }
-    else if (tokens[0] === 'find') {
-        return [
-            '**find**',
-            `Usage \`${prefix} find [-e <filter>] <mouse>\` will print the top attractions for the mouse, capped at 10.`,
-            `Use of \`-e <filter>\` is optional and adds a time filter. Known filters are: ${dbFilters}`,
-            'All attraction data is from <https://mhhunthelper.agiletravels.com/>.',
-            'Help populate the database for better information!',
-        ].join('\n');
-    }
-    else if (tokens[0] === 'ifind') {
-        return [
-            '**ifind**',
-            `Usage \`${prefix} ifind [-e <filter>] <item>\` will print the top 10 drop rates (per catch) for the item.`,
-            `Use of \`-e <filter>\` is optional and adds a time filter. Known filters are: ${dbFilters}`,
-            'All drop rate data is from <https://mhhunthelper.agiletravels.com/>.',
-            'Help populate the database for better information!',
-        ].join('\n');
-    }
     else
         return `I don't know that one, but I do know ${keywords}.`;
 }
 
-/**
- * @typedef {Object} DatabaseEntity
- * @property {string} id The ID of the entity
- * @property {string} value The entity's proper name
- * @property {string} lowerValue A lowercased version of the entity's name
- */
 
-/**
- * Query @devjacksmith's database for information about the given "item"
- *
- * @param {'loot'|'mouse'} queryType The type of "item" whose data is requested.
- * @param {DatabaseEntity} dbEntity Identifying information about the "item"
- * @param {Object <string, string>} [options] Any additional querystring options that should be set
- * @returns {Promise <any>} Result of the query to @devjacksmiths database
- */
-function getQueriedData(queryType, dbEntity, options) {
-    // TODO: fetch each value once, cache, and try to first serve cached content.
-    if (!dbEntity || !dbEntity.id || !dbEntity.value)
-        return Promise.reject({ error: `Could not perform a '${queryType}' query`, response: null });
-    // Check cache
-    /**
-     * Replace with actual cache checking:
-     * let cache_result = Cache.get(queryType, dbEntity.id, options)
-     * if (cache_result)
-     *   return Promise.resolve(cache_result);
-     */
-
-    // No result in cache, requery.
-    const qsOptions = new URLSearchParams(options);
-    qsOptions.append('item_type', queryType);
-    qsOptions.append('item_id', dbEntity.id);
-
-    return fetch('https://mhhunthelper.agiletravels.com/searchByItem.php?' + qsOptions.toString())
-        .then((response) => {
-            if (response.ok) {
-                /**
-                 * Replace with actual cache storage:
-                 * Cache.put(queryType, dbEntity.id, options, body);
-                 */
-                return response.json();
-            } else {
-                throw { error: `HTTP ${response.status}`, response };
-            }
-        });
-}
-
-/**
- * Process args for flags, like the -e event filter. Returns the args without any processed flags.
- *
- * @param {string} args a lowercased string of search criteria that may contain flags that map to querystring parameters
- * @param {Object <string, string>} qsParams an object which will have any discovered querystring parameters added
- * @returns {string} args, after stripping out any tokens associated with querystring parameters.
- */
-function removeQueryStringParams(args, qsParams) {
-    const tokens = args.split(/\s+/);
-    if (tokens.length > 2) {
-        if (tokens[0] === '-e') {
-            // Allow shorthand specifications instead of only the literal `last3days`.
-            // TODO: discover valid shorthands on startup.
-            // TODO: parse flag and argument even if given after the query.
-            switch (tokens[1].toLowerCase()) {
-                case '3':
-                case '3d':
-                    tokens[1] = '3_days';
-                    break;
-                case 'current':
-                    // Default to last 3 days, but if there is an ongoing event, use that instead.
-                    tokens[1] = '1_month';
-                    for (const filter of filters) {
-                        if (filter.start_time && !filter.end_time && filter.code_name !== tokens[1]) {
-                            tokens[1] = filter.code_name;
-                            break;
-                        }
-                    }
-                    break;
-            }
-            qsParams.timefilter = tokens[1].toString();
-            tokens.splice(0, 2);
-        }
-        // TODO: other querystring params (once supported).
-        args = tokens.join(' ');
-    }
-    return args;
-}
-
-/**
- * Initialize (or refresh) the known mice lists from @devjacksmith's tools.
- * @returns {Promise<void>}
- */
-function getMouseList() {
-    const now = DateTime.utc();
-    // Only request a mouse list update every so often.
-    if (last_timestamps.mouse_refresh) {
-        const next_refresh = last_timestamps.mouse_refresh.plus(refresh_rate);
-        if (now < next_refresh)
-            return Promise.resolve();
-    }
-    last_timestamps.mouse_refresh = now;
-
-    // Query @devjacksmith's tools for mouse lists.
-    Logger.log('Mice: Requesting a new mouse list.');
-    const url = 'https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=mouse&item_id=all';
-    return fetch(url).then(response => (response.status === 200) ? response.json() : '').then((body) => {
-        if (body) {
-            Logger.log('Mice: Got a new mouse list.');
-            mice.length = 0;
-            Array.prototype.push.apply(mice, body);
-            mice.forEach(mouse => mouse.lowerValue = mouse.value.toLowerCase());
-        } else {
-            Logger.warn('Mice: request returned non-200 response');
-        }
-    }).catch(err => Logger.error('Mice: request returned error:', err));
-}
-
-/**
- * Check the input args for a known mouse that can be looked up.
- * If no result is found, retries with an item search.
- *
- * @param {TextChannel} channel the channel on which to respond.
- * @param {string} args a lowercased string of search criteria.
- * @param {string} command the command switch used to initiate the request.
- */
-function findMouse(channel, args, command) {
-    /**
-     * Request the latest information about the valid mouse.
-     * @param {boolean} canSpam Whether the long or short response should be sent back.
-     * @param {DatabaseEntity} mouse The valid mouse to query for
-     * @param {Object <string, string>} opts Additional querystring parameters for the request, like 'timefilter'
-     * @returns {Promise<string>} The result of the lookup.
-     */
-    function _getQueryResult(canSpam, mouse, opts) {
-        return getQueriedData('mouse', mouse, opts).then(body => {
-            // Querying succeeded. Received a JSON object (either from cache or HTTP lookup).
-            // body is an array of objects with: location, stage, total_hunts, rate, cheese
-            // Sort it by "rate" but only if hunts > 100
-            const attractions = body.filter(setup => setup.total_hunts > 99)
-                .map(setup => {
-                    return {
-                        location: setup.location,
-                        stage: setup.stage ? setup.stage : ' N/A ',
-                        total_hunts: integerComma(setup.total_hunts),
-                        rate: setup.rate * 1.0 / 100,
-                        cheese: setup.cheese,
-                    };
-                });
-            if (!attractions.length)
-                return `${mouse.value} either hasn't been seen enough, or something broke.`;
-
-            // Sort that by Attraction Rate, descending.
-            attractions.sort((a, b) => b.rate - a.rate);
-            // Keep only the top 10 results, unless this is a DM.
-            attractions.splice(!canSpam ? 10 : 100);
-
-            // Column Formatting specification.
-            /** @type {Object <string, ColumnFormatOptions>} */
-            const columnFormatting = {};
-
-            // Specify the column order.
-            const order = ['location', 'stage', 'cheese', 'rate', 'total_hunts'];
-            // Inspect the attractions array to determine if we need to include the stage column.
-            if (attractions.every(row => row.stage === ' N/A '))
-                order.splice(order.indexOf('stage'), 1);
-
-            // Build the header row.
-            const labels = { location: 'Location', stage: 'Stage', total_hunts: 'Hunts', rate: 'AR', cheese: 'Cheese' };
-            const headers = order.map(key => {
-                columnFormatting[key] = {
-                    columnWidth: labels[key].length,
-                    alignRight: !isNaN(parseInt(attractions[0][key], 10)),
-                };
-                return { 'key': key, 'label': labels[key] };
-            });
-
-            // Give the numeric column proper formatting.
-            // TODO: toLocaleString - can it replace integerComma too?
-            columnFormatting['rate'] = {
-                alignRight: true,
-                isFixedWidth: true,
-                columnWidth: 7,
-                suffix: '%',
-            };
-
-            let retStr = `${mouse.value} (mouse) can be found the following ways:\n\`\`\``;
-            retStr += prettyPrintArrayAsString(attractions, columnFormatting, headers, '=');
-            retStr += `\`\`\`\nHTML version at: <https://mhhunthelper.agiletravels.com/?mouse=${mouse.id}&timefilter=${opts.timefilter ? opts.timefilter : 'all_time'}>`;
-            return retStr;
-        }, reason => {
-            // Querying failed. Received an error object / string, and possibly a response object.
-            Logger.error('Mice: Lookup failed for some reason:\n', reason.error, reason.response ? reason.response.toJSON() : 'No HTTP response');
-            throw new Error(`Could not process results for '${args}', AKA ${mouse.value}`);
-        });
-    }
-
-
-    const isDM = ['dm', 'group'].includes(channel.type);
-    const urlInfo = {
-        qsParams: {},
-        uri: 'https://mhhunthelper.agiletravels.com/',
-        type: 'mouse',
-    };
-
-    // Deep copy the input args, in case we modify them.
-    const orig_args = JSON.parse(JSON.stringify(args));
-    args = removeQueryStringParams(args, urlInfo.qsParams);
-
-    // If the input was a nickname, convert it to the queryable value.
-    if (nicknames.get('mice')[args])
-        args = nicknames.get('mice')[args];
-
-    // Special case of the relic hunter RGW
-    if (args.toLowerCase() === 'relic hunter') {
-        findRH(channel);
-        return;
-    }
-
-    const matches = getSearchedEntity(args, mice);
-    if (!matches.length) {
-        // If this was a mouse search, try finding an item.
-        if (command === 'find')
-            findItem(channel, orig_args, command);
-        else {
-            channel.send(`'${orig_args}' not found.`);
-            getItemList();
-        }
-    }
-    else
-        sendInteractiveSearchResult(matches, channel, _getQueryResult, isDM, urlInfo, args);
-}
-
-/**
- * Initialize (or refresh) the known loot lists from @devjacksmith's tools.
- * @returns {Promise<void>}
- */
-function getItemList() {
-    const now = DateTime.utc();
-    if (last_timestamps.item_refresh) {
-        const next_refresh = last_timestamps.item_refresh.plus(refresh_rate);
-        if (now < next_refresh)
-            return Promise.resolve();
-    }
-    last_timestamps.item_refresh = now;
-
-    Logger.log('Loot: Requesting a new loot list.');
-    const url = 'https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=loot&item_id=all';
-    return fetch(url).then(response => (response.status === 200) ? response.json() : '').then((body) => {
-        if (body) {
-            Logger.log('Loot: Got a new loot list.');
-            items.length = 0;
-            Array.prototype.push.apply(items, body);
-            items.forEach(item => item.lowerValue = item.value.toLowerCase());
-        } else {
-            Logger.warn('Loot: request returned non-200 response');
-        }
-    }).catch(err => Logger.error('Mice: request returned error:', err));
-}
-
-/**
- * Initialize (or refresh) the known filters from @devjacksmith's tools.
- * @returns {Promise<void>}
- */
-function getFilterList() {
-    const now = DateTime.utc();
-    if (last_timestamps.filter_refresh) {
-        const next_refresh = last_timestamps.filter_refresh.plus(refresh_rate);
-        if (now < next_refresh)
-            return Promise.resolve();
-    }
-    last_timestamps.filter_refresh = now;
-
-    Logger.log('Filters: Requesting a new filter list.');
-    const url = 'https://mhhunthelper.agiletravels.com/filters.php';
-    return fetch(url).then(response => (response.status === 200) ? response.json() : '').then((body) => {
-        if (body) {
-            Logger.log('Filters: Got a new filter list');
-            filters.length = 0;
-            Array.prototype.push.apply(filters, body);
-            filters.forEach(filter => filter.lowerValue = filter.code_name.toLowerCase());
-        } else {
-            Logger.warn('Filters: request returned non-200 response');
-        }
-    }).catch(err => Logger.error('Filters: request returned error:', err));
-}
-
-/**
- * Consistently format a rate
- * @param denominator
- * @param numerator
- * @returns a string representation of the rate
- */
-function calculateRate(denominator, numerator) {
-    const value = denominator ? Number(numerator / denominator) : 0;
-    const value2 = value.toPrecision(Math.max(Math.ceil(Math.log10(value)), 4));
-    return Number.parseFloat(value2).toFixed(value2 > 1 ? 0 : 4);
-}
-
-/**
- * Check the input args for a known item that can be looked up.
- * If no result is found, retries with a mouse search.
- *
- * @param {TextChannel} channel the channel on which to respond.
- * @param {string} args a lower cased string of search criteria.
- * @param {string} command the command switch used to initiate the request.
- */
-function findItem(channel, args, command) {
-    /**
-     * Request the latest information about the valid item.
-     * @param {boolean} canSpam Whether the long or short response should be sent back.
-     * @param {DatabaseEntity} item The valid item to query for
-     * @param {Object <string, string>} opts Additional querystring parameters for the request, like 'time filter'
-     * @returns {Promise<string>} The result of the lookup.
-     */
-    function _getQueryResult(canSpam, item, opts) {
-        return getQueriedData('loot', item, opts).then(body => {
-            // Querying succeeded. Received a JSON object (either from cache or HTTP lookup).
-            // body is an array of objects with: location, stage, total_hunts, rate, cheese
-            // 2018-06-18 rate -> rate_per_catch; total_hunts -> total_catches
-            // Sort by "rate" but only if hunts >= 100
-            const attractions = body.filter(setup => setup.total_catches > 99)
-                .map(setup => {
-                    return {
-                        location: setup.location,
-                        stage: setup.stage === null ? ' N/A ' : setup.stage,
-                        total_hunts: integerComma(setup.total_catches),
-                        rate: calculateRate(setup.total_catches, setup.total_drops) || 0,
-                        cheese: setup.cheese,
-                    };
-                });
-            if (!attractions.length)
-                return `${item.value} either hasn't been seen enough, or something broke.`;
-
-            // Sort the setups by the drop rate.
-            attractions.sort((a, b) => b.rate - a.rate);
-            // Keep only the top 10 results, unless this is a DM.
-            attractions.splice(!canSpam ? 10 : 100);
-
-            // Column Formatting specification.
-            /** @type {Object <string, ColumnFormatOptions>} */
-            const columnFormatting = {};
-
-            // Specify the column order.
-            const order = ['location', 'stage', 'cheese', 'rate', 'total_hunts'];
-            // Inspect the setups array to determine if we need to include the stage column.
-            if (attractions.every(row => row.stage === ' N/A '))
-                order.splice(order.indexOf('stage'), 1);
-
-            // Build the header row.
-            const labels = { location: 'Location', stage: 'Stage', total_hunts: 'Catches', rate: 'DR', cheese: 'Cheese' };
-            const headers = order.map(key => {
-                columnFormatting[key] = {
-                    columnWidth: labels[key].length,
-                    alignRight: !isNaN(parseInt(attractions[0][key], 10)),
-                };
-                return { 'key': key, 'label': labels[key] };
-            });
-
-            // Give the numeric column proper formatting.
-            columnFormatting['rate'] = {
-                alignRight: true,
-                isFixedWidth: true,
-                numDecimals: 3,
-                columnWidth: 7,
-            };
-
-            let retStr = `${item.value} (loot) can be found the following ways:\n\`\`\``;
-            retStr += prettyPrintArrayAsString(attractions, columnFormatting, headers, '=');
-            retStr += `\`\`\`\nHTML version at: <https://mhhunthelper.agiletravels.com/loot.php?item=${item.id}&timefilter=${opts.timefilter ? opts.timefilter : 'all_time'}>`;
-            return retStr;
-        }, reason => {
-            // Querying failed. Received an error object / string, and possibly a response object.
-            Logger.error('Loot: Lookup failed for some reason:\n', reason.error, reason.response ? reason.response.toJSON() : 'No HTTP response');
-            throw new Error(`Could not process results for '${args}', AKA ${item.value}`);
-        });
-    }
-
-
-    const isDM = ['dm', 'group'].includes(channel.type);
-    const urlInfo = {
-        qsParams: {},
-        uri: 'https://mhhunthelper.agiletravels.com/loot.php',
-        type: 'item',
-    };
-
-    // Deep copy the input args, in case we modify them.
-    const orig_args = JSON.parse(JSON.stringify(args));
-    args = removeQueryStringParams(args, urlInfo.qsParams);
-
-    // If the input was a nickname, convert it to the queryable value.
-    if (nicknames.get('loot')[args])
-        args = nicknames.get('loot')[args];
-
-    const matches = getSearchedEntity(args, items);
-    if (!matches.length) {
-        // If this was an item search, try finding a mouse.
-        if (command === 'ifind')
-            findMouse(channel, orig_args, command);
-        else {
-            channel.send(`'${orig_args}' not found.`);
-            getMouseList();
-        }
-    }
-    else
-        sendInteractiveSearchResult(matches, channel, _getQueryResult, isDM, urlInfo, args);
-}
-
-/**
- * Construct and dispatch a reaction-enabled message for interactive "search result" display.
- *
- * @param {DatabaseEntity[]} searchResults An ordered array of objects that resulted from a search.
- * @param {TextChannel} channel The channel on which the client received the find request.
- * @param {Function} dataCallback a Promise-returning function that converts the local entity data into the desired text response.
- * @param {boolean} isDM Whether the response will be to a private message (i.e. if the response can be spammy).
- * @param {{qsParams: Object <string, string>, uri: string, type: string}} urlInfo Information about the query that returned the given matches, including querystring parameters, uri, and the type of search.
- * @param {string} searchInput a lower-cased representation of the user's input.
- */
-function sendInteractiveSearchResult(searchResults, channel, dataCallback, isDM, urlInfo, searchInput) {
-    // Associate each search result with a "numeric" emoji.
-    const matches = searchResults.map((sr, i) => ({ emojiId: emojis[i].id, match: sr }));
-    // Construct a MessageEmbed with the search result information, unless this is for a PM with a single response.
-    const embed = new MessageEmbed({
-        title: `Search Results for '${searchInput}'`,
-        thumbnail: { url: 'https://cdn.discordapp.com/emojis/359244526688141312.png' }, // :clue:
-        footer: { text: `For any reaction you select, I'll ${isDM ? 'send' : 'PM'} you that information.` },
-    });
-
-    // Precompute the url prefix & suffix for each search result. Assumption: single-valued querystring params.
-    const urlPrefix = `${urlInfo.uri}?${urlInfo.type}=`;
-    const urlSuffix = Object.keys(urlInfo.qsParams).reduce((acc, key) => `${acc}&${key}=${urlInfo.qsParams[key]}`, '');
-    // Generate the description to include the reaction, name, and link to HTML data on @devjacksmith's website.
-    const description = matches.reduce((acc, entity, i) => {
-        const url = `${urlPrefix}${entity.match.id}${urlSuffix}`;
-        const row = `\n\t${emojis[i].text}:\t[${entity.match.value}](${url})`;
-        return acc + row;
-    }, `I found ${matches.length === 1 ? 'a single result' : `${matches.length} good results`}:`);
-    embed.setDescription(description);
-
-    const searchResponse = (isDM && matches.length === 1)
-        ? `I found a single result for '${searchInput}':`
-        : embed;
-    const sent = channel.send(searchResponse);
-    // To ensure a sensible order of emojis, we have to await the previous react's resolution.
-    if (!isDM || matches.length > 1)
-        sent.then(async (msg) => {
-            /** @type MessageReaction[] */
-            const mrxns = [];
-            for (const m of matches)
-                mrxns.push(await msg.react(m.emojiId).catch(err => Logger.error(err)));
-            return mrxns;
-        }).then(msgRxns => {
-            // Set a 5-minute listener on the message for these reactions.
-            const msg = msgRxns[0].message,
-                allowed = msgRxns.map(mr => mr.emoji.name),
-                filter = (reaction, user) => allowed.includes(reaction.emoji.name) && !user.bot,
-                rc = msg.createReactionCollector(filter, { time: 5 * 60 * 1000 });
-            rc.on('collect', (mr, user) => {
-                // Fetch the response and send it to the user.
-                const match = matches.filter(m => m.emojiId === mr.emoji.identifier)[0];
-                if (match) dataCallback(true, match.match, urlInfo.qsParams).then(
-                    result => user.send(result, { split: { prepend: '```', append: '```' } }),
-                    result => user.send(result),
-                ).catch(err => Logger.error(err));
-            }).on('end', () => rc.message.delete().catch(() => Logger.log('Unable to delete reaction message')));
-        }).catch(err => Logger.error('Reactions: error setting reactions:\n', err));
-
-    // Always send one result to the channel.
-    sent.then(() => dataCallback(isDM, matches[0].match, urlInfo.qsParams).then(
-        result => channel.send(result, { split: { prepend: '```', append: '```' } }),
-        result => channel.send(result)),
-    ).catch(err => Logger.error(err));
-}
-
-/**
- * Return a sorted list of approximate matches to the given input and container
- *
- * @param {string} input The text to match against
- * @param {DatabaseEntity[]} values The known values.
- * @returns {Array <number>[]} Up to 10 indices and their search score.
- */
-function getSearchedEntity(input, values) {
-    if (!input.length || !Array.isArray(values) || !values.length)
-        return [];
-
-    const matches = values.filter(v => v.lowerValue.includes(input)).map(v => {
-        return { entity: v, score: v.lowerValue.indexOf(input) };
-    });
-    matches.sort((a, b) => {
-        const r = a.score - b.score;
-        // Sort lexicographically if the scores are equal.
-        return r ? r : a.entity.value.localeCompare(b.entity.value, { sensitivity: 'base' });
-    });
-    // Keep only the top 10 results.
-    matches.splice(10);
-    return matches.map(m => m.entity);
-}
 
 /**
  * Load nickname data from the input path, defaulting to the value of 'nickname_urls_filename'.
@@ -2259,15 +1699,6 @@ function getNicknames(type) {
         client.nicknames.set(type, newData);
         parser.end(() => Logger.log(`Nicknames: ${Object.keys(newData).length} of type '${type}' loaded.`));
     }).catch(err => Logger.error(`Nicknames: request for type '${type}' failed with error:`, err));
-}
-
-/**
- * Convert the input number into a formatted string, e.g. 1234 -> 1,234
- * @param {number} number The number to be formatted
- * @returns {string} A comma-formatted string.
- */
-function integerComma(number) {
-    return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
 /**

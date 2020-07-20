@@ -259,9 +259,68 @@ function isValidURL(str) {
 
 }
 
+/**
+ * Consistently format a rate
+ * @param denominator The bottom number - the thing we're dividing by
+ * @param numerator The top number - the thing we're dividing
+ * @returns a string representation of the rate
+ */
+function calculateRate(denominator, numerator) {
+    if ((typeof denominator === 'undefined') ||
+        (typeof numerator === 'undefined') ||
+        isNaN(denominator) || isNaN(numerator)) {
+        return NaN;
+    }
+    if (!denominator)
+        return NaN;
+    if (!numerator)
+        numerator = 0;
+    const value = denominator ? Number(numerator / denominator) : 0;
+    const value2 = value.toPrecision(Math.max(Math.ceil(Math.log10(value)), 4));
+    return Number.parseFloat(value2).toFixed(value2 >= 1 ?
+        Math.max(4 - Math.ceil(Math.log10(value2),0)) : 4);
+}
+
+/**
+ * Convert the input number into a formatted string, e.g. 1234 -> 1,234
+ * @param {number} number The number to be formatted
+ * @returns {string} A comma-formatted string.
+ */
+function integerComma(number) {
+    if (typeof number === 'undefined')
+        return false;
+    return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+/**
+ * Turns an integer into a human-readable string, up to billions
+ * @param {Number} number
+ * @returns {string} Formatted number
+ */
+function intToHuman(number) {
+    // Billion, Million, K, end
+    if (isNaN(parseInt(number, 10))) {
+        return NaN;
+    }
+    number = parseInt(number, 10);
+    let reply = '';
+    if (number >= 1000000000)
+        reply = Math.round(number / 10000000) / 100 + 'B';
+    else if (number > 1000000)
+        reply =  Math.round(number / 10000) / 100 + 'M';
+    else if (number > 1000)
+        reply = Math.round(number / 10) / 100 + 'K';
+    else
+        reply = number.toString();
+    return reply;
+}
+
 exports.oxfordStringifyValues = oxfordStringifyValues;
 exports.prettyPrintArrayAsString = prettyPrintArrayAsString;
 exports.splitString = splitString;
 exports.timeLeft = timeLeft;
 exports.unescapeEntities = unescapeEntities;
 exports.isValidURL = isValidURL;
+exports.calculateRate = calculateRate;
+exports.integerComma = integerComma;
+exports.intToHuman = intToHuman;
