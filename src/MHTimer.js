@@ -539,11 +539,16 @@ function parseUserMessage(message) {
     if (tokens[0] === prefix)
         tokens.shift();
 
-    const command = tokens.shift();
+    let command = tokens.shift(); // changed from const for RH case. TODO: Change back to const
     if (!command) {
         message.channel.send('I didn\'t understand, but you can ask me for help.');
         return;
     }
+    // Today's hack brought to you by laziness - haven't migrated notifications/timers yet
+    if (command.toLowerCase() === 'find' && tokens.length && 
+            (tokens[0].toLowerCase() === 'rh' || tokens[0].toLowerCase() === 'relic_hunter') ||
+            (tokens.length >= 2 && tokens[0].toLowerCase() === 'relic' && tokens[1].toLowerCase() == 'hunter'))
+        command = 'findrh';
 
     // Parse the message to see if it matches any known timer areas, sub-areas, or has count information.
     const reminderRequest = tokens.length ? timerAliases(tokens) : {};
