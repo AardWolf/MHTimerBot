@@ -25,7 +25,7 @@ async function doFIND(message, tokens) {
         if (tokens[0] === '-e')
             tokens.shift();
         const filter = getFilter(tokens[0]);
-        if (filter && 'code_name' in filter) {
+        if (filter && 'code_name' in filter && tokens.length > 1) {
             opts.timefilter = filter.code_name;
             tokens.shift();
         }
