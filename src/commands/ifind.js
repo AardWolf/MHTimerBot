@@ -30,7 +30,7 @@ async function doIFIND(message, tokens) {
             tokens.shift();
         }
         // Figure out what they're searching for
-        const searchString = tokens.join(' ');
+        const searchString = tokens.join(' ').toLowerCase();
         // TODO: When I put the reaction menu back it goes here
         const all_loot = getLoot(searchString, message.client.nicknames.get('loot'));
         if (all_loot && all_loot.length) {

@@ -318,6 +318,7 @@ async function getMHCTList(type, list) {
         .then((body) => {
             if (body) {
                 Logger.log(`MHCT: Got a new ${type} list`);
+                list.splice(0, list.length);
                 Array.prototype.push.apply(list, body);
                 list.forEach(item => item.lowerValue = item.value.toLowerCase());
             }
