@@ -1,5 +1,5 @@
 const Logger = require('../modules/logger');
-const { initialize, getFilter, getLoot, formatLoot,
+const { getFilter, getLoot, formatLoot, 
     sendInteractiveSearchResult, listFilters, getMice, formatMice } = require('../modules/mhct-lookup');
 const CommandResult = require('../interfaces/command-result');
 
@@ -30,7 +30,7 @@ async function doIFIND(message, tokens) {
             tokens.shift();
         }
         // Figure out what they're searching for
-        const searchString = tokens.join(' ');
+        const searchString = tokens.join(' ').toLowerCase();
         // TODO: When I put the reaction menu back it goes here
         const all_loot = getLoot(searchString, message.client.nicknames.get('loot'));
         if (all_loot && all_loot.length) {
@@ -79,6 +79,7 @@ function helpFind() {
     return reply;
 }
 
+// initialize and save are in find.js
 module.exports = {
     name: 'ifind',
     args: true,
@@ -87,6 +88,5 @@ module.exports = {
     canDM: true,
     findFunction: helpFind,
     execute: doIFIND,
-    initialize: initialize,
 };
 

@@ -52,7 +52,7 @@ async function initialize() {
 
 /**
  * Function that is called when the bot is shutting down or unloading a command
- */
+  */
 function save() {
     if (someone_initialized) {
         Logger.log('hunter save called');

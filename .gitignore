@@ -12,6 +12,7 @@ MHTimer.pid
 reminders.json
 .reminders.json
 hunters.json
+.idea/
 
 
 # General-purpose ignores
