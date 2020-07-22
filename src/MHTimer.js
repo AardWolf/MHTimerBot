@@ -53,9 +53,9 @@ const settings = {},
 
 client.nicknames = new Map();
 /** @type {Timer[]} */
-const timers_list = [];
+client.timers_list = [];
 /** @type {TimerReminder[]} */
-const reminders = [];
+client.reminders = [];
 
 const refresh_rate = Duration.fromObject({ minutes: 5 });
 /** @type {Object<string, DateTime>} */
@@ -130,7 +130,7 @@ function Main() {
                 .then(timerData => {
                     createTimersFromList(timerData);
                     Logger.log(`Timers: imported ${timerData.length} from file.`);
-                    return timers_list.length > 0;
+                    return client.timers_list.length > 0;
                 })
                 .catch(err => failedLoad('Timers: import error:\n', err));
 
@@ -140,7 +140,7 @@ function Main() {
                     if (createRemindersFromData(reminderData))
                         pruneExpiredReminders();
                     Logger.log(`Reminders: imported ${reminderData.length} from file.`);
-                    return reminders.length > 0;
+                    return client.reminders.length > 0;
                 })
                 .catch(err => failedLoad('Reminders: import error:\n', err));
             hasReminders.then(() => {
@@ -199,7 +199,7 @@ function Main() {
                 }, []);
 
                 // Use one timeout per timer to manage default reminders and announcements.
-                timers_list.forEach(timer => scheduleTimer(timer, announcables));
+                client.timers_list.forEach(timer => scheduleTimer(timer, announcables));
                 Logger.log(`Timers: Initialized ${timer_config.size} timers on channels ${announcables}.`);
 
                 // If we disconnect and then reconnect, do not bother rescheduling the already-scheduled timers.
@@ -284,7 +284,7 @@ function quit() {
             for (const timer of Object.values(dataTimers))
                 clearInterval(timer);
             Logger.log('Shutdown: deactivating timers');
-            for (const timer of timers_list) {
+            for (const timer of client.timers_list) {
                 timer.stopInterval();
                 timer.stopTimeout();
             }
@@ -445,7 +445,7 @@ function loadTimers(path = timer_settings_filename) {
  * @returns {boolean} Whether or not any timers were created from the input.
  */
 function createTimersFromList(timerData) {
-    const knownTimers = timers_list.length;
+    const knownTimers = client.timers_list.length;
     for (const seed of timerData) {
         let timer;
         try {
@@ -454,9 +454,9 @@ function createTimersFromList(timerData) {
             Logger.error(`Timers: error occured while constructing timer: '${err}'. Received object:\n`, seed);
             continue;
         }
-        timers_list.push(timer);
+        client.timers_list.push(timer);
     }
-    return timers_list.length !== knownTimers;
+    return client.timers_list.length !== knownTimers;
 }
 
 /**
@@ -496,7 +496,7 @@ function getKnownTimersDetails() {
     // Prepare a detailed list of known timers and their sub-areas.
     /** @type {Object <string, Set<string>> */
     const details = {};
-    timers_list.forEach(timer => {
+    client.timers_list.forEach(timer => {
         const area = `**${timer.getArea()}**`;
         if (!details[area])
             details[area] = new Set();
@@ -788,8 +788,8 @@ function timerAliases(tokens) {
         sub_area: null,
         count: null,
     };
-    const timerAreas = timers_list.map(timer => timer.getArea());
-    const timerSubAreas = timers_list.map(timer => timer.getSubArea());
+    const timerAreas = client.timers_list.map(timer => timer.getArea());
+    const timerSubAreas = client.timers_list.map(timer => timer.getSubArea());
     // Scan the input tokens and attempt to match them to a known timer.
     for (let i = 0; i < tokens.length; i++) {
         const token = tokens[i].toLowerCase();
@@ -1074,7 +1074,7 @@ function nextTimer(validTimerData) {
     // Inspect all known timers to determine the one that matches the requested area, and occurs soonest.
     const area = validTimerData.area,
         sub = validTimerData.sub_area,
-        areaTimers = timers_list.filter(timer => timer.getArea() === area);
+        areaTimers = client.timers_list.filter(timer => timer.getArea() === area);
 
     let nextTimer;
     for (const timer of areaTimers)
@@ -1128,13 +1128,13 @@ function loadReminders(path = reminder_filename) {
  * @returns {boolean} Whether or not any reminders were created from the input.
  */
 function createRemindersFromData(reminderData) {
-    const knownReminders = reminders.length;
+    const knownReminders = client.reminders.length;
     /** TODO: Reminders as class instead of just formatted object
      * Class instantiation code would be here and replace the push call.
      */
     // Add each of these objects to the reminder list.
-    Array.prototype.push.apply(reminders, reminderData);
-    return reminders.length !== knownReminders;
+    Array.prototype.push.apply(client.reminders, reminderData);
+    return client.reminders.length !== knownReminders;
 }
 
 /**
@@ -1142,31 +1142,31 @@ function createRemindersFromData(reminderData) {
  */
 function pruneExpiredReminders() {
     // Remove any expired timers - no need to save them.
-    if (reminders.length) {
+    if (client.reminders.length) {
         // Move expired reminders to the end.
-        reminders.sort((a, b) => (a.count === 0) ? 1 : (b.count - a.count));
+        client.reminders.sort((a, b) => (a.count === 0) ? 1 : (b.count - a.count));
 
         // Find the first non-expired one.
-        let i = reminders.length,
+        let i = client.reminders.length,
             numExpired = 0;
         while (i--) {
-            if (reminders[i].count === 0)
+            if (client.reminders[i].count === 0)
                 ++numExpired;
             else
                 break;
         }
-        if (numExpired === reminders.length)
-            reminders.length = 0;
+        if (numExpired === client.reminders.length)
+            client.reminders.length = 0;
         else if (numExpired) {
             // Advance to the next record (which should be expired and a valid index).
             ++i;
             // If the current reminder is expired, splice it and the others away.
-            if (i < reminders.length && reminders[i].count === 0) {
-                const discarded = reminders.splice(i, numExpired);
-                Logger.log(`Reminders: spliced ${discarded.length} that were expired. ${reminders.length} remaining.`);
+            if (i < client.reminders.length && client.reminders[i].count === 0) {
+                const discarded = client.reminders.splice(i, numExpired);
+                Logger.log(`Reminders: spliced ${discarded.length} that were expired. ${client.reminders.length} remaining.`);
             }
             else
-                Logger.warn(`Reminders: found ${numExpired} expired, but couldn't splice because reminder at index ${i} was bad:\n`, reminders, '\n', reminders[i]);
+                Logger.warn(`Reminders: found ${numExpired} expired, but couldn't splice because reminder at index ${i} was bad:\n`, client.reminders, '\n', client.reminders[i]);
         }
     }
 }
@@ -1179,8 +1179,8 @@ function pruneExpiredReminders() {
  */
 function saveReminders(path = reminder_filename) {
     // Write out the JSON of the reminders array
-    return saveDataAsJSON(path, reminders).then(didSave => {
-        Logger.log(`Reminders: ${didSave ? 'Saved' : 'Failed to save'} ${reminders.length} to '${path}'.`);
+    return saveDataAsJSON(path, client.reminders).then(didSave => {
+        Logger.log(`Reminders: ${didSave ? 'Saved' : 'Failed to save'} ${client.reminders.length} to '${path}'.`);
         last_timestamps.reminder_save = DateTime.utc();
         return didSave;
     });
@@ -1232,7 +1232,7 @@ function doRemind(timer) {
 
     // TODO: Build a basic embed template object and package that to each recipient, rather than
     // fully construct the (basically equivalent) embed for each user.
-    const toDispatch = reminders
+    const toDispatch = client.reminders
         // If there no sub-area for this reminder, or the one specified matches
         // that of the timer, send the reminder.
         .filter(r => area === r.area && r.count !== 0 && (!r.sub_area || r.sub_area === sub))
@@ -1356,7 +1356,7 @@ async function addRemind(timerRequest, message) {
     // reminders e.g. thread race saveReminders, simply set the count to 0.)
     if (!count) {
         const responses = [];
-        for (const reminder of reminders)
+        for (const reminder of client.reminders)
             if (reminder.user === message.author.id && reminder.area === area) {
                 if (subArea && subArea === reminder.sub_area) {
                     reminder.count = 0;
@@ -1376,7 +1376,7 @@ async function addRemind(timerRequest, message) {
     }
 
     // User asked to be reminded - find a timer that meets the request, and sort in order of next activation.
-    const choices = timers_list
+    const choices = client.timers_list
         .filter(t => area === t.getArea() && (!subArea || subArea === t.getSubArea()))
         .sort((a, b) => a.getNext() - b.getNext());
     Logger.log(`Timers: found ${choices.length} matching input request:\n`, timerRequest);
@@ -1390,7 +1390,7 @@ async function addRemind(timerRequest, message) {
 
     // If the reminder already exists, set its new count to the requested count.
     const responses = [];
-    for (const reminder of reminders)
+    for (const reminder of client.reminders)
         if (reminder.user === message.author.id && reminder.area === area)
             if ((subArea && reminder.sub_area === subArea)
                 || (!subArea && !reminder.sub_area))
@@ -1417,7 +1417,7 @@ async function addRemind(timerRequest, message) {
     // null / undefined (i.e. a request for reminders from all timers in the area).
     if (timer.getSubArea())
         newReminder.sub_area = subArea;
-    reminders.push(newReminder);
+    client.reminders.push(newReminder);
 
     // If the user entered a generic reminder, they may not expect the specific name. Generic reminder
     // requests will have matched more than one timer, so we can reference 'choices' to determine the
@@ -1430,7 +1430,7 @@ async function addRemind(timerRequest, message) {
     responses.push((count === 1) ? 'once.' : (count < 0) ? 'until you stop it.' : `${count} times.`);
 
     // Inform a new user of the reminder functionality (i.e. PM only).
-    if (message.channel.type !== 'dm' && !reminders.some(r => r.user === message.author.id))
+    if (message.channel.type !== 'dm' && !client.reminders.some(r => r.user === message.author.id))
         responses.unshift('Hi there! Reminders are only sent via PM, and I\'m just making sure I can PM you.');
 
     // Send notice of the update via PM.
@@ -1457,7 +1457,7 @@ async function listRemind(message) {
     let timer_str = 'Your reminders:';
     let usage_str;
 
-    const userReminders = reminders.filter(r => r.user === user && r.count);
+    const userReminders = client.reminders.filter(r => r.user === user && r.count);
     const botPrefix = message.guild ? message.client.settings.guilds[message.guild.id].botPrefix.trim() :
         message.client.settings.botPrefix.trim();
     userReminders.forEach(reminder => {
@@ -1520,7 +1520,7 @@ function buildSchedule(timer_request) {
     /** @type {{time: DateTime, message: string}[]} */
     const upcoming_timers = [];
     const max_timers = 24;
-    (!area ? timers_list : timers_list.filter(t => t.getArea() === area && !t.isSilent()))
+    (!area ? client.timers_list : client.timers_list.filter(t => t.getArea() === area && !t.isSilent()))
         .forEach(timer => {
             const message = timer.getDemand();
             for (const time of timer.upcoming(until))
@@ -1724,7 +1724,7 @@ function remindRH(new_location) {
     //Logic to look for people with the reminder goes here
     if (new_location !== 'unknown') {
         Logger.log(`Relic Hunter: Sending reminders for ${new_location}`);
-        doRemind(timers_list.find(t => t.getArea() === 'relic_hunter'));
+        doRemind(client.timers_list.find(t => t.getArea() === 'relic_hunter'));
     }
 }
 
