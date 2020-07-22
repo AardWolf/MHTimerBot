@@ -1,6 +1,6 @@
 const Logger = require('../modules/logger');
 const { initialize, getFilter, getMice, formatMice, sendInteractiveSearchResult, 
-    listFilters, getLoot, formatLoot } = require('../modules/mhct-lookup');
+    listFilters, getLoot, formatLoot, save } = require('../modules/mhct-lookup');
 const CommandResult = require('../interfaces/command-result');
 
 /**
@@ -30,7 +30,7 @@ async function doFIND(message, tokens) {
             tokens.shift();
         }
         // Figure out what they're searching for
-        const searchString = tokens.join(' ');
+        const searchString = tokens.join(' ').toLowerCase();
         const all_mice = getMice(searchString, message.client.nicknames.get('mice'));
         if (all_mice && all_mice.length) {
             // We have multiple options, show the interactive menu
@@ -87,6 +87,7 @@ module.exports = {
     aliases: [ 'mfind' ],
     execute: doFIND,
     initialize: initialize,
+    save: save,
 };
 
 // Testing area

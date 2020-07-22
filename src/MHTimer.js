@@ -49,10 +49,8 @@ const settings = {},
         last_seen: DateTime.fromMillis(0),
         timeout: null,
     },
-    nicknames = new Map(),
     nickname_urls = {};
 
-//TODO This will replace the above, temporarily both exist
 client.nicknames = new Map();
 /** @type {Timer[]} */
 const timers_list = [];
@@ -63,10 +61,6 @@ const refresh_rate = Duration.fromObject({ minutes: 5 });
 /** @type {Object<string, DateTime>} */
 const last_timestamps = {
     reminder_save: DateTime.utc(),
-    hunter_save: DateTime.utc(),
-    item_refresh: null,
-    mouse_refresh: null,
-    filter_refresh: null,
 };
 
 /** @type {Object <string, NodeJS.Timer>} */
@@ -1693,9 +1687,6 @@ function getNicknames(type) {
         const body = await response.text();
         // Pass the response to the CSV parser (after removing the header row).
         parser.write(body.split(/[\r\n]+/).splice(1).join('\n').toLowerCase());
-        // Create a new (or replace the existing) nickname definition for this type.
-        nicknames.set(type, newData);
-        //TODO Remove above when nicknames are ONLY in the client
         client.nicknames.set(type, newData);
         parser.end(() => Logger.log(`Nicknames: ${Object.keys(newData).length} of type '${type}' loaded.`));
     }).catch(err => Logger.error(`Nicknames: request for type '${type}' failed with error:`, err));

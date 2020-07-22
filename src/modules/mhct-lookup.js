@@ -11,6 +11,7 @@ const refresh_list = {
     loot: DateTime.utc().minus(refresh_rate),
     filter: DateTime.utc().minus(refresh_rate),
 };
+const intervals = [];
 const filters = [],
     mice = [],
     loot = [];
@@ -317,6 +318,7 @@ async function getMHCTList(type, list) {
         .then((body) => {
             if (body) {
                 Logger.log(`MHCT: Got a new ${type} list`);
+                list.splice(0, list.length);
                 Array.prototype.push.apply(list, body);
                 list.forEach(item => item.lowerValue = item.value.toLowerCase());
             }
@@ -388,8 +390,15 @@ async function initialize() {
         getMHCTList('loot', loot),
         getFilterList(),
     ]);
+    intervals.push(setInterval(() => { getMHCTList('mouse', mice); }, refresh_rate));
+    intervals.push(setInterval(() => { getMHCTList('loot', loot); }, refresh_rate));
+    intervals.push(setInterval(() => { getFilterList(); }, refresh_rate));
     Logger.log(`MHCT Initialized: Loot: ${loot.length}, mice: ${mice.length}, filters: ${filters.length}`);
     return true;
+}
+
+async function save() {
+    intervals.forEach(i => clearInterval(i));
 }
 
 module.exports.getMHCTList = getMHCTList;
@@ -403,3 +412,4 @@ module.exports.formatMice = formatMice;
 module.exports.sendInteractiveSearchResult = sendInteractiveSearchResult;
 module.exports.getSearchedEntity = getSearchedEntity;
 module.exports.listFilters = listFilters;
+module.exports.save = save;
