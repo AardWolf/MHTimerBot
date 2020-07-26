@@ -354,7 +354,44 @@ function nextTimer(timers_list, validTimerData, botPrefix) {
     );
 }
 
+/**
+ * List the reminders for the user, and PM them the result.
+ *
+ * @param {String} user A Discord Snowflake user id
+ * @param {Array} reminders Array of reminders the bot is managing
+ * @param {String} botPrefix The bot prefix for the channel in use
+ */
+function listRemind(user, reminders, botPrefix) {
+    let timer_str = 'Your reminders:';
+    let usage_str;
+
+    const userReminders = reminders.filter(r => r.user === user && r.count);
+    userReminders.forEach(reminder => {
+        // TODO: prettyPrint this info.
+        const name = `${reminder.area}${reminder.sub_area ? ` (${reminder.sub_area})` : ''}`;
+        timer_str += `\nTimer:\t**${name}**`;
+        usage_str = `\`${botPrefix} remind ${reminder.area}`;
+        if (reminder.sub_area)
+            usage_str += ` ${reminder.sub_area}`;
+
+        timer_str += '\t';
+        if (reminder.count === 1)
+            timer_str += ' one more time';
+        else if (reminder.count === -1)
+            timer_str += ' until you stop it';
+        else
+            timer_str += ` ${reminder.count} times`;
+
+        timer_str += `.\nTo turn off\t${usage_str} stop\`\n`;
+
+        if (reminder.fail)
+            timer_str += `There have been ${reminder.fail} failed attempts to activate this reminder.\n`;
+    });
+    return userReminders.length ? timer_str : 'I found no reminders for you, sorry.';
+}
+
 
 module.exports.getKnownTimersDetails = getKnownTimersDetails;
 module.exports.timerAliases = timerAliases;
 module.exports.nextTimer = nextTimer;
+module.exports.listRemind = listRemind;

@@ -576,30 +576,6 @@ function parseUserMessage(message) {
     {
         switch (command.toLowerCase()) {
 
-            // Display or update the user's reminders.
-            case 'remind': {
-                // TODO: redirect responses to PM.
-                if (!tokens.length || !reminderRequest.area)
-                    addMessageReaction(listRemind(message));
-                else
-                    addMessageReaction(addRemind(reminderRequest, message));
-                break;
-            }
-
-            // Display information about upcoming timers.
-            case 'sched':
-            case 'itin':
-            case 'agenda':
-            case 'itinerary':
-            case 'schedule': {
-                // Default the searched time period to 24 hours if it was not specified.
-                reminderRequest.count = reminderRequest.count || 24;
-
-                const usage_str = buildSchedule(reminderRequest);
-                // Discord limits messages to 2000 characters, so use multiple messages if necessary.
-                message.channel.send(usage_str, { split: true });
-                break;
-            }
             case 'findrh': {
                 findRH(message.channel, { split: true });
                 break;
@@ -710,16 +686,6 @@ async function convertRewardLink(message) {
             .then(result => result || '');
     }
 }
-
-/**
- * @typedef {Object} ReminderRequest
- * @property {string} [area] The area of a Timer
- * @property {string} [sub_area] The sub-area of a Timer
- * @property {number} [count] The number of times a Timer should activate before this reminder is removed.
- */
-
-
-
 
 /**
  * @typedef {Object} TimerReminder
@@ -957,220 +923,7 @@ function sendRemind(user, remind, timer) {
     );
 }
 
-/**
- * Add (or remove) a reminder.
- *
- * @param {ReminderRequest} timerRequest a timer request which has already passed through token
- *                                       validation to set 'area' and 'sub_area' as possible.
- * @param {Message} message the Discord message that initiated this request.
- */
-async function addRemind(timerRequest, message) {
-    // If there were no area, the reminders would have been
-    // listed instead of 'addRemind' being called.
-    const area = timerRequest.area;
-    const subArea = timerRequest.sub_area;
-    if (!area) {
-        await message.channel.send('I do not know the area you asked for');
-        return new CommandResult({ success: false, replied: true, message });
-    }
 
-    // Default to reminding the user once.
-    const count = timerRequest.count || (timerRequest.count === 0 ? 0 : 1);
-    const requestName = `${area}${subArea ? `: ${subArea}` : ''}`;
-
-    // Delete the reminder, if that is being requested.
-    // (Rather than try to modify the positions and number of elements in
-    // reminders e.g. thread race saveReminders, simply set the count to 0.)
-    if (!count) {
-        const responses = [];
-        for (const reminder of client.reminders)
-            if (reminder.user === message.author.id && reminder.area === area) {
-                if (subArea && subArea === reminder.sub_area) {
-                    reminder.count = 0;
-                    responses.push(`Reminder for '${requestName}' turned off.`);
-                }
-                else if (!subArea && !reminder.sub_area) {
-                    reminder.count = 0;
-                    responses.push(`Reminder for '${requestName}' turned off.`);
-                }
-            }
-
-        await message.author.send(responses.length
-            ? `\`\`\`${responses.join('\n')}\`\`\``
-            : `I couldn't find a matching reminder for you in '${requestName}'.`,
-        );
-        return new CommandResult({ success: responses.length > 0, sentDm: true, message });
-    }
-
-    // User asked to be reminded - find a timer that meets the request, and sort in order of next activation.
-    const choices = client.timers_list
-        .filter(t => area === t.getArea() && (!subArea || subArea === t.getSubArea()))
-        .sort((a, b) => a.getNext() - b.getNext());
-    Logger.log(`Timers: found ${choices.length} matching input request:\n`, timerRequest);
-
-    // Assume the desired timer is the one that matched the given criteria and occurs next.
-    const [timer] = choices;
-    if (!timer) {
-        await message.author.send(`I'm sorry, there weren't any timers I know of that match your request. I know\n${getKnownTimersDetails()}`);
-        return new CommandResult({ success: false, sentDm: true, message });
-    }
-
-    // If the reminder already exists, set its new count to the requested count.
-    const responses = [];
-    for (const reminder of client.reminders)
-        if (reminder.user === message.author.id && reminder.area === area)
-            if ((subArea && reminder.sub_area === subArea)
-                || (!subArea && !reminder.sub_area))
-            {
-                responses.push(`Updated reminder count for '${requestName}' from '${reminder.count === -1
-                    ? 'always' : reminder.count}' to '${count === -1 ? 'always' : count}'.`);
-                reminder.count = count;
-            }
-
-    if (responses.length) {
-        Logger.log(`Reminders: updated ${responses.length} for ${message.author.username} to a count of ${count}.`, timerRequest);
-        await message.author.send(`\`\`\`${responses.join('\n')}\`\`\``);
-        return new CommandResult({ success: true, sentDm: true, message });
-    }
-
-    // No updates were made - free to add a new reminder.
-    const newReminder = {
-        'count': count,
-        'area': area,
-        'user': message.author.id,
-    };
-    // If the matched timer has a sub-area, we need to care about the sub-area specified
-    // in the request. It will either be the same as that of this timer, or it will be
-    // null / undefined (i.e. a request for reminders from all timers in the area).
-    if (timer.getSubArea())
-        newReminder.sub_area = subArea;
-    client.reminders.push(newReminder);
-
-    // If the user entered a generic reminder, they may not expect the specific name. Generic reminder
-    // requests will have matched more than one timer, so we can reference 'choices' to determine the
-    // proper response.
-    const isGenericRequest = !subArea && timer.getSubArea();
-    const subAreas = new Set(choices.map(t => `**${t.getSubArea()}**`));
-    responses.push(`Your reminder for **${isGenericRequest ? area : timer.name}** is set. ${choices.length > 1
-        ? `You'll get reminders for ${oxfordStringifyValues(subAreas)}. I'll PM you about them`
-        : 'I\'ll PM you about it'}`);
-    responses.push((count === 1) ? 'once.' : (count < 0) ? 'until you stop it.' : `${count} times.`);
-
-    // Inform a new user of the reminder functionality (i.e. PM only).
-    if (message.channel.type !== 'dm' && !client.reminders.some(r => r.user === message.author.id))
-        responses.unshift('Hi there! Reminders are only sent via PM, and I\'m just making sure I can PM you.');
-
-    // Send notice of the update via PM.
-    const ourResult = new CommandResult({ success: true, sentDm: false, message });
-    try {
-        await message.author.send(responses.join(' '));
-        ourResult.sentDm = true;
-    } catch(err) {
-        Logger.error(`Reminders: notification failure for ${message.author.username}.`);
-        ourResult.success = false;
-        ourResult.botError = true;
-    }
-    return ourResult;
-}
-
-/**
- * List the reminders for the user, and PM them the result.
- *
- * @param {Message} message a Discord message containing the request to list reminders.
- */
-async function listRemind(message) {
-    const user = message.author.id,
-        pm_channel = message.author;
-    let timer_str = 'Your reminders:';
-    let usage_str;
-
-    const userReminders = client.reminders.filter(r => r.user === user && r.count);
-    const botPrefix = message.guild ? message.client.settings.guilds[message.guild.id].botPrefix.trim() :
-        message.client.settings.botPrefix.trim();
-    userReminders.forEach(reminder => {
-        // TODO: prettyPrint this info.
-        const name = `${reminder.area}${reminder.sub_area ? ` (${reminder.sub_area})` : ''}`;
-        timer_str += `\nTimer:\t**${name}**`;
-        usage_str = `\`${botPrefix} remind ${reminder.area}`;
-        if (reminder.sub_area)
-            usage_str += ` ${reminder.sub_area}`;
-
-        timer_str += '\t';
-        if (reminder.count === 1)
-            timer_str += ' one more time';
-        else if (reminder.count === -1)
-            timer_str += ' until you stop it';
-        else
-            timer_str += ` ${reminder.count} times`;
-
-        timer_str += `.\nTo turn off\t${usage_str} stop\`\n`;
-
-        if (reminder.fail)
-            timer_str += `There have been ${reminder.fail} failed attempts to activate this reminder.\n`;
-    });
-
-    const ourResult = new CommandResult({ success: true, sentDm: false, message });
-    try {
-        await pm_channel.send(userReminders.length ? timer_str : 'I found no reminders for you, sorry.');
-        ourResult.sentDm = true;
-    } catch (err) {
-        Logger.error(`Reminders: notification failure for ${pm_channel.username}. Possibly blocked.`, err);
-        ourResult.success = false;
-        ourResult.botError = true;
-    }
-    return ourResult;
-}
-
-/**
- * Compute which timers are coming up in the next bit of time, for the requested area.
- * Returns a ready-to-print string listing up to 24 of the found timers, with their "demand" and when they will activate.
- * TODO: should this return a MessageEmbed?
- *
- * @param {{area: string, count: number}} timer_request A request that indicates the number of hours to search ahead, and the area in which to search
- * @returns {string} a ready-to-print string containing the timer's demand, and how soon it will occur.
- */
-function buildSchedule(timer_request) {
-    const area = timer_request.area;
-
-    // Search from 1 hour to 10 days out.
-    let req_hours = Duration.fromObject({ hours: timer_request.count });
-    if (!req_hours.isValid) {
-        return 'Invalid timespan given - how many hours did you want to look ahead?';
-    }
-    else if (req_hours.as('hours') <= 0)
-        req_hours = req_hours.set({ hours: 24 });
-    else if (req_hours.as('days') >= 10)
-        req_hours = req_hours.shiftTo('days').set({ days: 10 });
-
-    // Get the next occurrence for every timer. Compare its interval to determine how many of them to include
-    const until = DateTime.utc().plus(req_hours);
-    /** @type {{time: DateTime, message: string}[]} */
-    const upcoming_timers = [];
-    const max_timers = 24;
-    (!area ? client.timers_list : client.timers_list.filter(t => t.getArea() === area && !t.isSilent()))
-        .forEach(timer => {
-            const message = timer.getDemand();
-            for (const time of timer.upcoming(until))
-                upcoming_timers.push({ time: time, message: message });
-        });
-
-    // Sort the list of upcoming timers in this area by time, so that the soonest is printed first.
-    upcoming_timers.sort((a, b) => a.time - b.time);
-
-    // Make a nice message to display.
-    let return_str = `I have ${upcoming_timers.length} timers coming up in the next ${req_hours.as('hours')} hours`;
-    if (upcoming_timers.length > max_timers) {
-        return_str += `. Here are the next ${max_timers} of them`;
-        upcoming_timers.splice(max_timers, upcoming_timers.length);
-    }
-    return_str += upcoming_timers.length ? ':\n' : '.';
-
-    return_str = upcoming_timers.reduce((str, val) => {
-        return `${str}${val.message} ${timeLeft(val.time)}\n`;
-    }, return_str);
-
-    return return_str;
-}
 
 /**
  * Get the help text.
@@ -1208,8 +961,6 @@ function getHelpMessage(message, tokens) {
         ].join('\n');
     }
 
-    const areaInfo = 'Areas are Seasonal Garden (**sg**), Forbidden Grove (**fg**), Toxic Spill (**ts**), Balack\'s Cove (**cove**), and the daily **reset**.';
-    const subAreaInfo = 'Sub areas are the seasons, open/close, spill ranks, and tide levels';
     const command = tokens[0].toLowerCase();
 
     const dynCommand = allowedCommands.get(command)
@@ -1223,28 +974,7 @@ function getHelpMessage(message, tokens) {
         else
             return `I know how to ${command} but I don't know how to tell you how to ${command}`;
     }
-    else if (tokens[0] === 'remind') {
-        return [
-            '**remind**',
-            `Usage: \`${prefix} remind [<area> | <sub-area>] [<number> | always | stop]\` will control my reminder function relating to you specifically.`,
-            'Using the word `stop` will turn off a reminder if it exists.',
-            'Using a number means I will remind you that many times for that timer.',
-            'Use the word `always` to have me remind you for every occurrence.',
-            `Just using \`${prefix} remind\` will list all your existing reminders and how to turn off each`,
-            areaInfo,
-            subAreaInfo,
-            `Example: \`${prefix} remind close always\` will always PM you 15 minutes before the Forbidden Grove closes.`,
-        ].join('\n');
-    }
-    else if (tokens[0].substring(0, 5) === 'sched') {
-        return [
-            '**schedule**',
-            `Usage: \`${prefix} schedule [<area>] [<number>]\` will tell you the timers scheduled for the next \`<number>\` of hours. Default is 24, max is 240.`,
-            'If you provide an area, I will only report on that area.',
-            areaInfo,
-        ].join('\n');
-    }
-    else
+    else 
         return `I don't know that one, but I do know ${keywords}.`;
 }
 

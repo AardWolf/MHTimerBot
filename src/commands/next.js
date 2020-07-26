@@ -6,7 +6,7 @@ const usage = [
     'Areas are Seasonal Garden (sg), Forbidden Grove (fg), Toxic Spill (ts), Balack\'s Cove (cove), and the daily reset (reset).',
     'Sub areas are the seasons (winter, spring, summer, fall), open/close, spill ranks, and tide levels (low, mid, high)',
     'Example: "next sg fall" will tell how long until Autumn in Seasonal Garden',
-    'See Also: remind; for setting reminders',
+    'See Also: remind; for setting reminders. schedule; for seeing a bunch of timers at once.',
 ].join('\n\t');
 
 /**
@@ -62,13 +62,6 @@ async function doNEXT(message, tokens) {
     return theResult;
 }
 
-/**
- * @returns {<String>} The help information
- */
-function helpNext() {
-    // TODO: Turn this into something dynamic
-    return [];
-}
 
 module.exports = {
     name: 'next',
