@@ -622,9 +622,9 @@ async function convertRewardLink(message) {
         return;
     }
 
-    const links = message.content.replace(/[<>]/gm,'').split(/\s|\n/).map(t => t.trim()).filter(text => /^(http[s]?:\/\/htgb\.co\/).*/g.test(text));
+    const links = message.content.replace(/[<>]/gm,'').split(/\s|\n/).map(t => t.trim()).filter(text => /(http[s]?:\/\/htgb\.co\/).*/g.test(text));
     const newLinks = (await Promise.all(links.map(async link => {
-        const target = await getHGTarget(link);
+        const target = await getHGTarget(link.replace(/[^\x20-\x7E]/g, ''));
         if (target) {
             const shortLink = await getBitlyLink(target);
             return shortLink ? { fb: link, mh: shortLink } : '';
