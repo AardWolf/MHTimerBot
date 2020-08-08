@@ -25,7 +25,7 @@ async function doNEXT(message, tokens) {
     if (!tokens.length) {
         // TODO: pretty-print known timer info
         reply = aboutTimers;
-    } else if (!reminderRequest.area) {
+    } else if (!reminderRequest || !reminderRequest['area']) {
         // received "-mh next <words>", but the words didn't match any known timer information.
         // Currently, the only other information we handle is RONZA.
         switch (tokens[0].toLowerCase()) {
