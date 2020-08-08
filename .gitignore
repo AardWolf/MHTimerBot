@@ -58,3 +58,4 @@ _ReSharper*/
 .vscode
 src/quick.js
 jsconfig.json
+src/commands/scratch.json
