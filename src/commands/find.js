@@ -30,6 +30,9 @@ async function doFIND(message, tokens) {
             tokens.shift();
         }
         // Figure out what they're searching for
+        if (tokens[tokens.length - 1].toLowerCase() === 'mouse') {
+            tokens.pop();
+        }
         const searchString = tokens.join(' ').toLowerCase();
         const all_mice = getMice(searchString, message.client.nicknames.get('mice'));
         if (all_mice && all_mice.length) {
@@ -45,6 +48,8 @@ async function doFIND(message, tokens) {
             if (all_loot && all_loot.length) {
                 // We have multiple options, show the interactive menu
                 urlInfo.qsParams = opts;
+                urlInfo.type = 'item';
+                urlInfo.uri = 'https://mhhunthelper.agiletravels.com/loot.php';
                 sendInteractiveSearchResult(all_loot, message.channel, formatLoot,
                     ['dm', 'group'].includes(message.channel.type), urlInfo, searchString);
                 theResult.replied = true;
