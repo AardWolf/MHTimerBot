@@ -45,6 +45,8 @@ async function doFIND(message, tokens) {
             if (all_loot && all_loot.length) {
                 // We have multiple options, show the interactive menu
                 urlInfo.qsParams = opts;
+                urlInfo.type = 'item';
+                urlInfo.uri = 'https://mhhunthelper.agiletravels.com/loot.php';
                 sendInteractiveSearchResult(all_loot, message.channel, formatLoot,
                     ['dm', 'group'].includes(message.channel.type), urlInfo, searchString);
                 theResult.replied = true;

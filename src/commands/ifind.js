@@ -46,6 +46,8 @@ async function doIFIND(message, tokens) {
             if (all_mice && all_mice.length) {
                 // We have multiple options, show the interactive menu
                 urlInfo.qsParams = opts;
+                urlInfo.type = 'mouse';
+                urlInfo.uri = 'https://mhhunthelper.agiletravels.com/';
                 sendInteractiveSearchResult(all_mice, message.channel, formatMice,
                     ['dm', 'group'].includes(message.channel.type), urlInfo, searchString);
                 theResult.replied = true;
