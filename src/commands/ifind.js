@@ -29,7 +29,10 @@ async function doIFIND(message, tokens) {
             opts.timefilter = filter.code_name;
             tokens.shift();
         }
-        // Figure out what they're searching for
+        // Figure out what they're searching for (remove mouse at the end in case of fallthrough)
+        if (tokens[tokens.length - 1].toLowerCase() === 'mouse') {
+            tokens.pop();
+        }
         const searchString = tokens.join(' ').toLowerCase();
         // TODO: When I put the reaction menu back it goes here
         const all_loot = getLoot(searchString, message.client.nicknames.get('loot'));
