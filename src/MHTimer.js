@@ -53,9 +53,9 @@ const settings = {},
 
 client.nicknames = new Map();
 /** @type {Timer[]} */
-const timers_list = [];
+client.timers_list = [];
 /** @type {TimerReminder[]} */
-const reminders = [];
+client.reminders = [];
 
 const refresh_rate = Duration.fromObject({ minutes: 5 });
 /** @type {Object<string, DateTime>} */
@@ -130,7 +130,7 @@ function Main() {
                 .then(timerData => {
                     createTimersFromList(timerData);
                     Logger.log(`Timers: imported ${timerData.length} from file.`);
-                    return timers_list.length > 0;
+                    return client.timers_list.length > 0;
                 })
                 .catch(err => failedLoad('Timers: import error:\n', err));
 
@@ -140,7 +140,7 @@ function Main() {
                     if (createRemindersFromData(reminderData))
                         pruneExpiredReminders();
                     Logger.log(`Reminders: imported ${reminderData.length} from file.`);
-                    return reminders.length > 0;
+                    return client.reminders.length > 0;
                 })
                 .catch(err => failedLoad('Reminders: import error:\n', err));
             hasReminders.then(() => {
@@ -199,7 +199,7 @@ function Main() {
                 }, []);
 
                 // Use one timeout per timer to manage default reminders and announcements.
-                timers_list.forEach(timer => scheduleTimer(timer, announcables));
+                client.timers_list.forEach(timer => scheduleTimer(timer, announcables));
                 Logger.log(`Timers: Initialized ${timer_config.size} timers on channels ${announcables}.`);
 
                 // If we disconnect and then reconnect, do not bother rescheduling the already-scheduled timers.
@@ -284,7 +284,7 @@ function quit() {
             for (const timer of Object.values(dataTimers))
                 clearInterval(timer);
             Logger.log('Shutdown: deactivating timers');
-            for (const timer of timers_list) {
+            for (const timer of client.timers_list) {
                 timer.stopInterval();
                 timer.stopTimeout();
             }
@@ -445,7 +445,7 @@ function loadTimers(path = timer_settings_filename) {
  * @returns {boolean} Whether or not any timers were created from the input.
  */
 function createTimersFromList(timerData) {
-    const knownTimers = timers_list.length;
+    const knownTimers = client.timers_list.length;
     for (const seed of timerData) {
         let timer;
         try {
@@ -454,9 +454,9 @@ function createTimersFromList(timerData) {
             Logger.error(`Timers: error occured while constructing timer: '${err}'. Received object:\n`, seed);
             continue;
         }
-        timers_list.push(timer);
+        client.timers_list.push(timer);
     }
-    return timers_list.length !== knownTimers;
+    return client.timers_list.length !== knownTimers;
 }
 
 /**
@@ -484,34 +484,6 @@ function scheduleTimer(timer, channels) {
         }, msUntilActivation, timer),
     );
     timer_config.set(timer.id, { active: true, channels: channels, inactiveChannels: [] });
-}
-
-/**
- * Inspects the current timers list to dynamically determine the text to print when informing users
- * of what timers are available.
- *
- * @returns {string} a ready-to-print string of timer details, with each timer on a new line.
- */
-function getKnownTimersDetails() {
-    // Prepare a detailed list of known timers and their sub-areas.
-    /** @type {Object <string, Set<string>> */
-    const details = {};
-    timers_list.forEach(timer => {
-        const area = `**${timer.getArea()}**`;
-        if (!details[area])
-            details[area] = new Set();
-        if (timer.getSubArea())
-            details[area].add(timer.getSubArea());
-    });
-    const names = [];
-    for (const area in details) {
-        let description = area;
-        if (details[area].size)
-            description += ` (${Array.from(details[area]).join(', ')})`;
-        names.push(description);
-    }
-
-    return names.join('\n');
 }
 
 /**
@@ -544,8 +516,6 @@ function parseUserMessage(message) {
             (tokens.length >= 2 && tokens[0].toLowerCase() === 'relic' && tokens[1].toLowerCase() == 'hunter'))
         command = 'findrh';
 
-    // Parse the message to see if it matches any known timer areas, sub-areas, or has count information.
-    const reminderRequest = tokens.length ? timerAliases(tokens) : {};
     const dynCommand = client.commands.get(command.toLowerCase())
         || client.commands.find(cmd => cmd.aliases && cmd.aliases.includes(command));
     const botPrefix = message.guild ? message.client.settings.guilds[message.guild.id].botPrefix.trim() :
@@ -605,58 +575,7 @@ function parseUserMessage(message) {
     else
     {
         switch (command.toLowerCase()) {
-            // Display information about the next instance of a timer.
-            case 'next': {
-                const aboutTimers = `I know these timers:\n${getKnownTimersDetails()}`;
-                if (!tokens.length) {
-                    // received "-mh next" -> display the help string.
-                    // TODO: pretty-print known timer info
-                    message.channel.send(aboutTimers);
-                } else if (!reminderRequest.area) {
-                    // received "-mh next <words>", but the words didn't match any known timer information.
-                    // Currently, the only other information we handle is RONZA.
-                    switch (tokens[0].toLowerCase()) {
-                        case 'ronza':
-                            message.channel.send('Don\'t let aardwolf see you ask or you\'ll get muted');
-                            break;
-                        default:
-                            message.channel.send(aboutTimers);
-                    }
-                } else {
-                    // Display information about this known timer.
-                    const timerInfo = nextTimer(reminderRequest);
-                    if (typeof timerInfo === 'string')
-                        message.channel.send(timerInfo);
-                    else
-                        message.channel.send('', { embed: timerInfo });
-                }
-                break;
-            }
 
-            // Display or update the user's reminders.
-            case 'remind': {
-                // TODO: redirect responses to PM.
-                if (!tokens.length || !reminderRequest.area)
-                    addMessageReaction(listRemind(message));
-                else
-                    addMessageReaction(addRemind(reminderRequest, message));
-                break;
-            }
-
-            // Display information about upcoming timers.
-            case 'sched':
-            case 'itin':
-            case 'agenda':
-            case 'itinerary':
-            case 'schedule': {
-                // Default the searched time period to 24 hours if it was not specified.
-                reminderRequest.count = reminderRequest.count || 24;
-
-                const usage_str = buildSchedule(reminderRequest);
-                // Discord limits messages to 2000 characters, so use multiple messages if necessary.
-                message.channel.send(usage_str, { split: true });
-                break;
-            }
             case 'findrh': {
                 findRH(message.channel, { split: true });
                 break;
@@ -703,9 +622,9 @@ async function convertRewardLink(message) {
         return;
     }
 
-    const links = message.content.replace(/[<>]/gm,'').split(/\s|\n/).map(t => t.trim()).filter(text => /^(http[s]?:\/\/htgb\.co\/).*/g.test(text));
+    const links = message.content.replace(/[<>]/gm,'').split(/\s|\n/).map(t => t.trim()).filter(text => /(http[s]?:\/\/htgb\.co\/).*/g.test(text));
     const newLinks = (await Promise.all(links.map(async link => {
-        const target = await getHGTarget(link);
+        const target = await getHGTarget(link.replace(/[^\x20-\x7E]/g, ''));
         if (target) {
             const shortLink = await getBitlyLink(target);
             return shortLink ? { fb: link, mh: shortLink } : '';
@@ -769,332 +688,6 @@ async function convertRewardLink(message) {
 }
 
 /**
- * @typedef {Object} ReminderRequest
- * @property {string} [area] The area of a Timer
- * @property {string} [sub_area] The sub-area of a Timer
- * @property {number} [count] The number of times a Timer should activate before this reminder is removed.
- */
-
-/**
- * Attempt to find a Timer that satisfies the input tokens.
- * Returns a ReminderRequest of unknown state (may have some or all properties set).
- *
- * @param {string[]} tokens a set of tokens which may match known Timer areas or sub-areas.
- * @returns {ReminderRequest} an object that may have some or all of the needed properties to create a Reminder
- */
-function timerAliases(tokens) {
-    const newReminder = {
-        area: null,
-        sub_area: null,
-        count: null,
-    };
-    const timerAreas = timers_list.map(timer => timer.getArea());
-    const timerSubAreas = timers_list.map(timer => timer.getSubArea());
-    // Scan the input tokens and attempt to match them to a known timer.
-    for (let i = 0; i < tokens.length; i++) {
-        const token = tokens[i].toLowerCase();
-
-        // Check if this is an exact timer name, useful if we can dynamically add new timers.
-        const areaIndex = timerAreas.indexOf(token);
-        if (areaIndex !== -1) {
-            newReminder.area = token;
-            continue;
-        } else {
-            const subIndex = timerSubAreas.indexOf(token);
-            if (subIndex !== -1) {
-                newReminder.area = timerAreas[subIndex];
-                newReminder.sub_area = token;
-                continue;
-            }
-        }
-
-        // Attempt to find an area from this token
-        if (!newReminder.area && parseTokenForArea(token, newReminder))
-            continue;
-
-        // Attempt to find a sub-area from this token.
-        if (!newReminder.sub_area && parseTokenForSubArea(token, newReminder))
-            continue;
-
-        // Attempt to find a count from this token.
-        if (!newReminder.count && parseTokenForCount(token, newReminder))
-            continue;
-
-        // Upon reaching here, the token has no area, sub-area, or count information, or those fields
-        // were already set, and thus it was not parsed for them.
-        if (newReminder.area && newReminder.sub_area && newReminder.count !== null) {
-            Logger.log(`MessageHandling: got an extra token '${String(token)}' from user input '${tokens}'.`);
-            break;
-        }
-    }
-
-    return newReminder;
-}
-
-/**
- * Attempt to match the input string to known Timer areas. If successful, updates the given reminder.
- *
- * @param {string} token a word or phrase from a Discord message
- * @param {ReminderRequest} newReminder the reminder request being built from the entirety of the input Discord message
- * @returns {boolean} if the token parsed to an area.
- */
-function parseTokenForArea(token, newReminder) {
-    switch (token) {
-        // Seasonal Garden aliases
-        case 'sg':
-        case 'seasonal':
-        case 'season':
-        case 'garden':
-            newReminder.area = 'sg';
-            break;
-
-        // Forbidden Grove aliases
-        case 'fg':
-        case 'grove':
-        case 'gate':
-        case 'ar':
-        case 'acolyte':
-        case 'ripper':
-        case 'realm':
-            newReminder.area = 'fg';
-            break;
-
-        // Game Reset
-        case 'reset':
-        case 'game':
-        case 'midnight':
-            newReminder.area = 'reset';
-            break;
-
-        case 'rh':
-        case 'rhm':
-        case 'relic':
-            newReminder.area = 'relic_hunter';
-            break;
-
-        // Balack's Cove aliases
-        case 'cove':
-        case 'balack':
-        case 'tide':
-            newReminder.area = 'cove';
-            break;
-
-        // Toxic Spill aliases
-        case 'spill':
-        case 'toxic':
-        case 'ts':
-            newReminder.area = 'spill';
-            break;
-
-        // This token is not a known timer area.
-        default:
-            return false;
-    }
-    return true;
-}
-
-/**
- * Attempt to match the input string to known Timer sub-areas. If successful, updates the given reminder.
- * Overwrites any previously-specified area.
- *
- * @param {string} token an input string from the user's message.
- * @param {ReminderRequest} newReminder the seed for a new reminder that will be updated.
- * @returns {boolean} if the token parsed to a sub-area.
- */
-function parseTokenForSubArea(token, newReminder) {
-    switch (token) {
-        // Seasonal Garden seasons aliases.
-        case 'fall':
-        case 'autumn':
-            newReminder.area = 'sg';
-            newReminder.sub_area = 'autumn';
-            break;
-        case 'spring':
-            newReminder.area = 'sg';
-            newReminder.sub_area = 'spring';
-            break;
-        case 'summer':
-            newReminder.area = 'sg';
-            newReminder.sub_area = 'summer';
-            break;
-        case 'winter':
-            newReminder.area = 'sg';
-            newReminder.sub_area = 'winter';
-            break;
-
-        // Forbidden Grove gate state aliases.
-        case 'open':
-        case 'opens':
-        case 'opened':
-        case 'opening':
-            newReminder.area = 'fg';
-            newReminder.sub_area = 'open';
-            break;
-        case 'close':
-        case 'closed':
-        case 'closing':
-        case 'shut':
-            newReminder.area = 'fg';
-            newReminder.sub_area = 'close';
-            break;
-
-        // Balack's Cove tide aliases.
-        case 'low-tide':
-        case 'lowtide':
-        case 'low':
-            newReminder.area = 'cove';
-            newReminder.sub_area = 'low';
-            break;
-        case 'mid-tide':
-        case 'midtide':
-        case 'mid':
-            newReminder.area = 'cove';
-            newReminder.sub_area = 'mid';
-            break;
-        case 'high-tide':
-        case 'hightide':
-        case 'high':
-            newReminder.area = 'cove';
-            newReminder.sub_area = 'high';
-            break;
-
-        // Toxic Spill severity level aliases.
-        case 'archduke':
-        case 'ad':
-        case 'archduchess':
-        case 'aardwolf':
-        case 'arch':
-            newReminder.area = 'spill';
-            newReminder.sub_area = 'arch';
-            break;
-        case 'grandduke':
-        case 'gd':
-        case 'grandduchess':
-        case 'grand':
-            newReminder.area = 'spill';
-            newReminder.sub_area = 'grand';
-            break;
-        case 'duchess':
-        case 'duke':
-            newReminder.area = 'spill';
-            newReminder.sub_area = 'duke';
-            break;
-        case 'countess':
-        case 'count':
-            newReminder.area = 'spill';
-            newReminder.sub_area = 'count';
-            break;
-        case 'baronness':
-        case 'baron':
-            newReminder.area = 'spill';
-            newReminder.sub_area = 'baron';
-            break;
-        case 'lady':
-        case 'lord':
-            newReminder.area = 'spill';
-            newReminder.sub_area = 'lord';
-            break;
-        case 'heroine':
-        case 'hero':
-            newReminder.area = 'spill';
-            newReminder.sub_area = 'hero';
-            break;
-
-        // This token did not match any known Timer sub-areas.
-        default:
-            return false;
-    }
-    return true;
-}
-
-/**
- * Attempt to match the input string to a positive integer. If successful, updates the given reminder.
- * Overwrites any previously-specified count.
- *
- * @param {string} token an input string from the user's message.
- * @param {ReminderRequest} newReminder the seed for a new reminder that will be updated.
- * @returns {boolean} if the token parsed to a valid count.
- */
-function parseTokenForCount(token, newReminder) {
-    switch (token) {
-        // Words for numbers...
-        case 'once':
-        case 'one':
-            newReminder.count = 1;
-            break;
-
-        case 'twice':
-        case 'two':
-            newReminder.count = 2;
-            break;
-
-        case 'thrice':
-        case 'three':
-            newReminder.count = 3;
-            break;
-
-        case 'always':
-        case 'forever':
-        case 'unlimited':
-        case 'inf':
-        case 'infinity':
-            newReminder.count = -1;
-            break;
-
-        case 'never':
-        case 'end':
-        case 'forget':
-        case 'quit':
-        case 'stop':
-            newReminder.count = 0;
-            break;
-
-        // If it is an actual number, then we can just use it as normal. Note that parseInt will
-        // take garbage input like unrepresentably large numbers and coerce to + /-Infinity.
-        default:
-            if (!isNaN(parseInt(token, 10))) {
-                let val = parseInt(token, 10);
-                if (val === Infinity || val < 0)
-                    val = -1;
-                newReminder.count = val;
-                break;
-            }
-            return false;
-    }
-    return true;
-}
-
-/**
- * Returns the next occurrence of the desired class of timers as a MessageEmbed.
- *
- * @param {ReminderRequest} validTimerData Validated input that is known to match an area and subarea
- * @returns {MessageEmbed} A rich snippet summary of the next occurrence of the matching timer.
- */
-function nextTimer(validTimerData) {
-    // Inspect all known timers to determine the one that matches the requested area, and occurs soonest.
-    const area = validTimerData.area,
-        sub = validTimerData.sub_area,
-        areaTimers = timers_list.filter(timer => timer.getArea() === area);
-
-    let nextTimer;
-    for (const timer of areaTimers)
-        if (!sub || sub === timer.getSubArea())
-            if (!nextTimer || timer.getNext() < nextTimer.getNext())
-                nextTimer = timer;
-
-    const sched_syntax = `${settings.botPrefix} remind ${area}${sub ? ` ${sub}` : ''}`;
-    return (new MessageEmbed()
-        .setDescription(nextTimer.getDemand()
-            + `\n${timeLeft(nextTimer.getNext())}`
-            // Putting here makes it look nicer and fit in portrait mode
-            + `\nTo schedule this reminder: \`${sched_syntax}\``,
-        )
-        .setTimestamp(nextTimer.getNext().toJSDate())
-        .setFooter('at') // There has to be something in here or there is no footer
-    );
-}
-
-/**
  * @typedef {Object} TimerReminder
  * @property {User} user The Discord user who requested the reminder.
  * @property {number} count The number of remaining times this reminder will activate.
@@ -1128,13 +721,13 @@ function loadReminders(path = reminder_filename) {
  * @returns {boolean} Whether or not any reminders were created from the input.
  */
 function createRemindersFromData(reminderData) {
-    const knownReminders = reminders.length;
+    const knownReminders = client.reminders.length;
     /** TODO: Reminders as class instead of just formatted object
      * Class instantiation code would be here and replace the push call.
      */
     // Add each of these objects to the reminder list.
-    Array.prototype.push.apply(reminders, reminderData);
-    return reminders.length !== knownReminders;
+    Array.prototype.push.apply(client.reminders, reminderData);
+    return client.reminders.length !== knownReminders;
 }
 
 /**
@@ -1142,31 +735,31 @@ function createRemindersFromData(reminderData) {
  */
 function pruneExpiredReminders() {
     // Remove any expired timers - no need to save them.
-    if (reminders.length) {
+    if (client.reminders.length) {
         // Move expired reminders to the end.
-        reminders.sort((a, b) => (a.count === 0) ? 1 : (b.count - a.count));
+        client.reminders.sort((a, b) => (a.count === 0) ? 1 : (b.count - a.count));
 
         // Find the first non-expired one.
-        let i = reminders.length,
+        let i = client.reminders.length,
             numExpired = 0;
         while (i--) {
-            if (reminders[i].count === 0)
+            if (client.reminders[i].count === 0)
                 ++numExpired;
             else
                 break;
         }
-        if (numExpired === reminders.length)
-            reminders.length = 0;
+        if (numExpired === client.reminders.length)
+            client.reminders.length = 0;
         else if (numExpired) {
             // Advance to the next record (which should be expired and a valid index).
             ++i;
             // If the current reminder is expired, splice it and the others away.
-            if (i < reminders.length && reminders[i].count === 0) {
-                const discarded = reminders.splice(i, numExpired);
-                Logger.log(`Reminders: spliced ${discarded.length} that were expired. ${reminders.length} remaining.`);
+            if (i < client.reminders.length && client.reminders[i].count === 0) {
+                const discarded = client.reminders.splice(i, numExpired);
+                Logger.log(`Reminders: spliced ${discarded.length} that were expired. ${client.reminders.length} remaining.`);
             }
             else
-                Logger.warn(`Reminders: found ${numExpired} expired, but couldn't splice because reminder at index ${i} was bad:\n`, reminders, '\n', reminders[i]);
+                Logger.warn(`Reminders: found ${numExpired} expired, but couldn't splice because reminder at index ${i} was bad:\n`, client.reminders, '\n', client.reminders[i]);
         }
     }
 }
@@ -1179,8 +772,8 @@ function pruneExpiredReminders() {
  */
 function saveReminders(path = reminder_filename) {
     // Write out the JSON of the reminders array
-    return saveDataAsJSON(path, reminders).then(didSave => {
-        Logger.log(`Reminders: ${didSave ? 'Saved' : 'Failed to save'} ${reminders.length} to '${path}'.`);
+    return saveDataAsJSON(path, client.reminders).then(didSave => {
+        Logger.log(`Reminders: ${didSave ? 'Saved' : 'Failed to save'} ${client.reminders.length} to '${path}'.`);
         last_timestamps.reminder_save = DateTime.utc();
         return didSave;
     });
@@ -1232,7 +825,7 @@ function doRemind(timer) {
 
     // TODO: Build a basic embed template object and package that to each recipient, rather than
     // fully construct the (basically equivalent) embed for each user.
-    const toDispatch = reminders
+    const toDispatch = client.reminders
         // If there no sub-area for this reminder, or the one specified matches
         // that of the timer, send the reminder.
         .filter(r => area === r.area && r.count !== 0 && (!r.sub_area || r.sub_area === sub))
@@ -1330,220 +923,7 @@ function sendRemind(user, remind, timer) {
     );
 }
 
-/**
- * Add (or remove) a reminder.
- *
- * @param {ReminderRequest} timerRequest a timer request which has already passed through token
- *                                       validation to set 'area' and 'sub_area' as possible.
- * @param {Message} message the Discord message that initiated this request.
- */
-async function addRemind(timerRequest, message) {
-    // If there were no area, the reminders would have been
-    // listed instead of 'addRemind' being called.
-    const area = timerRequest.area;
-    const subArea = timerRequest.sub_area;
-    if (!area) {
-        await message.channel.send('I do not know the area you asked for');
-        return new CommandResult({ success: false, replied: true, message });
-    }
 
-    // Default to reminding the user once.
-    const count = timerRequest.count || (timerRequest.count === 0 ? 0 : 1);
-    const requestName = `${area}${subArea ? `: ${subArea}` : ''}`;
-
-    // Delete the reminder, if that is being requested.
-    // (Rather than try to modify the positions and number of elements in
-    // reminders e.g. thread race saveReminders, simply set the count to 0.)
-    if (!count) {
-        const responses = [];
-        for (const reminder of reminders)
-            if (reminder.user === message.author.id && reminder.area === area) {
-                if (subArea && subArea === reminder.sub_area) {
-                    reminder.count = 0;
-                    responses.push(`Reminder for '${requestName}' turned off.`);
-                }
-                else if (!subArea && !reminder.sub_area) {
-                    reminder.count = 0;
-                    responses.push(`Reminder for '${requestName}' turned off.`);
-                }
-            }
-
-        await message.author.send(responses.length
-            ? `\`\`\`${responses.join('\n')}\`\`\``
-            : `I couldn't find a matching reminder for you in '${requestName}'.`,
-        );
-        return new CommandResult({ success: responses.length > 0, sentDm: true, message });
-    }
-
-    // User asked to be reminded - find a timer that meets the request, and sort in order of next activation.
-    const choices = timers_list
-        .filter(t => area === t.getArea() && (!subArea || subArea === t.getSubArea()))
-        .sort((a, b) => a.getNext() - b.getNext());
-    Logger.log(`Timers: found ${choices.length} matching input request:\n`, timerRequest);
-
-    // Assume the desired timer is the one that matched the given criteria and occurs next.
-    const [timer] = choices;
-    if (!timer) {
-        await message.author.send(`I'm sorry, there weren't any timers I know of that match your request. I know\n${getKnownTimersDetails()}`);
-        return new CommandResult({ success: false, sentDm: true, message });
-    }
-
-    // If the reminder already exists, set its new count to the requested count.
-    const responses = [];
-    for (const reminder of reminders)
-        if (reminder.user === message.author.id && reminder.area === area)
-            if ((subArea && reminder.sub_area === subArea)
-                || (!subArea && !reminder.sub_area))
-            {
-                responses.push(`Updated reminder count for '${requestName}' from '${reminder.count === -1
-                    ? 'always' : reminder.count}' to '${count === -1 ? 'always' : count}'.`);
-                reminder.count = count;
-            }
-
-    if (responses.length) {
-        Logger.log(`Reminders: updated ${responses.length} for ${message.author.username} to a count of ${count}.`, timerRequest);
-        await message.author.send(`\`\`\`${responses.join('\n')}\`\`\``);
-        return new CommandResult({ success: true, sentDm: true, message });
-    }
-
-    // No updates were made - free to add a new reminder.
-    const newReminder = {
-        'count': count,
-        'area': area,
-        'user': message.author.id,
-    };
-    // If the matched timer has a sub-area, we need to care about the sub-area specified
-    // in the request. It will either be the same as that of this timer, or it will be
-    // null / undefined (i.e. a request for reminders from all timers in the area).
-    if (timer.getSubArea())
-        newReminder.sub_area = subArea;
-    reminders.push(newReminder);
-
-    // If the user entered a generic reminder, they may not expect the specific name. Generic reminder
-    // requests will have matched more than one timer, so we can reference 'choices' to determine the
-    // proper response.
-    const isGenericRequest = !subArea && timer.getSubArea();
-    const subAreas = new Set(choices.map(t => `**${t.getSubArea()}**`));
-    responses.push(`Your reminder for **${isGenericRequest ? area : timer.name}** is set. ${choices.length > 1
-        ? `You'll get reminders for ${oxfordStringifyValues(subAreas)}. I'll PM you about them`
-        : 'I\'ll PM you about it'}`);
-    responses.push((count === 1) ? 'once.' : (count < 0) ? 'until you stop it.' : `${count} times.`);
-
-    // Inform a new user of the reminder functionality (i.e. PM only).
-    if (message.channel.type !== 'dm' && !reminders.some(r => r.user === message.author.id))
-        responses.unshift('Hi there! Reminders are only sent via PM, and I\'m just making sure I can PM you.');
-
-    // Send notice of the update via PM.
-    const ourResult = new CommandResult({ success: true, sentDm: false, message });
-    try {
-        await message.author.send(responses.join(' '));
-        ourResult.sentDm = true;
-    } catch(err) {
-        Logger.error(`Reminders: notification failure for ${message.author.username}.`);
-        ourResult.success = false;
-        ourResult.botError = true;
-    }
-    return ourResult;
-}
-
-/**
- * List the reminders for the user, and PM them the result.
- *
- * @param {Message} message a Discord message containing the request to list reminders.
- */
-async function listRemind(message) {
-    const user = message.author.id,
-        pm_channel = message.author;
-    let timer_str = 'Your reminders:';
-    let usage_str;
-
-    const userReminders = reminders.filter(r => r.user === user && r.count);
-    const botPrefix = message.guild ? message.client.settings.guilds[message.guild.id].botPrefix.trim() :
-        message.client.settings.botPrefix.trim();
-    userReminders.forEach(reminder => {
-        // TODO: prettyPrint this info.
-        const name = `${reminder.area}${reminder.sub_area ? ` (${reminder.sub_area})` : ''}`;
-        timer_str += `\nTimer:\t**${name}**`;
-        usage_str = `\`${botPrefix} remind ${reminder.area}`;
-        if (reminder.sub_area)
-            usage_str += ` ${reminder.sub_area}`;
-
-        timer_str += '\t';
-        if (reminder.count === 1)
-            timer_str += ' one more time';
-        else if (reminder.count === -1)
-            timer_str += ' until you stop it';
-        else
-            timer_str += ` ${reminder.count} times`;
-
-        timer_str += `.\nTo turn off\t${usage_str} stop\`\n`;
-
-        if (reminder.fail)
-            timer_str += `There have been ${reminder.fail} failed attempts to activate this reminder.\n`;
-    });
-
-    const ourResult = new CommandResult({ success: true, sentDm: false, message });
-    try {
-        await pm_channel.send(userReminders.length ? timer_str : 'I found no reminders for you, sorry.');
-        ourResult.sentDm = true;
-    } catch (err) {
-        Logger.error(`Reminders: notification failure for ${pm_channel.username}. Possibly blocked.`, err);
-        ourResult.success = false;
-        ourResult.botError = true;
-    }
-    return ourResult;
-}
-
-/**
- * Compute which timers are coming up in the next bit of time, for the requested area.
- * Returns a ready-to-print string listing up to 24 of the found timers, with their "demand" and when they will activate.
- * TODO: should this return a MessageEmbed?
- *
- * @param {{area: string, count: number}} timer_request A request that indicates the number of hours to search ahead, and the area in which to search
- * @returns {string} a ready-to-print string containing the timer's demand, and how soon it will occur.
- */
-function buildSchedule(timer_request) {
-    const area = timer_request.area;
-
-    // Search from 1 hour to 10 days out.
-    let req_hours = Duration.fromObject({ hours: timer_request.count });
-    if (!req_hours.isValid) {
-        return 'Invalid timespan given - how many hours did you want to look ahead?';
-    }
-    else if (req_hours.as('hours') <= 0)
-        req_hours = req_hours.set({ hours: 24 });
-    else if (req_hours.as('days') >= 10)
-        req_hours = req_hours.shiftTo('days').set({ days: 10 });
-
-    // Get the next occurrence for every timer. Compare its interval to determine how many of them to include
-    const until = DateTime.utc().plus(req_hours);
-    /** @type {{time: DateTime, message: string}[]} */
-    const upcoming_timers = [];
-    const max_timers = 24;
-    (!area ? timers_list : timers_list.filter(t => t.getArea() === area && !t.isSilent()))
-        .forEach(timer => {
-            const message = timer.getDemand();
-            for (const time of timer.upcoming(until))
-                upcoming_timers.push({ time: time, message: message });
-        });
-
-    // Sort the list of upcoming timers in this area by time, so that the soonest is printed first.
-    upcoming_timers.sort((a, b) => a.time - b.time);
-
-    // Make a nice message to display.
-    let return_str = `I have ${upcoming_timers.length} timers coming up in the next ${req_hours.as('hours')} hours`;
-    if (upcoming_timers.length > max_timers) {
-        return_str += `. Here are the next ${max_timers} of them`;
-        upcoming_timers.splice(max_timers, upcoming_timers.length);
-    }
-    return_str += upcoming_timers.length ? ':\n' : '.';
-
-    return_str = upcoming_timers.reduce((str, val) => {
-        return `${str}${val.message} ${timeLeft(val.time)}\n`;
-    }, return_str);
-
-    return return_str;
-}
 
 /**
  * Get the help text.
@@ -1556,7 +936,7 @@ function buildSchedule(timer_request) {
  */
 function getHelpMessage(message, tokens) {
     // TODO: Remove these as external commands are added
-    const keywordArray = [ 'remind', 'next', 'schedule' ];
+    const keywordArray = [ 'remind', 'schedule' ];
     const allowedCommands = client.commands
         .filter(command => {
             let canRun = false;
@@ -1581,8 +961,6 @@ function getHelpMessage(message, tokens) {
         ].join('\n');
     }
 
-    const areaInfo = 'Areas are Seasonal Garden (**sg**), Forbidden Grove (**fg**), Toxic Spill (**ts**), Balack\'s Cove (**cove**), and the daily **reset**.';
-    const subAreaInfo = 'Sub areas are the seasons, open/close, spill ranks, and tide levels';
     const command = tokens[0].toLowerCase();
 
     const dynCommand = allowedCommands.get(command)
@@ -1596,37 +974,7 @@ function getHelpMessage(message, tokens) {
         else
             return `I know how to ${command} but I don't know how to tell you how to ${command}`;
     }
-    else if (tokens[0] === 'next') {
-        return [
-            '**next**',
-            `Usage: \`${prefix} next [<area> | <sub-area>]\` will provide a message about the next related occurrence.`,
-            areaInfo,
-            subAreaInfo,
-            `Example: \`${prefix} next fall\` will tell when it is Autumn in the Seasonal Garden.`,
-        ].join('\n');
-    }
-    else if (tokens[0] === 'remind') {
-        return [
-            '**remind**',
-            `Usage: \`${prefix} remind [<area> | <sub-area>] [<number> | always | stop]\` will control my reminder function relating to you specifically.`,
-            'Using the word `stop` will turn off a reminder if it exists.',
-            'Using a number means I will remind you that many times for that timer.',
-            'Use the word `always` to have me remind you for every occurrence.',
-            `Just using \`${prefix} remind\` will list all your existing reminders and how to turn off each`,
-            areaInfo,
-            subAreaInfo,
-            `Example: \`${prefix} remind close always\` will always PM you 15 minutes before the Forbidden Grove closes.`,
-        ].join('\n');
-    }
-    else if (tokens[0].substring(0, 5) === 'sched') {
-        return [
-            '**schedule**',
-            `Usage: \`${prefix} schedule [<area>] [<number>]\` will tell you the timers scheduled for the next \`<number>\` of hours. Default is 24, max is 240.`,
-            'If you provide an area, I will only report on that area.',
-            areaInfo,
-        ].join('\n');
-    }
-    else
+    else 
         return `I don't know that one, but I do know ${keywords}.`;
 }
 
@@ -1724,7 +1072,7 @@ function remindRH(new_location) {
     //Logic to look for people with the reminder goes here
     if (new_location !== 'unknown') {
         Logger.log(`Relic Hunter: Sending reminders for ${new_location}`);
-        doRemind(timers_list.find(t => t.getArea() === 'relic_hunter'));
+        doRemind(client.timers_list.find(t => t.getArea() === 'relic_hunter'));
     }
 }
 
