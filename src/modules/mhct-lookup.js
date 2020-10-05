@@ -108,7 +108,7 @@ async function sendInteractiveSearchResult(searchResults, channel, dataCallback,
 async function formatLoot(isDM, loot, opts) {
     const results = await findThing('loot', loot.id, opts);
     const no_stage = ' N/A ';
-    const target_url = `<https://mhhunthelper.agiletravels.com/loot.php?item=${loot.id}&timefilter=${opts.timefilter ? opts.timefilter : 'all_time'}>`;
+    const target_url = `<https://www.agiletravels.com/loot.php?item=${loot.id}&timefilter=${opts.timefilter ? opts.timefilter : 'all_time'}>`;
     const drops = results.filter(loot => loot.total_catches > 99)
         .map(loot => {
             return {
@@ -170,7 +170,7 @@ async function formatLoot(isDM, loot, opts) {
 async function formatMice(isDM, mouse, opts) {
     const results = await findThing('mouse', mouse.id, opts);
     const no_stage = ' N/A ';
-    const target_url = `<https://mhhunthelper.agiletravels.com/?mouse=${mouse.id}&timefilter=${opts.timefilter ? opts.timefilter : 'all_time'}>`;
+    const target_url = `<https://www.agiletravels.com/attractions.php?mouse=${mouse.id}&timefilter=${opts.timefilter ? opts.timefilter : 'all_time'}>`;
     const attracts = results.filter(mouse => mouse.total_hunts > 99)
         .map(mice => {
             return {
@@ -288,7 +288,7 @@ async function findThing(type, id, options) {
     const qsOptions = new URLSearchParams(options);
     qsOptions.append('item_type', type);
     qsOptions.append('item_id', id);
-    const url = 'https://mhhunthelper.agiletravels.com/searchByItem.php?' + qsOptions.toString();
+    const url = 'https://www.agiletravels.com/searchByItem.php?' + qsOptions.toString();
     return await fetch(url)
         .then(response => response.json())
         .catch(err => {
@@ -312,7 +312,7 @@ async function getMHCTList(type, list) {
         Logger.log(`getMHCTList: Received a request for ${type} but I don't do that yet`);
     }
     Logger.log(`MHCT list: Getting a new ${type} list`);
-    const url = `https://mhhunthelper.agiletravels.com/searchByItem.php?item_type=${type}&item_id=all`;
+    const url = `https://www.agiletravels.com/searchByItem.php?item_type=${type}&item_id=all`;
     await fetch(url)
         .then(response => (response.status === 200) ? response.json() : '')
         .then((body) => {
@@ -340,7 +340,7 @@ async function getFilterList() {
     refresh_list.filter = now;
 
     Logger.log('Filters: Requesting a new filter list.');
-    const url = 'https://mhhunthelper.agiletravels.com/filters.php';
+    const url = 'https://www.agiletravels.com/filters.php';
     return fetch(url).then(response => (response.status === 200) ? response.json() : '').then((body) => {
         if (body) {
             Logger.log('Filters: Got a new filter list');
