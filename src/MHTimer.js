@@ -1155,7 +1155,7 @@ function DBGamesRHLookup() {
  * @returns {Promise<{ location: string, source: 'MHCT' }>}
  */
 function MHCTRHLookup() {
-    return fetch('https://mhhunthelper.agiletravels.com/tracker.json')
+    return fetch('https://www.agiletravels.com/tracker.json')
         .then(async (response) => {
             if (!response.ok) throw `HTTP ${response.status}`;
             const { rh } = await response.json();
