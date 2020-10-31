@@ -225,9 +225,9 @@ function getFilter(tester) {
     if (!tester)
         return;
     tester = `${tester}`;
-    if (tester.startsWith('3_d'))
+    if (tester.startsWith('3_d') || tester.startsWith('3d'))
         tester = '3_days';
-    else if (tester.startsWith('3_m'))
+    else if (tester.startsWith('3_m') || tester.startsWith('3m'))
         tester = '3_months';
     else if (tester.startsWith('all'))
         tester = 'alltime';
