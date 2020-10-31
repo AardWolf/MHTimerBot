@@ -225,8 +225,10 @@ function getFilter(tester) {
     if (!tester)
         return;
     tester = `${tester}`;
-    if (tester.startsWith('3'))
+    if (tester.startsWith('3_d'))
         tester = '3_days';
+    else if (tester.startsWith('3_m'))
+        tester = '3_months';
     else if (tester.startsWith('all'))
         tester = 'alltime';
     else if (tester === 'current') {
