@@ -36,7 +36,7 @@ test('getFilter', suite => {
             { input: '3_d', expected: '3_days' },
             { input: '3days', expected: '3_days' },
             { input: '3_m', expected: '3_months' },
-            { input: '3months', expected: '3_months'},
+            { input: '3months', expected: '3_months' },
             { input: 'all', expected: 'alltime' },
             { input: 'allowance', expected: 'alltime' },
             { input: 'current', expected: '1_month' }, //NOTE this can only be asserted because we don't load the filter list
