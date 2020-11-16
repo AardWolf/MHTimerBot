@@ -169,6 +169,10 @@ async function formatLoot(isDM, loot, opts) {
  */
 async function formatMice(isDM, mouse, opts) {
     const results = await findThing('mouse', mouse.id, opts);
+    if (results === null) {
+        const reply = 'Looks like I\'m having a bit of trouble finding your mouse right now.' ;
+        return reply;
+    }
     const no_stage = ' N/A ';
     const target_url = `<https://www.agiletravels.com/attractions.php?mouse=${mouse.id}&timefilter=${opts.timefilter ? opts.timefilter : 'all_time'}>`;
     const attracts = results.filter(mouse => mouse.total_hunts > 99)
@@ -290,7 +294,14 @@ async function findThing(type, id, options) {
     qsOptions.append('item_id', id);
     const url = 'https://www.agiletravels.com/searchByItem.php?' + qsOptions.toString();
     return await fetch(url)
-        .then(response => response.json())
+        .then((response) => {
+            if(response.ok){
+                return response.json();
+            }
+            else {
+                return null;
+            }
+        })
         .catch(err => {
             Logger.log(`findThings: Error getting item ${qsOptions.toString()} - ${err}`);
         });
