@@ -10,11 +10,14 @@ const refresh_list = {
     mouse: DateTime.utc().minus(refresh_rate),
     loot: DateTime.utc().minus(refresh_rate),
     filter: DateTime.utc().minus(refresh_rate),
+    convertible: DateTime.utc().minus(refresh_rate),
 };
 const intervals = [];
 const filters = [],
     mice = [],
-    loot = [];
+    loot = [],
+    convertibles = [];
+
 let someone_initialized = 0;
 
 const emojis = [
@@ -215,6 +218,53 @@ async function formatMice(isDM, mouse, opts) {
     return reply;
 }
 
+async function formatConvertibles(isDM, convertible, opts) {
+    const results = await findThing('convertible', convertible.id, opts);
+    const no_stage = ' N/A ';
+    const target_url = `<https://www.agiletravels.com/converter.php?item=${convertible.id}>`;
+    const converter = results
+        .map(convertible => {
+            return {
+                item: convertible.item.substring(0, 20),
+                average_qty: convertible.total_items / convertible.total,
+            };
+        });
+    const order = ['item', 'average_qty'];
+    const labels = { item: 'Item', average_qty: 'Average Qty' };
+    //Sort the results
+    converter.sort((a, b) => parseFloat(b.dr) - parseFloat(a.dr));
+    converter.splice(isDM ? 100 : 10);
+    if (converter.every(row => row.stage === no_stage))
+        order.splice(order.indexOf('stage'), 1);
+    // Column Formatting specification.
+    /** @type {Object <string, ColumnFormatOptions>} */
+    const columnFormatting = {};
+    const headers = order.map(key => {
+        columnFormatting[key] = {
+            columnWidth: labels[key].length,
+            alignRight: !isNaN(parseInt(converter[0][key], 10)),
+        };
+        return { 'key': key, 'label': labels[key] };
+    });
+    // Give the numeric column proper formatting.
+    // TODO: toLocaleString - can it replace integerComma too?
+    columnFormatting['dr'] = {
+        alignRight: true,
+        isFixedWidth: true,
+        columnWidth: 7,
+    };
+    columnFormatting['pct'] = {
+        alignRight: true,
+        isFixedWidth: true,
+        suffix: '%',
+        columnWidth: 7,
+    };
+    let reply = `${convertible.value} (convertible) has the following possible contents:\n\`\`\``;
+    reply += prettyPrintArrayAsString(converter, columnFormatting, headers, '=');
+    reply += '```\n' + `HTML version at: ${target_url}`;
+    return reply;
+}
+
 /**
  * Determines if a string is a filter
  * @param {String} tester String to check if it's a filter
@@ -274,6 +324,21 @@ function getMice(tester, nicknames) {
 }
 
 /**
+ * Checks if the convertible requested is one we know about. Returns the highest scoring match
+ *
+ * @param {string} tester The mouse we're looking for
+ * @param {Array} nicknames The nicknames for mice
+ * @returns {Array<number>} The first mice that matched
+ */
+function getConvertibles(tester) {
+    if (!tester)
+        return;
+    tester = `${tester}`;
+
+    return getSearchedEntity(tester, convertibles);
+}
+
+/**
  * Finds a thing - uses MHCT searchByItem.php
  * @param {String} type Type of thing to find, supported by searchByItem.php
  * @param {int} id The MHCT numeric id of the thing to find
@@ -298,7 +363,7 @@ async function findThing(type, id, options) {
 
 /**
  * Initialize (or refresh) a list of items from MHCT
- * @param {'mouse'|'loot'} type The type of thing to get a list of
+ * @param {'mouse'|'loot' | 'convertible'} type The type of thing to get a list of
  * @param {Array} list The list to populate / re-populate
  */
 async function getMHCTList(type, list) {
@@ -388,12 +453,14 @@ async function initialize() {
     await Promise.all([
         getMHCTList('mouse', mice),
         getMHCTList('loot', loot),
+        getMHCTList('convertible', convertibles),
         getFilterList(),
     ]);
     intervals.push(setInterval(() => { getMHCTList('mouse', mice); }, refresh_rate));
     intervals.push(setInterval(() => { getMHCTList('loot', loot); }, refresh_rate));
+    intervals.push(setInterval(() => { getMHCTList('convertible', convertibles); }, refresh_rate));
     intervals.push(setInterval(() => { getFilterList(); }, refresh_rate));
-    Logger.log(`MHCT Initialized: Loot: ${loot.length}, mice: ${mice.length}, filters: ${filters.length}`);
+    Logger.log(`MHCT Initialized: Loot: ${loot.length}, mice: ${mice.length}, Copnvertibles: ${convertibles.length}, filters: ${filters.length}`);
     return true;
 }
 
@@ -407,8 +474,10 @@ module.exports.findThing = findThing;
 module.exports.getFilter = getFilter;
 module.exports.getLoot = getLoot;
 module.exports.getMice = getMice;
+module.exports.getConvertibles = getConvertibles;
 module.exports.formatLoot = formatLoot;
 module.exports.formatMice = formatMice;
+module.exports.formatConvertibles = formatConvertibles;
 module.exports.sendInteractiveSearchResult = sendInteractiveSearchResult;
 module.exports.getSearchedEntity = getSearchedEntity;
 module.exports.listFilters = listFilters;
