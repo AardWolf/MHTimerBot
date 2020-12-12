@@ -10,6 +10,7 @@ const mhct_lookup = require('../../src/modules/mhct-lookup');
 const getFilter = mhct_lookup.getFilter;
 const getLoot = mhct_lookup.getLoot;
 const getMice = mhct_lookup.getMice;
+const getConvertibles = mhct_lookup.getConvertibles;
 //const formatLoot = mhct_lookup.formatLoot;
 
 
@@ -77,7 +78,20 @@ test('getFilter', suite => {
         ));
         sinon.reset();
 
-    });    suite.test('Module Cleanup', t => {
+    });  suite.test('given input that can\'t be turned into a truthy string - returns undefined', t => {
+        const inputs = [
+            '',
+            undefined,
+        ];
+        t.plan(inputs.length);
+        inputs.forEach(input => t.deepEqual(
+            getConvertibles(input),
+            undefined,
+            `should return undefined for random and empty stuff - ${typeof input}`,
+        ));
+        sinon.reset();
+
+    });  suite.test('Module Cleanup', t => {
         sinon.restore();
         t.end();
     });

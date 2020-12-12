@@ -22,7 +22,7 @@ async function doWHATSIN(message, tokens) {
         reply = 'I just cannot find what you\'re looking for (since you didn\'t tell me what it was).';
     else {
         const searchString = tokens.join(' ').toLowerCase();
-        const all_convertibles = getConvertibles(searchString, message.client.nicknames.get('mice'));
+        const all_convertibles = getConvertibles(searchString);
         if (all_convertibles && all_convertibles.length) {
             // We have multiple options, show the interactive menu
             urlInfo.qsParams = opts;

@@ -460,7 +460,7 @@ async function initialize() {
     intervals.push(setInterval(() => { getMHCTList('loot', loot); }, refresh_rate));
     intervals.push(setInterval(() => { getMHCTList('convertible', convertibles); }, refresh_rate));
     intervals.push(setInterval(() => { getFilterList(); }, refresh_rate));
-    Logger.log(`MHCT Initialized: Loot: ${loot.length}, mice: ${mice.length}, Copnvertibles: ${convertibles.length}, filters: ${filters.length}`);
+    Logger.log(`MHCT Initialized: Loot: ${loot.length}, mice: ${mice.length}, Convertibles: ${convertibles.length}, filters: ${filters.length}`);
     return true;
 }
 
