@@ -52,7 +52,7 @@ async function doWHATSIN(message, tokens) {
     return theResult;
 
 }
-//TODO: fix this
+
 function helpWhatsIn() {
     let reply = '-mh whatsin convertible:\nFind the possible contents of a convertible (nicknames not supported).\n';
     reply += 'Known filters: `current`, ' + listFilters();

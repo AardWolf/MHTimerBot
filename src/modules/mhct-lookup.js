@@ -217,6 +217,7 @@ async function formatMice(isDM, mouse, opts) {
     reply += '```\n' + `HTML version at: ${target_url}`;
     return reply;
 }
+
 /**
  * Formats convertibles into a nice table
  * @param {boolean} isDM Whether the command came as a DM

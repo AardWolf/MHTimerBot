@@ -96,3 +96,36 @@ test('getFilter', suite => {
         t.end();
     });
 });
+
+test('getConvertibles', suite => {
+    
+    suite.test('given input that can\'t be turned into a truthy string - returns undefined', t => {
+        const inputs = [
+            '',
+            undefined,
+        ];
+        t.plan(inputs.length);
+        inputs.forEach(input => t.deepEqual(
+            getConvertibles(input),
+            undefined,
+            `should return undefined for random and empty stuff - ${typeof input}`,
+        ));
+        sinon.reset();
+
+    });
+
+    suite.test('given input matches the return value of getSearchedEntity - returns input', t => {
+        const inputs = [
+            '10th',
+            'birthday',
+        ];
+        t.plan(inputs.length);
+        getSearchedEntityStub.returns('10th Birthday');
+        inputs.forEach(input => t.match(
+            getConvertibles(input),
+            /10th Birthday/,
+            'should return known string when given correct input',
+        ));
+        sinon.reset();
+    });
+});
