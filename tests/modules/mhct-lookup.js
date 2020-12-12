@@ -78,7 +78,7 @@ test('getFilter', suite => {
         ));
         sinon.reset();
 
-    });    suite.test('given input that can\'t be turned into a truthy string - returns undefined', t => {
+    });  suite.test('given input that can\'t be turned into a truthy string - returns undefined', t => {
         const inputs = [
             '',
             undefined,
@@ -91,7 +91,7 @@ test('getFilter', suite => {
         ));
         sinon.reset();
 
-    }); suite.test('Module Cleanup', t => {
+    });  suite.test('Module Cleanup', t => {
         sinon.restore();
         t.end();
     });
