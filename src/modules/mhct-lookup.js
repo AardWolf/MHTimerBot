@@ -217,7 +217,13 @@ async function formatMice(isDM, mouse, opts) {
     reply += '```\n' + `HTML version at: ${target_url}`;
     return reply;
 }
-
+/**
+ * Formats convertibles into a nice table
+ * @param {boolean} isDM Whether the command came as a DM
+ * @param {Object} convertible A convertible object - it has an id and a value
+ * @param {Object} opts Options property. It has filter and DM information
+ * @returns {Promise<string>} Formatted mouse AR table
+ */
 async function formatConvertibles(isDM, convertible, opts) {
     const results = await findThing('convertible', convertible.id, opts);
     const no_stage = ' N/A ';
@@ -326,9 +332,8 @@ function getMice(tester, nicknames) {
 /**
  * Checks if the convertible requested is one we know about. Returns the highest scoring match
  *
- * @param {string} tester The mouse we're looking for
- * @param {Array} nicknames The nicknames for mice
- * @returns {Array<number>} The first mice that matched
+ * @param {string} tester The convertible we're looking for
+ * @returns {Array<number>} The first convertible that matched
  */
 function getConvertibles(tester) {
     if (!tester)
@@ -460,7 +465,7 @@ async function initialize() {
     intervals.push(setInterval(() => { getMHCTList('loot', loot); }, refresh_rate));
     intervals.push(setInterval(() => { getMHCTList('convertible', convertibles); }, refresh_rate));
     intervals.push(setInterval(() => { getFilterList(); }, refresh_rate));
-    Logger.log(`MHCT Initialized: Loot: ${loot.length}, mice: ${mice.length}, Copnvertibles: ${convertibles.length}, filters: ${filters.length}`);
+    Logger.log(`MHCT Initialized: Loot: ${loot.length}, mice: ${mice.length}, Convertibles: ${convertibles.length}, filters: ${filters.length}`);
     return true;
 }
 
