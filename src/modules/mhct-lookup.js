@@ -96,7 +96,7 @@ async function sendInteractiveSearchResult(searchResults, channel, dataCallback,
 
     // Always send one result to the channel.
     sent.then(() => dataCallback(isDM, matches[0].match, urlInfo.qsParams).then(
-        result => channel.send(result || `Not enough quality data for ${searchInput}`, { split: { prepend: '```\n', append: '\n```' } }))
+        result => channel.send(result || `Not enough quality data for ${searchInput}`, { split: { prepend: '```\n', append: '\n```' } })),
     ).catch(err => Logger.error(err));
 }
 

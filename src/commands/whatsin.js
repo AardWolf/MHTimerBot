@@ -1,6 +1,6 @@
 const Logger = require('../modules/logger');
 const { initialize, getConvertibles, sendInteractiveSearchResult, 
-    listFilters, save, formatConvertibles } = require('../modules/mhct-lookup');
+    save, formatConvertibles } = require('../modules/mhct-lookup');
 const CommandResult = require('../interfaces/command-result');
 
 /**
@@ -55,7 +55,7 @@ async function doWHATSIN(message, tokens) {
 }
 
 function helpWhatsIn() {
-    let reply = '-mh whatsin convertible:\nFind the possible contents of a convertible (nicknames not supported).\n';
+    const reply = '-mh whatsin convertible:\nFind the possible contents of a convertible (nicknames not supported).\n';
     // reply += 'Known filters: `current`, ' + listFilters(); // There are no filters right now
     return reply;
 }
