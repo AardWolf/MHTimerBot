@@ -96,8 +96,7 @@ async function sendInteractiveSearchResult(searchResults, channel, dataCallback,
 
     // Always send one result to the channel.
     sent.then(() => dataCallback(isDM, matches[0].match, urlInfo.qsParams).then(
-        result => channel.send(result || `Not enough quality data for ${searchInput}`, { split: { prepend: '```\n', append: '\n```' } }),
-        result => channel.send(result)),
+        result => channel.send(result || `Not enough quality data for ${searchInput}`, { split: { prepend: '```\n', append: '\n```' } }))
     ).catch(err => Logger.error(err));
 }
 
@@ -232,14 +231,15 @@ async function formatConvertibles(isDM, convertible, opts) {
     const converter = results
         .map(convertible => {
             return {
-                item: convertible.item.substring(0, 20),
-                average_qty: convertible.total_items / convertible.total,
+                item: convertible.item.substring(0, 30),
+                average_qty: calculateRate(convertible.total, convertible.total_items),
+                // average_qty: convertible.total_items / convertible.total,
             };
         });
     const order = ['item', 'average_qty'];
     const labels = { item: 'Item', average_qty: 'Average Qty' };
     //Sort the results
-    converter.sort((a, b) => parseFloat(b.dr) - parseFloat(a.dr));
+    converter.sort((a, b) => parseFloat(b.average_qty) - parseFloat(a.average_qty));
     converter.splice(isDM ? 100 : 10);
     if (converter.every(row => row.stage === no_stage))
         order.splice(order.indexOf('stage'), 1);
@@ -255,7 +255,7 @@ async function formatConvertibles(isDM, convertible, opts) {
     });
     // Give the numeric column proper formatting.
     // TODO: toLocaleString - can it replace integerComma too?
-    columnFormatting['dr'] = {
+    columnFormatting['average_qty'] = {
         alignRight: true,
         isFixedWidth: true,
         columnWidth: 7,

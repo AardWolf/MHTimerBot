@@ -16,7 +16,7 @@ async function doWHATSIN(message, tokens) {
     const urlInfo = {
         qsParams: {},
         uri: 'https://agiletravels.com/converter.php',
-        type: 'convertible',
+        type: 'item',
     };
     if (!tokens)
         reply = 'I just cannot find what you\'re looking for (since you didn\'t tell me what it was).';
@@ -40,6 +40,7 @@ async function doWHATSIN(message, tokens) {
     if (reply) {
         try {
             // Note that a lot of this is handled by sendInteractiveSearchResult
+            Logger.log(`Reply size: ${reply.length}`);
             await message.channel.send(reply, { split: { prepend: '```\n', append: '\n```' } });
             theResult.replied = true;
             theResult.success = true;
@@ -55,7 +56,7 @@ async function doWHATSIN(message, tokens) {
 
 function helpWhatsIn() {
     let reply = '-mh whatsin convertible:\nFind the possible contents of a convertible (nicknames not supported).\n';
-    reply += 'Known filters: `current`, ' + listFilters();
+    // reply += 'Known filters: `current`, ' + listFilters(); // There are no filters right now
     return reply;
 }
 
