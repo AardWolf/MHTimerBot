@@ -67,7 +67,7 @@ module.exports = {
     helpFunction: helpWhatsIn,
     description: 'Check what is inside a convertable',
     canDM: true,
-    aliases: [ 'mwhatsin' ],
+    aliases: [ 'convert', 'inside' ],
     execute: doWHATSIN,
     initialize: initialize,
     save: save,

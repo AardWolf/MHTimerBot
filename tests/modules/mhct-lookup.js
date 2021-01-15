@@ -78,20 +78,8 @@ test('getFilter', suite => {
         ));
         sinon.reset();
 
-    });  suite.test('given input that can\'t be turned into a truthy string - returns undefined', t => {
-        const inputs = [
-            '',
-            undefined,
-        ];
-        t.plan(inputs.length);
-        inputs.forEach(input => t.deepEqual(
-            getConvertibles(input),
-            undefined,
-            `should return undefined for random and empty stuff - ${typeof input}`,
-        ));
-        sinon.reset();
-
-    });  suite.test('Module Cleanup', t => {
+    });
+    suite.test('Module Cleanup', t => {
         sinon.restore();
         t.end();
     });
