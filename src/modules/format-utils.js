@@ -278,7 +278,7 @@ function calculateRate(denominator, numerator) {
     const value = denominator ? Number(numerator / denominator) : 0;
     const value2 = value.toPrecision(Math.max(Math.ceil(Math.log10(value)), 4));
     return Number.parseFloat(value2).toFixed(value2 >= 1 ?
-        Math.max(4 - Math.ceil(Math.log10(value2),0)) : 4);
+        Math.max(4 - Math.ceil(Math.log10(value2),0),0) : 4);
 }
 
 /**

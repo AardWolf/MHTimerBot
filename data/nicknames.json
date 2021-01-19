@@ -1,6 +1,6 @@
 {
-	"loot": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQRxGO1iLgX6N2P2iUT57ftCbh5lv_cmnatC6F8NevrdYDtumjcIJw-ooAqm1vIjSu6b0HfP4v2DYil/pub?gid=1181602359&single=true&output=csv",
-	"mice": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQRxGO1iLgX6N2P2iUT57ftCbh5lv_cmnatC6F8NevrdYDtumjcIJw-ooAqm1vIjSu6b0HfP4v2DYil/pub?gid=762700375&single=true&output=csv",
-	"locations": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQRxGO1iLgX6N2P2iUT57ftCbh5lv_cmnatC6F8NevrdYDtumjcIJw-ooAqm1vIjSu6b0HfP4v2DYil/pub?gid=0&single=true&output=csv",
-	"ranks": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQRxGO1iLgX6N2P2iUT57ftCbh5lv_cmnatC6F8NevrdYDtumjcIJw-ooAqm1vIjSu6b0HfP4v2DYil/pub?gid=2040388330&single=true&output=csv"
+	"loot": "https://docs.google.com/a/google.com/spreadsheets/d/1ymBBVycIpc1QPMII8N49BqF26_GHyU81m6IQiXy6N6E/gviz/tq?tq=select%20*&tqx=out:csv&sheet=Loot",
+	"mice": "https://docs.google.com/a/google.com/spreadsheets/d/1ymBBVycIpc1QPMII8N49BqF26_GHyU81m6IQiXy6N6E/gviz/tq?tq=select%20*&tqx=out:csv&sheet=Mice",
+	"locations": "https://docs.google.com/a/google.com/spreadsheets/d/1ymBBVycIpc1QPMII8N49BqF26_GHyU81m6IQiXy6N6E/gviz/tq?tq=select%20*&tqx=out:csv&sheet=Locations",
+	"ranks": "https://docs.google.com/a/google.com/spreadsheets/d/1ymBBVycIpc1QPMII8N49BqF26_GHyU81m6IQiXy6N6E/gviz/tq?tq=select%20*&tqx=out:csv&sheet=Ranks"
 }
