@@ -1,9 +1,10 @@
 const fetch = require('node-fetch');
 const Logger = require('../modules/logger');
 const { DateTime, Duration } = require('luxon');
-const { calculateRate, prettyPrintArrayAsString, intToHuman } = require('../modules/format-utils');
+const { calculateRate, prettyPrintArrayAsString, intToHuman, integerComma } = require('../modules/format-utils');
 const { getSearchedEntity } = require('../modules/search-helpers');
 const { MessageEmbed } = require('discord.js');
+const { firstBy } = require('thenby');
 
 const refresh_rate = Duration.fromObject({ minutes: 5 });
 const refresh_list = {
@@ -230,23 +231,48 @@ async function formatMice(isDM, mouse, opts) {
  */
 async function formatConvertibles(isDM, convertible, opts) {
     const results = await findThing('convertible', convertible.id, opts);
-    const no_stage = ' N/A ';
     const target_url = `<https://www.agiletravels.com/converter.php?item=${convertible.id}>`;
+    const minMax = (a, b) => {
+        if (a && b && !isNaN(a) && !isNaN(b) && a === b)
+            return integerComma(a);
+        return (a || 'N/A').concat('-').concat(b || 'N/A');
+    };
+    const pctDisplay = (opens, total_items) => {
+        return Number(calculateRate(opens, total_items*100)).toFixed(2);
+    };
     const converter = results
         .map(convertible => {
             return {
                 item: convertible.item.substring(0, 30),
                 average_qty: calculateRate(convertible.total, convertible.total_items),
-                // average_qty: convertible.total_items / convertible.total,
+                min_max: minMax(convertible.min_item_quantity, convertible.max_item_quantity),
+                average_when: calculateRate(convertible.times_with_any, 
+                    convertible.total_quantity_when_any),
+                chance: pctDisplay(convertible.single_opens, convertible.times_with_any),
+                total: convertible.total,
+                single_opens: convertible.single_opens,
             };
         });
-    const order = ['item', 'average_qty'];
-    const labels = { item: 'Item', average_qty: 'Average Qty' };
+    const order = ['item', 'average_qty', 'chance', 'min_max', 'average_when'];
+    const labels = { 
+        item: 'Item', 
+        average_qty: 'Per Open', 
+        min_max: 'Min-Max',
+        chance: 'Chance',
+        average_when: 'Per Slot',
+    };
     //Sort the results
-    converter.sort((a, b) => parseFloat(b.average_qty) - parseFloat(a.average_qty));
+    const numSort = (a, b) => {
+        return Number(a) - Number(b);
+    };
+    converter.sort(
+        firstBy('average_qty', { cmp: numSort, direction: 'desc' })
+            .thenBy('chance', { cmp: numSort, direction: 'desc' })
+            .thenBy('item'),
+    );
     converter.splice(isDM ? 100 : 10);
-    if (converter.every(row => row.stage === no_stage))
-        order.splice(order.indexOf('stage'), 1);
+    const total_seen = converter[0].total;
+    const single_seen = converter[0].single_opens;
     // Column Formatting specification.
     /** @type {Object <string, ColumnFormatOptions>} */
     const columnFormatting = {};
@@ -258,21 +284,28 @@ async function formatConvertibles(isDM, convertible, opts) {
         return { 'key': key, 'label': labels[key] };
     });
     // Give the numeric column proper formatting.
-    // TODO: toLocaleString - can it replace integerComma too?
     columnFormatting['average_qty'] = {
         alignRight: true,
         isFixedWidth: true,
         columnWidth: 7,
+        commify: true,
     };
-    columnFormatting['pct'] = {
+    columnFormatting['chance'] = {
         alignRight: true,
         isFixedWidth: true,
         suffix: '%',
         columnWidth: 7,
     };
+    columnFormatting['average_when'] = {
+        alignRight: true,
+        isFixedWidth: true,
+        columnWidth: 7,
+        commify: true,
+    };
     let reply = `${convertible.value} (convertible) has the following possible contents:\n\`\`\``;
     reply += prettyPrintArrayAsString(converter, columnFormatting, headers, '=');
-    reply += '```\n' + `HTML version at: ${target_url}`;
+    reply += '```\n' + `Seen ${intToHuman(total_seen)} times, ${intToHuman(single_seen)} as single opens. `;
+    reply += `HTML version at: ${target_url}`;
     return reply;
 }
 

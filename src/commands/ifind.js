@@ -91,7 +91,7 @@ module.exports = {
     usage: 'Coming Soon',
     description: 'Find items sorted by their drop rates',
     canDM: true,
-    findFunction: helpFind,
+    helpFunction: helpFind,
     execute: doIFIND,
 };
 
