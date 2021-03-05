@@ -3,6 +3,12 @@ const { initialize, getConvertibles, sendInteractiveSearchResult,
     save, formatConvertibles } = require('../modules/mhct-lookup');
 const CommandResult = require('../interfaces/command-result');
 
+const usage = [
+    '<convertible> will report stats about what is inside that convertible',
+    'Example: `whatsin gilded charm` will show how much SUPER|Brie+ comes out of gilded charms, on average',
+    'See Also: find; for finding mice. ifind; for finding loot drops.',
+].join('\n\t');
+
 /**
  *
  * @param {Message} message The message that triggered the action
@@ -54,17 +60,10 @@ async function doWHATSIN(message, tokens) {
 
 }
 
-function helpWhatsIn() {
-    const reply = '-mh whatsin convertible:\nFind the possible contents of a convertible (nicknames not supported).\n';
-    // reply += 'Known filters: `current`, ' + listFilters(); // There are no filters right now
-    return reply;
-}
-
 module.exports = {
     name: 'whatsin',
     args: true,
-    usage: 'Coming Soon',
-    helpFunction: helpWhatsIn,
+    usage: usage,
     description: 'Check what is inside a convertable',
     canDM: true,
     aliases: [ 'convert', 'inside' ],

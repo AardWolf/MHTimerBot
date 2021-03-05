@@ -37,6 +37,7 @@ function oxfordStringifyValues(container, final = 'and') {
  * @property {boolean} [alignRight] Whether the column should be right-aligned (default: left-aligned)
  * @property {boolean} [convertToPercent] Whether the value is a raw float that should be converted to a percentage value by multiplying by 100. (Does not add a % to the end)
  * @property {number} [numDecimals] For right-aligned values that are converted to percent, the number of decimals kept.
+ * @property {boolean} [commify] Whether to run it through integerComma 
  */
 
 /**
@@ -138,6 +139,10 @@ function prettyPrintArrayAsString(body, columnFormat, headers, headerUnderline) 
                     text = String(text).substr(0, options.columnWidth - options.suffix.length - options.prefix.length);
                 }
                 text = String(text);
+            }
+
+            if (options.commify) {
+                text = integerComma(text);
             }
 
             // Add the desired prefix and suffix for this column, and then pad as desired.
@@ -263,9 +268,10 @@ function isValidURL(str) {
  * Consistently format a rate
  * @param denominator The bottom number - the thing we're dividing by
  * @param numerator The top number - the thing we're dividing
+ * @param precision Optional - precision, if you know you want X decimal places
  * @returns a string representation of the rate
  */
-function calculateRate(denominator, numerator) {
+function calculateRate(denominator, numerator, precision) {
     if ((typeof denominator === 'undefined') ||
         (typeof numerator === 'undefined') ||
         isNaN(denominator) || isNaN(numerator)) {
@@ -275,10 +281,12 @@ function calculateRate(denominator, numerator) {
         return NaN;
     if (!numerator)
         numerator = 0;
+    if (!precision)
+        precision = 4;
     const value = denominator ? Number(numerator / denominator) : 0;
-    const value2 = value.toPrecision(Math.max(Math.ceil(Math.log10(value)), 4));
+    const value2 = value.toPrecision(Math.max(Math.ceil(Math.log10(value)) || 1, 4));
     return Number.parseFloat(value2).toFixed(value2 >= 1 ?
-        Math.max(4 - Math.ceil(Math.log10(value2),0),0) : 4);
+        Math.max(4 - Math.ceil(Math.log10(value2) || 1,0),0) : precision);
 }
 
 /**
@@ -289,6 +297,9 @@ function calculateRate(denominator, numerator) {
 function integerComma(number) {
     if (typeof number === 'undefined')
         return false;
+    if (isNaN(number) || Number(number) < 1)
+        return number.toString();
+    //TODO: Can split this on '.' and only work on the left side, then re-join it.
     return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
