@@ -333,7 +333,7 @@ test('calculateRate', suite => {
         const inputs = [
             {  denominator: 1, numerator: 100, expected: '100.00' },
             {  denominator: 2, numerator: 100, expected: '50.00' },
-            {  denominator: 100, numerator: 100, expected: '1.0000' },
+            {  denominator: 100, numerator: 100, expected: '1.000' },
             {  denominator: 200, numerator: 100, expected: '0.5000' },
             {  denominator: 1000, numerator: 100, expected: '0.1000' },
             {  denominator: 10000, numerator: 100, expected: '0.0100' },
@@ -344,6 +344,25 @@ test('calculateRate', suite => {
         t.plan(inputs.length);
         inputs.forEach(input => t.deepEqual(
             calculateRate(input.denominator, input.numerator),
+            input.expected,
+            'should return consistent values',
+        ));
+    });
+    suite.test('Given some known ratios and precision (2), returns known results', t => {
+        const inputs = [
+            {  denominator: 1, numerator: 100, expected: '100.00' },
+            {  denominator: 2, numerator: 100, expected: '50.00' },
+            {  denominator: 100, numerator: 100, expected: '1.000' },
+            {  denominator: 200, numerator: 100, expected: '0.50' },
+            {  denominator: 1000, numerator: 100, expected: '0.10' },
+            {  denominator: 10000, numerator: 100, expected: '0.01' },
+            {  denominator: 100000, numerator: 100, expected: '0.00' },
+            {  denominator: 1000000, numerator: 100, expected: '0.00' },
+            {  denominator: 10000000, numerator: 100, expected: '0.00' },
+        ];
+        t.plan(inputs.length);
+        inputs.forEach(input => t.deepEqual(
+            calculateRate(input.denominator, input.numerator, 2),
             input.expected,
             'should return consistent values',
         ));

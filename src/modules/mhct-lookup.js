@@ -237,36 +237,37 @@ async function formatConvertibles(isDM, convertible, opts) {
             return integerComma(a);
         return (a || 'N/A').concat('-').concat(b || 'N/A');
     };
+    const pctDisplay = (opens, total_items) => {
+        return Number(calculateRate(opens, total_items*100)).toFixed(2);
+    };
     const converter = results
         .map(convertible => {
             return {
                 item: convertible.item.substring(0, 30),
-                // average_qty: integerComma(calculateRate(convertible.total, convertible.total_items)),
-                average_qty: integerComma(calculateRate(convertible.total, convertible.total_items)),
+                average_qty: calculateRate(convertible.total, convertible.total_items),
                 min_max: minMax(convertible.min_item_quantity, convertible.max_item_quantity),
-                average_when: calculateRate(convertible.times_with_any, convertible.total_quantity_when_any),
-                chance: calculateRate(convertible.single_opens, 
-                    convertible.times_with_any*100),
+                average_when: calculateRate(convertible.times_with_any, 
+                    convertible.total_quantity_when_any),
+                chance: pctDisplay(convertible.single_opens, convertible.times_with_any),
                 total: convertible.total,
                 single_opens: convertible.single_opens,
-                // average_qty: convertible.total_items / convertible.total,
             };
         });
     const order = ['item', 'average_qty', 'chance', 'min_max', 'average_when'];
     const labels = { 
         item: 'Item', 
-        average_qty: 'Average Qty', 
+        average_qty: 'Per Open', 
         min_max: 'Min-Max',
         chance: 'Chance',
-        average_when: 'When Qty',
+        average_when: 'Per Slot',
     };
     //Sort the results
     const numSort = (a, b) => {
         return Number(a) - Number(b);
     };
     converter.sort(
-        firstBy('chance', {cmp: numSort, direction: 'desc'})
-            .thenBy('average_when', {cmp: numSort, direction: 'desc'})
+        firstBy('average_qty', {cmp: numSort, direction: 'desc'})
+            .thenBy('chance', {cmp: numSort, direction: 'desc'})
             .thenBy('item'),
     );
     converter.splice(isDM ? 100 : 10);
@@ -287,6 +288,7 @@ async function formatConvertibles(isDM, convertible, opts) {
         alignRight: true,
         isFixedWidth: true,
         columnWidth: 7,
+        commify: true,
     };
     columnFormatting['chance'] = {
         alignRight: true,
@@ -298,6 +300,7 @@ async function formatConvertibles(isDM, convertible, opts) {
         alignRight: true,
         isFixedWidth: true,
         columnWidth: 7,
+        commify: true,
     };
     let reply = `${convertible.value} (convertible) has the following possible contents:\n\`\`\``;
     reply += prettyPrintArrayAsString(converter, columnFormatting, headers, '=');
