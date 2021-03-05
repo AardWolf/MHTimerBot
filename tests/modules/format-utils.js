@@ -374,6 +374,11 @@ test('integerComma', suite => {
             {  input: 10000, expected: '10,000' },
             {  input: 100000, expected: '100,000' },
             {  input: 1000000, expected: '1,000,000' },
+            {  input: 0, expected: '0' },
+            {  input: 0.1, expected: '0.1' },
+            {  input: 0.01, expected: '0.01' },
+            {  input: 0.001, expected: '0.001' },
+            {  input: 0.0001, expected: '0.0001' },
         ];
         t.plan(inputs.length);
         inputs.forEach(input => t.deepEqual(
