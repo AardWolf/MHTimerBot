@@ -297,7 +297,7 @@ function calculateRate(denominator, numerator, precision) {
 function integerComma(number) {
     if (typeof number === 'undefined')
         return false;
-    if (Number(number) === NaN || Number(number) < 1)
+    if (isNaN(number) || Number(number) < 1)
         return number.toString();
     //TODO: Can split this on '.' and only work on the left side, then re-join it.
     return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');

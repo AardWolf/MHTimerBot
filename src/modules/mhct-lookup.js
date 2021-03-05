@@ -233,7 +233,7 @@ async function formatConvertibles(isDM, convertible, opts) {
     const results = await findThing('convertible', convertible.id, opts);
     const target_url = `<https://www.agiletravels.com/converter.php?item=${convertible.id}>`;
     const minMax = (a, b) => {
-        if (a && b && Number(a) !== NaN && Number(b) !== NaN && a === b)
+        if (a && b && !isNaN(a) && !isNaN(b) && a === b)
             return integerComma(a);
         return (a || 'N/A').concat('-').concat(b || 'N/A');
     };
@@ -266,8 +266,8 @@ async function formatConvertibles(isDM, convertible, opts) {
         return Number(a) - Number(b);
     };
     converter.sort(
-        firstBy('average_qty', {cmp: numSort, direction: 'desc'})
-            .thenBy('chance', {cmp: numSort, direction: 'desc'})
+        firstBy('average_qty', { cmp: numSort, direction: 'desc' })
+            .thenBy('chance', { cmp: numSort, direction: 'desc' })
             .thenBy('item'),
     );
     converter.splice(isDM ? 100 : 10);
