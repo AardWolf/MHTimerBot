@@ -512,9 +512,9 @@ function parseUserMessage(message) {
     }
     // Today's hack brought to you by laziness - haven't migrated notifications/timers yet
     if (command.toLowerCase() === 'find' && tokens.length && 
-            (tokens[0].toLowerCase() === 'rh' || tokens[0].toLowerCase() === 'relic_hunter') ||
-            (tokens.length >= 2 && tokens[0].toLowerCase() === 'relic' && tokens[1].toLowerCase() == 'hunter'))
-        command = 'findrh';
+            ((tokens[0].toLowerCase() === 'rh' || tokens[0].toLowerCase() === 'relic_hunter') ||
+            (tokens.length >= 2 && tokens[0].toLowerCase() === 'relic' && tokens[1].toLowerCase() == 'hunter')))
+        command = 'findrh'; 
 
     const dynCommand = client.commands.get(command.toLowerCase())
         || client.commands.find(cmd => cmd.aliases && cmd.aliases.includes(command));

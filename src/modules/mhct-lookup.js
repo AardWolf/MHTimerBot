@@ -253,13 +253,13 @@ async function formatConvertibles(isDM, convertible, opts) {
                 single_opens: convertible.single_opens,
             };
         });
-    const order = ['item', 'average_qty', 'chance', 'min_max', 'average_when'];
+    // Dropping average_when from the display
+    const order = ['item', 'average_qty', 'chance', 'min_max'];
     const labels = { 
         item: 'Item', 
-        average_qty: 'Per Open', 
+        average_qty: 'Avg Qty', 
         min_max: 'Min-Max',
         chance: 'Chance',
-        average_when: 'Per Slot',
     };
     //Sort the results
     const numSort = (a, b) => {
@@ -295,12 +295,6 @@ async function formatConvertibles(isDM, convertible, opts) {
         isFixedWidth: true,
         suffix: '%',
         columnWidth: 7,
-    };
-    columnFormatting['average_when'] = {
-        alignRight: true,
-        isFixedWidth: true,
-        columnWidth: 7,
-        commify: true,
     };
     let reply = `${convertible.value} (convertible) has the following possible contents:\n\`\`\``;
     reply += prettyPrintArrayAsString(converter, columnFormatting, headers, '=');
