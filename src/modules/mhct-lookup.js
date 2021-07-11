@@ -5,20 +5,22 @@ const { calculateRate, prettyPrintArrayAsString, intToHuman, integerComma } = re
 const { getSearchedEntity } = require('../modules/search-helpers');
 const { MessageEmbed } = require('discord.js');
 const { firstBy } = require('thenby');
+const csv_parse = require('csv-parse');
 
-const refresh_rate = Duration.fromObject({ minutes: 5 });
+const refresh_rate = Duration.fromObject({ minutes: 30 });
 const refresh_list = {
     mouse: DateTime.utc().minus(refresh_rate),
     loot: DateTime.utc().minus(refresh_rate),
     filter: DateTime.utc().minus(refresh_rate),
     convertible: DateTime.utc().minus(refresh_rate),
+    minluck: DateTime.utc().minus(refresh_rate),
 };
 const intervals = [];
 const filters = [],
     mice = [],
     loot = [],
     convertibles = [];
-
+const minlucks = {};
 let someone_initialized = 0;
 
 const emojis = [
@@ -471,6 +473,53 @@ async function getFilterList() {
 }
 
 /**
+ * Initialize (or refresh) the mouse minlucks from Selianth's spreadsheet.
+ * @returns {Promise<void>}
+ */
+async function getMinLuck() {
+    const now = DateTime.utc();
+    if (refresh_list.minluck) {
+        const next_refresh = refresh_list.minluck.plus(refresh_rate);
+        if (now < next_refresh)
+            return Promise.resolve();
+    }
+    refresh_list.minluck = now;
+
+    Logger.log('Minluck: Grabbing a fresh copy');
+    const url = 'https://docs.google.com/a/google.com/spreadsheets/d/13hKjNDFTFR3rTkmQzyi3d4ZDOlQJUvTfWPDQemmFW_Y/gviz/tq?tq=select%20*&tqx=out:csv&sheet=Minlucks';
+    const newMinlucks = {};
+    // Set up the parser
+    const parser = csv_parse({ delimiter: ',' })
+        .on('readable', () => {
+            let record;
+            // eslint-disable-next-line no-cond-assign
+            while (record = parser.read()) {
+                if (record.length < 14) {
+                    Logger.log(`Minluck: Short entry found: ${record}`);
+                    continue;
+                }
+                newMinlucks[record[0]] = {
+                    "Arcane": record[4],
+                    "Draconic": record[5],
+                    "Forgotten": record[6],
+                    "Hydro": record[7],
+                    "Parental": record[8],
+                    "Physical": record[9],
+                    "Shadow": record[10],
+                    "Tactical": record[11],
+                    "Law": record[12],
+                    "Rift": record[13],
+                };
+            }
+        })
+        .on('error', err => Logger.error(err.message));
+    Object.assign(minlucks, newMinlucks);
+    Logger.log(`Minluck: New minlucks downloaded - ${Object.keys(minlucks).length} mice`);
+
+
+}
+
+/**
  * 
  * @param {Object} accumulator -- string or something with code_name as a property
  * @param {Object} current -- something with code_name as a property
@@ -507,11 +556,13 @@ async function initialize() {
         getMHCTList('loot', loot),
         getMHCTList('convertible', convertibles),
         getFilterList(),
+        getMinLuck(),
     ]);
     intervals.push(setInterval(() => { getMHCTList('mouse', mice); }, refresh_rate));
     intervals.push(setInterval(() => { getMHCTList('loot', loot); }, refresh_rate));
     intervals.push(setInterval(() => { getMHCTList('convertible', convertibles); }, refresh_rate));
     intervals.push(setInterval(() => { getFilterList(); }, refresh_rate));
+    intervals.push(setInterval(() => { getMinLuck(); }, refresh_rate));
     Logger.log(`MHCT Initialized: Loot: ${loot.length}, mice: ${mice.length}, Convertibles: ${convertibles.length}, filters: ${filters.length}`);
     return true;
 }
