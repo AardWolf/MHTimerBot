@@ -499,24 +499,61 @@ async function getMinLuck() {
                     continue;
                 }
                 newMinlucks[record[0]] = {
-                    "Arcane": record[4],
-                    "Draconic": record[5],
-                    "Forgotten": record[6],
-                    "Hydro": record[7],
-                    "Parental": record[8],
-                    "Physical": record[9],
-                    "Shadow": record[10],
-                    "Tactical": record[11],
-                    "Law": record[12],
-                    "Rift": record[13],
+                    'Arcane': record[4],
+                    'Draconic': record[5],
+                    'Forgotten': record[6],
+                    'Hydro': record[7],
+                    'Parental': record[8],
+                    'Physical': record[9],
+                    'Shadow': record[10],
+                    'Tactical': record[11],
+                    'Law': record[12],
+                    'Rift': record[13],
                 };
             }
         })
         .on('error', err => Logger.error(err.message));
-    Object.assign(minlucks, newMinlucks);
+
+    fetch(url).then(async (response) => {
+        if (response.status !== 200) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        const body = await response.text();
+        // Pass the response to the CSV parser (after removing the header row).
+        parser.write(body.split(/[\r\n]+/).splice(1).join('\n').toLowerCase());
+        Object.assign(minlucks, newMinlucks);
+        parser.end(() => Logger.log(`Minlucks: ${Object.keys(newMinlucks).length} minlucks loaded.`));
+    }).catch(err => Logger.error('Minlucks: request for minlucks failed with error:', err));
+
     Logger.log(`Minluck: New minlucks downloaded - ${Object.keys(minlucks).length} mice`);
+}
 
-
+/**
+ * Given a mouse and an array of power types, return the minlucks that match
+ * @param {String} mouse 
+ * @param {Array} flags 
+ * @returns {String} The string to report to the requester
+ */
+function getMinluckString(mouse, flags) {
+    let reply = '';
+    if (!mouse || !(mouse in minlucks)) {
+        reply = `Sorry, I don't know ${mouse}'s minluck values`;
+    }
+    else {
+        // Minluck for <mouse>: <power> <num>
+        reply = `Minluck for __${mouse}__: `;
+        const powerString = flags.forEach(flag => {
+            if (flag in minlucks[mouse]) {
+                return `*${flag}*: **${minlucks[mouse][flag]}**`;
+            }
+        }).join(', ');
+        if (powerString) {
+            reply += powerString;
+        } else {
+            reply += 'Not susceptible to those powers or something broke.';
+        }
+    }
+    return reply;
 }
 
 /**
@@ -585,3 +622,4 @@ module.exports.sendInteractiveSearchResult = sendInteractiveSearchResult;
 module.exports.getSearchedEntity = getSearchedEntity;
 module.exports.listFilters = listFilters;
 module.exports.save = save;
+module.exports.getMinluckString = getMinluckString;

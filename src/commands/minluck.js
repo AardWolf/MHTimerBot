@@ -1,5 +1,5 @@
 const Logger = require('../modules/logger');
-const { initialize, getMice, save } = require('../modules/mhct-lookup');
+const { initialize, getMice, getMinluckString, save } = require('../modules/mhct-lookup');
 const CommandResult = require('../interfaces/command-result');
 
 const usage = [
@@ -15,7 +15,7 @@ const usage = [
     '-s[hadow]      : Shadow',
     '-t[actical]    : Tactical',
     '-r[ift]        : Rift',
-    'Only the first letter after the dash is considered, Parental must be a capital P, Physical must be lowercase p.'
+    'Only the first letter after the dash is considered, Parental must be a capital P, Physical must be lowercase p.',
 ].join('\n\t');
 
 const typeMap = {
@@ -29,7 +29,7 @@ const typeMap = {
     's': 'Shadow',
     't': 'Tactical',
     'r': 'Rift',
-}
+};
 
 /**
  * Get the minluck of a mouse
@@ -40,14 +40,13 @@ const typeMap = {
 
 async function doMINLUCK(message, tokens) {
     const theResult = new CommandResult({ message, success: false, sentDM: false });
-    const flags = [];
     const allFlags = Object.keys(typeMap);
     let reply = '';
     if (!tokens)
         reply = 'Yeah, good luck with that...';
     else {
         const commandFlags = tokens.filter(word => word.charAt(0) === '-');
-        commandFlags.forEach(flag => {
+        const flags = commandFlags.forEach(flag => {
             if (flag.length > 1 && flag.charAt(1) === 'A') {
                 return allFlags;
             }
@@ -58,19 +57,38 @@ async function doMINLUCK(message, tokens) {
                 if (flag.charAt(1).toLowerCase() in typeMap)
                     return flag.charAt(1).toLowerCase();
             }
-        }).filter((value, index, self) => self.indexOf(value) === index);
+        }).flat().filter((value, index, self) => self.indexOf(value) === index);
         // Figure out what they're searching for
         if (tokens[tokens.length - 1].toLowerCase() === 'mouse') {
             tokens.pop();
         }
-        const searchString = tokens.filter(word => word.charAt(0) !=== '-').join(' ');
+        const searchString = tokens.filter(word => word.charAt(0) !== '-').join(' ');
         const all_mice = getMice(searchString, message.client.nicknames.get('mice'));
         if (all_mice && all_mice.length) {
             if (all_mice.length > 1)
                 reply = 'I found multiple matches, here is the first.';
             all_mice.splice(1);
             // all_mice.id is the mhct id, all_mice.value is the text name of the mouse
-
+            const types = flags.forEach(f => {
+                if (f in typeMap)
+                    return typeMap[f];
+            });
+            reply = getMinluckString(all_mice[0].text, types);
+        }
+    }
+    if (reply) {
+        try {
+            if (typeof reply === 'string') {
+                await message.channel.send(reply);
+            } else {
+                await message.channel.send('', { embed: reply });
+            }
+            theResult.replied = true;
+            theResult.success = true;
+            theResult.sentDM = ['dm', 'group'].includes(message.channel.type);
+        } catch (err) {
+            Logger.error('NEXT: failed to send reply', err);
+            theResult.botError = true;
         }
     }
 
@@ -79,7 +97,7 @@ async function doMINLUCK(message, tokens) {
 module.exports = {
     name: 'minluck',
     args: true,
-    usage: 'minluck [-A] [-a] [-d] [-f] [-h] [-p] [-s] [-t] [-l] [-r] <mouse>',
+    usage: usage,
     description: 'Get the minluck values of mice - this is the lowest luck stat that "guarantees" a catch of that mouse with that power type.',
     canDM: true,
     aliases: [ 'luck', 'mluck' ],
