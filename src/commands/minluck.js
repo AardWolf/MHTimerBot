@@ -46,18 +46,21 @@ async function doMINLUCK(message, tokens) {
         reply = 'Yeah, good luck with that...';
     else {
         const commandFlags = tokens.filter(word => word.charAt(0) === '-');
-        const flags = commandFlags.forEach(flag => {
+        let flags = commandFlags.map(flag => {
             if (flag.length > 1 && flag.charAt(1) === 'A') {
                 return allFlags;
             }
             if (flag.length > 1 && flag.charAt(1) === 'P') {
-                return flag.charAt(1).toLowerCase();
+                return 'P';
             }
             if (flag.length > 1 && flag.charAt(1) !== 'P') {
                 if (flag.charAt(1).toLowerCase() in typeMap)
                     return flag.charAt(1).toLowerCase();
             }
-        }).flat().filter((value, index, self) => self.indexOf(value) === index);
+        }).filter(word => !!word);
+        if (!flags.length)
+            flags = allFlags;
+        flags = flags.flat().filter((value, index, self) => self.indexOf(value) === index);
         // Figure out what they're searching for
         if (tokens[tokens.length - 1].toLowerCase() === 'mouse') {
             tokens.pop();
@@ -67,13 +70,13 @@ async function doMINLUCK(message, tokens) {
         if (all_mice && all_mice.length) {
             if (all_mice.length > 1)
                 reply = 'I found multiple matches, here is the first.';
-            all_mice.splice(1);
+            // all_mice.splice(1);
             // all_mice.id is the mhct id, all_mice.value is the text name of the mouse
-            const types = flags.forEach(f => {
+            const types = flags.map(f => {
                 if (f in typeMap)
                     return typeMap[f];
             });
-            reply = getMinluckString(all_mice[0].text, types);
+            reply = getMinluckString(all_mice[0].value, types);
         }
     }
     if (reply) {
@@ -91,6 +94,7 @@ async function doMINLUCK(message, tokens) {
             theResult.botError = true;
         }
     }
+    return theResult;
 
 }
 

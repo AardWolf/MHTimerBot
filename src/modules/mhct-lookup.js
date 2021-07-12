@@ -521,11 +521,13 @@ async function getMinLuck() {
         const body = await response.text();
         // Pass the response to the CSV parser (after removing the header row).
         parser.write(body.split(/[\r\n]+/).splice(1).join('\n').toLowerCase());
-        Object.assign(minlucks, newMinlucks);
-        parser.end(() => Logger.log(`Minlucks: ${Object.keys(newMinlucks).length} minlucks loaded.`));
+        parser.end(() => {
+            Object.assign(minlucks, newMinlucks);
+            Logger.log(`Minlucks: ${Object.keys(minlucks).length} minlucks loaded.`);
+        });
     }).catch(err => Logger.error('Minlucks: request for minlucks failed with error:', err));
 
-    Logger.log(`Minluck: New minlucks downloaded - ${Object.keys(minlucks).length} mice`);
+    // Logger.log(`Minluck: New minlucks downloaded - ${Object.keys(minlucks).length} mice`);
 }
 
 /**
@@ -536,15 +538,16 @@ async function getMinLuck() {
  */
 function getMinluckString(mouse, flags) {
     let reply = '';
-    if (!mouse || !(mouse in minlucks)) {
+    if (!mouse || !(mouse.toLowerCase() in minlucks)) {
         reply = `Sorry, I don't know ${mouse}'s minluck values`;
     }
     else {
         // Minluck for <mouse>: <power> <num>
+        const lmouse = mouse.toLowerCase();
         reply = `Minluck for __${mouse}__: `;
-        const powerString = flags.forEach(flag => {
-            if (flag in minlucks[mouse]) {
-                return `*${flag}*: **${minlucks[mouse][flag]}**`;
+        const powerString = flags.map(flag => {
+            if (flag in minlucks[lmouse] && minlucks[lmouse]) {
+                return `*${flag}*: **${minlucks[lmouse][flag] || '∞'}**`;
             }
         }).join(', ');
         if (powerString) {
