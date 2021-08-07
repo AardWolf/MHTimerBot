@@ -36,6 +36,9 @@ const emojis = [
     { id: '%F0%9F%94%9F', text: ':keycap_ten:' },
 ];
 
+const powerFlags = ['Arcane', 'Draconic', 'Forgotten', 'Hydro', 'Parental', 'Physical', 'Shadow',
+    'Tactical', 'Law', 'Rift'];
+
 
 /**
  * Construct and dispatch a reaction-enabled message for interactive "search result" display.
@@ -218,9 +221,14 @@ async function formatMice(isDM, mouse, opts) {
         suffix: '%',
         columnWidth: 7,
     };
+    const minLuckString = getMinluckString(mouse.value, powerFlags);
     let reply = `${mouse.value} (mouse) can be found the following ways:\n\`\`\``;
     reply += prettyPrintArrayAsString(attracts, columnFormatting, headers, '=');
-    reply += '```\n' + `HTML version at: ${target_url}`;
+    reply += '```\n';
+    if (minLuckString) {
+        reply += minLuckString + "\n";
+    }
+    reply += `HTML version at: ${target_url}`;
     return reply;
 }
 
@@ -538,6 +546,8 @@ async function getMinLuck() {
  */
 function getMinluckString(mouse, flags) {
     let reply = '';
+    if (!flags || !Array.isArray(flags))
+        flags = powerFlags;
     if (!mouse || !(mouse.toLowerCase() in minlucks)) {
         reply = `Sorry, I don't know ${mouse}'s minluck values`;
     }
