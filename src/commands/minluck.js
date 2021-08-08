@@ -84,7 +84,7 @@ async function doMINLUCK(message, tokens) {
             if (typeof reply === 'string') {
                 await message.channel.send(reply);
             } else {
-                await message.channel.send('', { embed: reply });
+                await message.channel.send('', { embeds: [reply] });
             }
             theResult.replied = true;
             theResult.success = true;

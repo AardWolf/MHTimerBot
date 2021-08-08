@@ -3,7 +3,7 @@ const Logger = require('../modules/logger');
 const { DateTime, Duration } = require('luxon');
 const { calculateRate, prettyPrintArrayAsString, intToHuman, integerComma } = require('../modules/format-utils');
 const { getSearchedEntity } = require('../modules/search-helpers');
-const { MessageEmbed } = require('discord.js');
+const { MessageEmbed, Util } = require('discord.js');
 const { firstBy } = require('thenby');
 const csv_parse = require('csv-parse');
 
@@ -74,7 +74,7 @@ async function sendInteractiveSearchResult(searchResults, channel, dataCallback,
 
     const searchResponse = (isDM && matches.length === 1)
         ? `I found a single result for '${searchInput}':`
-        : embed;
+        : { embeds: [embed] };
     const sent = channel.send(searchResponse);
     // To ensure a sensible order of emojis, we have to await the previous react's resolution.
     if (!isDM || matches.length > 1)
@@ -89,12 +89,13 @@ async function sendInteractiveSearchResult(searchResults, channel, dataCallback,
             const msg = msgRxns[0].message,
                 allowed = msgRxns.map(mr => mr.emoji.name),
                 filter = (reaction, user) => allowed.includes(reaction.emoji.name) && !user.bot,
-                rc = msg.createReactionCollector(filter, { time: 5 * 60 * 1000 });
+                rc = msg.createReactionCollector({ filter, time: 5 * 60 * 1000 });
             rc.on('collect', (mr, user) => {
                 // Fetch the response and send it to the user.
                 const match = matches.filter(m => m.emojiId === mr.emoji.identifier)[0];
                 if (match) dataCallback(true, match.match, urlInfo.qsParams).then(
-                    result => user.send(result || `Not enough quality data for ${searchInput}`, { split: { prepend: '```', append: '```' } }),
+                    result => Util.splitMessage(result || `Not enough quality data for ${searchInput}`, { prepend: '```', append: '```' })
+                        .forEach(part => user.send({ content: part })),
                     result => user.send(result || 'Not enough quality data to display this'),
                 ).catch(err => Logger.error(err));
             }).on('end', () => rc.message.delete().catch(() => Logger.log('Unable to delete reaction message')));
@@ -102,7 +103,7 @@ async function sendInteractiveSearchResult(searchResults, channel, dataCallback,
 
     // Always send one result to the channel.
     sent.then(() => dataCallback(isDM, matches[0].match, urlInfo.qsParams).then(
-        result => channel.send(result || `Not enough quality data for ${searchInput}`, { split: { prepend: '```\n', append: '\n```' } })),
+        result => channel.send({ content: result || `Not enough quality data for ${searchInput}`, split: { prepend: '```\n', append: '\n```' } })),
     ).catch(err => Logger.error(err));
 }
 
@@ -226,7 +227,7 @@ async function formatMice(isDM, mouse, opts) {
     reply += prettyPrintArrayAsString(attracts, columnFormatting, headers, '=');
     reply += '```\n';
     if (minLuckString) {
-        reply += minLuckString + "\n";
+        reply += minLuckString + '\n';
     }
     reply += `HTML version at: ${target_url}`;
     return reply;

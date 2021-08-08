@@ -8,7 +8,7 @@ const fs = require('fs');
 
 // Extract type-hinting definitions for Discord classes.
 // eslint-disable-next-line no-unused-vars
-const { Client, Collection, Guild, GuildMember, Message, MessageReaction, MessageEmbed, TextChannel, User } = Discord;
+const { Client, Collection, Guild, GuildMember, Intents, Message, MessageReaction, MessageEmbed, TextChannel, User } = Discord;
 
 // Import our own local classes and functions.
 const Timer = require('./modules/timers.js');
@@ -33,8 +33,14 @@ const fetch = require('node-fetch');
 const csv_parse = require('csv-parse');
 
 // Globals
-const client = new Client({ disabledEvents: ['TYPING_START'] });
-const textChannelTypes = new Set(['text', 'dm', 'group']);
+const client = new Client({ disabledEvents: ['TYPING_START'], 
+    intents: [Intents.FLAGS.GUILD_MESSAGES,
+        Intents.FLAGS.GUILD_MESSAGE_REACTIONS,
+        Intents.FLAGS.GUILDS,
+        Intents.FLAGS.DIRECT_MESSAGES,
+        Intents.FLAGS.DIRECT_MESSAGE_REACTIONS],
+    partials: ['MESSAGE', 'CHANNEL', 'REACTION'] });
+const textChannelTypes = new Set(['GUILD_TEXT', 'DM', 'GROUP_DM', 'GUILD_NEWS', 'GUILD_NEWS_THREAD', 'GUILD_PUBLIC_THREAD', 'GUILD_PRIVATE_THREAD']);
 const main_settings_filename = 'data/settings.json',
     timer_settings_filename = 'data/timer_settings.json',
     reminder_filename = 'data/reminders.json',
@@ -212,20 +218,20 @@ function Main() {
                 if (client.settings.guilds[guild].botPrefix)
                     re[guild] = new RegExp('^' + client.settings.guilds[guild].botPrefix.trim() + '\\s');
             }
-            client.on('message', message => {
+            client.on('messageCreate', message => {
                 if (message.author.id === client.user.id)
                     return;
 
-                if (message.webhookID === settings.relic_hunter_webhook)
+                if (message.webhookId === settings.relic_hunter_webhook)
                     handleRHWebhook(message);
-
+                
                 switch (message.channel.name) {
                     case settings.linkConversionChannel:
                         if (/(http[s]?:\/\/htgb\.co\/)/g.test(message.content.toLowerCase()))
                             convertRewardLink(message);
                         break;
                     default:
-                        if (message.channel.type === 'dm')
+                        if (message.channel.type === 'DM' || message.channel.type === 'GROUP_DM')
                             parseUserMessage(message);
                         else if (re[message.guild.id].test(message.content))
                             parseUserMessage(message);
@@ -525,11 +531,11 @@ function parseUserMessage(message) {
             const reply = 'You didn\'t provide arguments.\n' +
                 `\`\`\`\n${botPrefix} ${dynCommand.name}:\n` +
                 `\t${dynCommand.usage.replace('\n', '\t\n')}\n\`\`\``;
-            message.reply(reply);
+            message.reply({ content: reply });
         }
-        else if (!dynCommand.canDM && message.channel.type === 'dm') {
+        else if (!dynCommand.canDM && message.channel.type === 'DM') {
             const reply = `\`${command.toLowerCase()}\` is not allowed in DMs`;
-            message.reply(reply);
+            message.reply({ content: reply });
         }
         else {
             let canRun = true;
@@ -549,7 +555,7 @@ function parseUserMessage(message) {
                     // In case they leak an exception, catch it here.
                     .catch((commandErr) => {
                         Logger.error(`Error executing dynamic command ${command.toLowerCase()}`, commandErr);
-                        return message.reply(`Sorry, I couldn't do ${command.toLowerCase()} for ... reasons.`)
+                        return message.reply({ content: `Sorry, I couldn't do ${command.toLowerCase()} for ... reasons.` })
                             .then(() => new CommandResult({
                                 replied: true,
                                 botError: true,
@@ -568,7 +574,7 @@ function parseUserMessage(message) {
                     .then((cmdResult) => addMessageReaction(cmdResult));
             } else {
                 const reply = `You do not have permission to use \`${command.toLowerCase()}\``;
-                message.reply(reply);
+                message.reply({ content: reply });
             }
         }
     }
@@ -917,7 +923,7 @@ function sendRemind(user, remind, timer) {
     output.setTimestamp(new Date());
     output.setFooter('Sent:');
 
-    user.send({ embed: output }).then(
+    user.send({ embeds: [output] }).then(
         () => remind.fail = 0,
         () => remind.fail = (remind.fail || 0) + 1,
     );
@@ -936,7 +942,7 @@ function sendRemind(user, remind, timer) {
  */
 function getHelpMessage(message, tokens) {
     // TODO: Remove these as external commands are added
-    const keywordArray = [ 'remind', 'schedule' ];
+    const keywordArray = [ ]; // This was used for commands not properly moved out of this file.
     const allowedCommands = client.commands
         .filter(command => {
             let canRun = false;
