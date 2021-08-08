@@ -33,7 +33,7 @@ async function doNOT_IAM(message, tokens) {
             hunter = message.mentions.members.first().id;
         }
         else if (tokens[0]) {
-            hunter = message.guild.member(tokens[0]);
+            hunter = message.guild.members.cache.get(tokens[0]);
             if (hunter && hunter.id) {
                 hunter = hunter.id;
             } else {

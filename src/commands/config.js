@@ -49,7 +49,7 @@ async function doSet(message, tokens) {
             }
         }
         Logger.log(`Guild: ${guild.available}\nRole ${newRole}: ${guild.roles.cache.findKey(r => r.name === newRole)}`);
-        Logger.log(`Roles: ${guild.roles.cache.array()}`);
+        Logger.log(`Roles: ${[...guild.roles.cache.values()]}`);
     }
     else if (action === 'timers') {
         let subAction = '';
@@ -57,7 +57,7 @@ async function doSet(message, tokens) {
             subAction = tokens.shift().toLowerCase();
         if (subAction === 'add') {
             // Next argument should be a channel reference, add it to the array of timer channels.
-            const channels = message.mentions.channels.array();
+            const channels = message.mentions.channels.values();
             if (channels && channels.length > 0) {
                 const channel = channels.shift();
                 if (!channel)

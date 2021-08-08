@@ -281,7 +281,7 @@ function cleanHunters(message) {
     Object.keys(hunters)
         .filter(key => hunters[key].hid)
         .forEach((discordID) => {
-            if(!message.guild.member(discordID)) {
+            if(!message.guild.members.cache.get(discordID)) {
                 Logger.log(`Cleaning up ${discordID} from ${message.guild.id}`);
                 unsetHunterID(discordID);
             }
