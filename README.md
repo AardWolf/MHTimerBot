@@ -1,11 +1,8 @@
 # MHTimerBot
-Discord bot that understands mousehunt timers
+Discord bot that understands mousehunt timers and MouseHunt Community Tools (MHCT) and a few other things about life.
 
 ## Needs
-Store timers in a file, database, or something "static" for when it's offline
-The definition of these timers should help determine that format.
-Timers have a next occurrence. A duration. A repeat frequency. Some timers would change into next if they're fancy - spill timers, season timers. Or do like the currently do and repeat themselves
-Timers need a way to catch back up if offline a while.
+Next big push is make things into slash commands.
 
 ## Commands
 
@@ -16,15 +13,22 @@ Timers need a way to catch back up if offline a while.
   -remind season winter once - Will only remind the next time the timer goes
 * schedule \<area\> [\<number\>] - Shows the timers for the next \<number\> of days for an area
   -schedule spill 2 - The levels will rise to Arch in 2h31m / The levels will fall through Arch in 1d2h31m
-* find \<mouse\> - Finds a mouse using agiletravels' data. You need up to three characters of the start of the mouse's name
+* find \<mouse\> - Finds a mouse using MHCT data. You need up to three characters of the start of the mouse's name
   -find Ful'mina OR -find ful
+* ifind \<loot\> - Finds a loot drop using MHCT data. You need up to three characters of the loot's name
+  -ifind tooth
+* whatsin \<convertible\> - Displays things that MHCT has seen in other things
+  -whatsin arduous
+* iam \<hunter id\> - Enters you into the hunter registry
+* whois [in|a] [\<location|title\>] - Looks for potential new friends in the hunter's registry
+  -whois in lagoon
+* minluck \<mouse\> - Displays a mouse's minluck values
+  -minluck Ful'mina OR -minluck ful
+
 
 ## TO-DO
 
-* Implement setInterval for the timers.
-* Configure which channel is announced on (should be #timers at some point)
-* Read/Save reminder requests.
-* Add commands to listener
+* Slash commands
 
 ## To Use In Your Own Server
 
@@ -35,3 +39,7 @@ Make a bot account. Google that if you don't know how. In the `data/settings.jso
 * linkConversionChannel - (optional) the name of the channel to monitor for links (default: larrys-freebies)
 * timedAnnouncementsChannel - (optional) the name of the channel to announce timers in (default: timers)
 * botPrefix - (optional) the prefix for the bot's commands (default: -mh)
+
+Current requirement is for discord.js v13 and node.js v16.6
+
+Fork this repo to your hosting server, edit the config files to put in your values (including your ID as owner), and run `node src/MHTimer.js`.
