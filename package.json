@@ -1,6 +1,6 @@
 {
   "name": "mhtimerbot",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "A Discord bot that understands Mousehunt timers",
   "author": {
     "name": "AardWolf",
