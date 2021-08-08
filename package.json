@@ -1,6 +1,6 @@
 {
   "name": "mhtimerbot",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "A Discord bot that understands Mousehunt timers",
   "author": {
     "name": "AardWolf",
@@ -22,7 +22,7 @@
   ],
   "dependencies": {
     "csv-parse": "^4.15.4",
-    "discord.js": "^12.5.3",
+    "discord.js": "^13.0.1",
     "jsdom": "^16.5.3",
     "luxon": "^1.26.0",
     "node-fetch": "^2.6.1",
@@ -40,8 +40,8 @@
     "eslint": "^6.8.0"
   },
   "devDependencies": {
-    "sinon": "^10.0.0",
     "mock-fs": "^4.14.0",
+    "sinon": "^10.0.0",
     "tape": "^5.2.2"
   }
 }
