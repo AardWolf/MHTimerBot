@@ -896,7 +896,7 @@ function sendRemind(user, remind, timer) {
     if (remind.fail > 10)
         remind.count = 1;
     // For non-perpetual reminders, decrement the counter.
-    output.addField('Reminders Left', (remind.count < 0) ? 'unlimited' : --remind.count, true);
+    output.addField('Reminders Left', (remind.count < 0) ? 'unlimited' : `${--remind.count}`, true);
 
     const advanceAmount = timer.getAdvanceNotice().as('milliseconds');
     // Should this be next user reminder, or next activation of this timer?
