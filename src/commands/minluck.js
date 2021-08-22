@@ -76,7 +76,11 @@ async function doMINLUCK(message, tokens) {
                 if (f in typeMap)
                     return typeMap[f];
             });
-            reply = getMinluckString(all_mice[0].value, types, false);
+            if ('guild' in message && 'emoji' in message.client.settings.guilds[message.guild.id]) {
+                reply = getMinluckString(all_mice[0].value, types, false, message.client.settings.guilds[message.guild.id].emoji);
+            } else {
+                reply = getMinluckString(all_mice[0].value, types, false);
+            }
         }
     }
     if (reply) {

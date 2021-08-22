@@ -39,20 +39,20 @@ const emojis = [
 const powerFlags = ['Arcane', 'Draconic', 'Forgotten', 'Hydro', 'Parental', 'Physical', 'Shadow',
     'Tactical', 'Law', 'Rift'];
 
-/* Changed to use guild-level config'd emoji
+// Default but overwrite with guild-level config
 const powerEmoji = {
-    'Arcane': 'https://cdn.discordapp.com/emojis/713376355814866964.png',
-    'Draconic': 'https://cdn.discordapp.com/emojis/713376379743240257.png',
-    'Forgotten': 'https://cdn.discordapp.com/emojis/713376400790388767.png',
-    'Hydro': 'https://cdn.discordapp.com/emojis/713376423208812605.png',
-    'Parental': 'https://cdn.discordapp.com/emojis/713376465571282975.png',
-    'Physical': 'https://cdn.discordapp.com/emojis/713376488254210189.png',
-    'Shadow': 'https://cdn.discordapp.com/emojis/713376549453168703.png',
-    'Tactical': 'https://cdn.discordapp.com/emojis/713376574514135150.png',
-    'Law': 'https://cdn.discordapp.com/emojis/713376445535092746.png',
-    'Rift': 'https://cdn.discordapp.com/emojis/713376528393830420.png',
+    'arcane': 'Arcane',
+    'draconic': 'Draconic',
+    'forgotten': 'Forgotten',
+    'hydro': 'Hydro',
+    'parental': 'Parental',
+    'physical': 'Physical',
+    'shadow': 'Shadow',
+    'tactical': 'Tactical',
+    'law': 'Law',
+    'rift': 'Rift',
 };
-*/
+
 
 /**
  * Construct and dispatch a reaction-enabled message for interactive "search result" display.
@@ -522,16 +522,16 @@ async function getMinLuck() {
                     continue;
                 }
                 newMinlucks[record[0]] = {
-                    'Arcane': record[4],
-                    'Draconic': record[5],
-                    'Forgotten': record[6],
-                    'Hydro': record[7],
-                    'Parental': record[8],
-                    'Physical': record[9],
-                    'Shadow': record[10],
-                    'Tactical': record[11],
-                    'Law': record[12],
-                    'Rift': record[13],
+                    'Arcane': record[4] || '∞',
+                    'Draconic': record[5] || '∞',
+                    'Forgotten': record[6] || '∞',
+                    'Hydro': record[7] || '∞',
+                    'Parental': record[8] || '∞',
+                    'Physical': record[9] || '∞',
+                    'Shadow': record[10] || '∞',
+                    'Tactical': record[11] || '∞',
+                    'Law': record[12] || '∞',
+                    'Rift': record[13] || '∞',
                 };
             }
         })
@@ -560,7 +560,7 @@ async function getMinLuck() {
  * @param {Boolean} shorten_flags True if the output should be reduced to one line
  * @returns {String} The string to report to the requester
  */
-function getMinluckString(mouse, flags, shorten_flag = false) {
+function getMinluckString(mouse, flags, shorten_flag = false, emojiMap = powerEmoji) {
     let reply = '';
     if (!flags || !Array.isArray(flags))
         flags = powerFlags;
@@ -575,15 +575,21 @@ function getMinluckString(mouse, flags, shorten_flag = false) {
         flags.forEach(flag => {
             if (minlucks[lmouse] && flag in minlucks[lmouse]) {
                 if (minlucks[lmouse][flag] in lucks) {
-                    lucks[minlucks[lmouse][flag]].push(flag);
+                    lucks[minlucks[lmouse][flag]].push(flag.toLowerCase());
                 } else {
-                    lucks[minlucks[lmouse][flag]] = [flag];
+                    lucks[minlucks[lmouse][flag]] = [flag.toLowerCase()];
                 }
             }
         });
         const powerString = Object.keys(lucks).sort(sortMinluck).map(minluck => {
-            // const pString = lucks[minluck].map(power => powerEmoji[power]).join(' ');
-            const pString = lucks[minluck].join(', ');
+            const pString = lucks[minluck].map(power => {
+                if (power in emojiMap) {
+                    return emojiMap[power];
+                } else {
+                    return powerEmoji[power];
+                }
+            }).join(' ');
+            // const pString = lucks[minluck].join(' ');
             return `**${minluck}**: ${pString}`;
         }).join(`${shorten_flag ? ' / ': '\n'}`);
         if (powerString) {
