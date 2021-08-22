@@ -1,6 +1,6 @@
 
 // eslint-disable-next-line no-unused-vars
-const { Message } = require('discord.js');
+const { Message, Util } = require('discord.js');
 
 const CommandResult = require('../interfaces/command-result');
 const Logger = require('../modules/logger');
@@ -34,6 +34,32 @@ async function doSet(message, tokens) {
         // Show current settings
         reply = `\`adminrole\` - ${guildSettings.adminrole}\n`;
         reply += `\`modrole\` - ${guildSettings.modrole}`;
+    }
+    else if (guild && action === 'emoji') {
+        //Allow setting for any string, really. But we especially want power types
+        reply = 'I don\'t know what to set here...';
+        let guild_emojis = {};
+        if ('emoji' in guildSettings)
+            guild_emojis = guildSettings['emoji'];
+        if (tokens.length === 0) {
+            //Show off what we have right now
+            const howMany = Object.keys(guild_emojis).length;
+            reply = `Currently configured emoji (${howMany}):\n`;
+            reply += Object.keys(guild_emojis).map(e => {
+                return `${e} - ${guild_emojis[e]}`;
+            }).join('\n');
+        }
+        if (tokens.length === 2) {
+            const emoji_name = tokens.shift().toLowerCase();
+            const set_to = tokens.shift();
+            reply = `I set ${emoji_name} to ${set_to}`;
+            guild_emojis[emoji_name] = set_to;
+            guildSettings['emoji'] = guild_emojis;
+        } else if (tokens.length === 1) {
+            const emoji_name = tokens.shift().toLowerCase();
+            const current_value = (emoji_name in guild_emojis ? guild_emojis[emoji_name] : 'nothing yet');
+            reply = `${emoji_name} is set to ${current_value}`;
+        }
     }
     else if (action === 'modrole' || action === 'adminrole') {
         // Set the moderator role on this server
@@ -114,7 +140,7 @@ async function doSet(message, tokens) {
     }
     if (reply) {
         try {
-            await message.channel.send(reply, { split: true });
+            Util.splitMessage(reply).forEach(r => message.channel.send(r));
             theResult.replied = true;
             if (message.channel.type === 'dm') theResult.sentDm = true;
             theResult.success = true;
