@@ -37,6 +37,7 @@ const client = new Client({ disabledEvents: ['TYPING_START'],
     intents: [Intents.FLAGS.GUILD_MESSAGES,
         Intents.FLAGS.GUILD_MESSAGE_REACTIONS,
         Intents.FLAGS.GUILDS,
+        Intents.FLAGS.GUILD_EMOJIS_AND_STICKERS,
         Intents.FLAGS.DIRECT_MESSAGES,
         Intents.FLAGS.DIRECT_MESSAGE_REACTIONS],
     partials: ['MESSAGE', 'CHANNEL', 'REACTION'] });
@@ -409,6 +410,7 @@ function saveSettings(path = main_settings_filename) {
     for (const guild in outobj.guilds) {
         outobj.guilds[guild].timedAnnouncementChannels = Array.from(outobj.guilds[guild].timedAnnouncementChannels);
     }
+    console.log(outobj);
     return saveDataAsJSON(path, outobj);
 }
 
@@ -584,6 +586,20 @@ function parseUserMessage(message) {
 
             case 'findrh': {
                 findRH(message.channel, { split: true });
+                break;
+            }
+            case 'shutdown': {
+                if (message.author.id === settings.owner) {
+                    message.channel.send('Good-bye');
+                    quit().then(didSave => didSave ? process.exit() : message.channel.send('Uhhh, save failed'));
+                }
+                break;
+            }
+            case 'save': {
+                if (message.author.id === settings.owner) {
+                    message.channel.send('Asynchronous save started');
+                    doSaveAll().then(didSaveAll => message.channel.send(`Save complete: ${didSaveAll ? 'success': 'failure'}`));
+                }
                 break;
             }
             case 'reset':
