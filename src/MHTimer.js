@@ -410,7 +410,6 @@ function saveSettings(path = main_settings_filename) {
     for (const guild in outobj.guilds) {
         outobj.guilds[guild].timedAnnouncementChannels = Array.from(outobj.guilds[guild].timedAnnouncementChannels);
     }
-    console.log(outobj);
     return saveDataAsJSON(path, outobj);
 }
 

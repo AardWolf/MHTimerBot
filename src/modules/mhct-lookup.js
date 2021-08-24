@@ -558,6 +558,7 @@ async function getMinLuck() {
  * @param {String} mouse The mouse being looked up
  * @param {Array} flags Full named power types
  * @param {Boolean} shorten_flags True if the output should be reduced to one line
+ * @param {Object} emojiMap Key-value pairs for power type to emoji to use
  * @returns {String} The string to report to the requester
  */
 function getMinluckString(mouse, flags, shorten_flag = false, emojiMap = powerEmoji) {
