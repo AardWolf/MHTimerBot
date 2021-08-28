@@ -76,7 +76,11 @@ async function doMINLUCK(message, tokens) {
                 if (f in typeMap)
                     return typeMap[f];
             });
-            reply = getMinluckString(all_mice[0].value, types);
+            if ('guild' in message && 'emoji' in message.client.settings.guilds[message.guild.id]) {
+                reply = getMinluckString(all_mice[0].value, types, false, message.client.settings.guilds[message.guild.id].emoji);
+            } else {
+                reply = getMinluckString(all_mice[0].value, types, false);
+            }
         }
     }
     if (reply) {
@@ -104,7 +108,7 @@ module.exports = {
     usage: usage,
     description: 'Get the minluck values of mice - this is the lowest luck stat that "guarantees" a catch of that mouse with that power type.',
     canDM: true,
-    aliases: [ 'luck', 'mluck' ],
+    aliases: [ 'luck', 'lucks', 'mluck', 'mlucks', 'minlucks' ],
     execute: doMINLUCK,
     initialize: initialize,
     save: save,
