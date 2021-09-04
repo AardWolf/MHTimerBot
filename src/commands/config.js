@@ -1,6 +1,6 @@
 
 // eslint-disable-next-line no-unused-vars
-const { Message } = require('discord.js');
+const { Message, Util } = require('discord.js');
 
 const CommandResult = require('../interfaces/command-result');
 const Logger = require('../modules/logger');
@@ -11,6 +11,8 @@ const usage = [
     'adminrole - define the role on this server for admin level',
     'prefix - change the prefix on this server',
     'timers [add|remove] [<channel>] - add or remove a channel to announce timers in',
+    'emoji [remove] [<name>] - removes/unsets the emoji for this server or displays what it currently is',
+    'emoji <name> <value> - sets an emoji for this server for that <name> such as power type emoji',
 ].join('\n\t');
 
 /**
@@ -34,6 +36,51 @@ async function doSet(message, tokens) {
         // Show current settings
         reply = `\`adminrole\` - ${guildSettings.adminrole}\n`;
         reply += `\`modrole\` - ${guildSettings.modrole}`;
+        if ('emoji' in guildSettings) {
+            reply += '\nYou can see your emoji settings with `config emoji`';
+        }
+    }
+    else if (guild && action === 'emoji') {
+        //Allow setting for any string, really. But we especially want power types
+        reply = 'I don\'t know what to set here...';
+        let guild_emojis = {};
+        let action = 'add';
+        if (tokens.length > 0) {
+            if (tokens[0].toLowerCase() === 'remove') {
+                action = 'remove';
+                tokens.shift();
+            }
+        }
+        if ('emoji' in guildSettings)
+            guild_emojis = guildSettings['emoji'];
+        if (tokens.length === 0) {
+            //Show off what we have right now
+            const howMany = Object.keys(guild_emojis).length;
+            reply = `Currently configured emoji (${howMany}):\n`;
+            reply += Object.keys(guild_emojis).map(e => {
+                return `${e} - ${guild_emojis[e]}`;
+            }).join('\n');
+        } else if (tokens.length === 1) {
+            const emoji_name = tokens.shift().toLowerCase();
+            const current_value = (emoji_name in guild_emojis ? guild_emojis[emoji_name] : 'nothing yet');
+            if (action === 'remove') {
+                if (current_value === 'nothing yet') {
+                    reply = `${emoji_name} is not set and was not unset`;
+                } else {
+                    delete guild_emojis[emoji_name];
+                    guildSettings['emoji'] = guild_emojis;
+                    reply = `${emoji_name} was ${current_value}`;
+                }
+            } else {
+                reply = `${emoji_name} is set to ${current_value}`;
+            }
+        } else if (tokens.length === 2) {
+            const emoji_name = tokens.shift().toLowerCase();
+            const set_to = tokens.shift();
+            reply = `I set ${emoji_name} to ${set_to}`;
+            guild_emojis[emoji_name] = set_to;
+            guildSettings['emoji'] = guild_emojis;
+        }
     }
     else if (action === 'modrole' || action === 'adminrole') {
         // Set the moderator role on this server
@@ -114,7 +161,7 @@ async function doSet(message, tokens) {
     }
     if (reply) {
         try {
-            await message.channel.send(reply, { split: true });
+            Util.splitMessage(reply).forEach(r => message.channel.send(r));
             theResult.replied = true;
             if (message.channel.type === 'dm') theResult.sentDm = true;
             theResult.success = true;

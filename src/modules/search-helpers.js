@@ -9,8 +9,8 @@ function getSearchedEntity(input, values) {
     if (!input.length || !Array.isArray(values) || !values || !values.length)
         return [];
 
-    const matches = values.filter(v => v.lowerValue.includes(input)).map(v => {
-        return { entity: v, score: v.lowerValue.indexOf(input) };
+    const matches = values.filter(v => v.lowerValue.includes(input.toLowerCase())).map(v => {
+        return { entity: v, score: v.lowerValue.indexOf(input.toLowerCase()) };
     });
     matches.sort((a, b) => {
         const r = a.score - b.score;

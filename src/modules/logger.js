@@ -16,6 +16,14 @@ const addTimestamp = (firstArg, ...rest) => {
 
 module.exports = class TimeStampedLogger {
     /**
+     * @param {...any} args Items to debug in a timestamped console
+     */
+    static debug(...args) {
+        if (!args.length) return;
+        console.debug.apply(console, addTimestamp(...args));
+    }
+
+    /**
      * @param {...any} args Items to log in a timestamped console
      */
     static log(...args) {

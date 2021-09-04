@@ -39,6 +39,20 @@ const emojis = [
 const powerFlags = ['Arcane', 'Draconic', 'Forgotten', 'Hydro', 'Parental', 'Physical', 'Shadow',
     'Tactical', 'Law', 'Rift'];
 
+// Default but overwrite with guild-level config
+const powerEmoji = {
+    'arcane': 'Arcane',
+    'draconic': 'Draconic',
+    'forgotten': 'Forgotten',
+    'hydro': 'Hydro',
+    'parental': 'Parental',
+    'physical': 'Physical',
+    'shadow': 'Shadow',
+    'tactical': 'Tactical',
+    'law': 'Law',
+    'rift': 'Rift',
+};
+
 
 /**
  * Construct and dispatch a reaction-enabled message for interactive "search result" display.
@@ -57,7 +71,7 @@ async function sendInteractiveSearchResult(searchResults, channel, dataCallback,
     // Construct a MessageEmbed with the search result information, unless this is for a PM with a single response.
     const embed = new MessageEmbed({
         title: `Search Results for '${searchInput}'`,
-        thumbnail: { url: 'https://cdn.discordapp.com/emojis/359244526688141312.png' }, // :clue:
+        thumbnail: { url: 'https://cdn.discordapp.com/emojis/867110562617360445.png' }, // :clue:
         footer: { text: `For any reaction you select, I'll ${isDM ? 'send' : 'PM'} you that information.` },
     });
 
@@ -222,7 +236,7 @@ async function formatMice(isDM, mouse, opts) {
         suffix: '%',
         columnWidth: 7,
     };
-    const minLuckString = getMinluckString(mouse.value, powerFlags);
+    const minLuckString = getMinluckString(mouse.value, powerFlags, true);
     let reply = `${mouse.value} (mouse) can be found the following ways:\n\`\`\``;
     reply += prettyPrintArrayAsString(attracts, columnFormatting, headers, '=');
     reply += '```\n';
@@ -374,10 +388,10 @@ function getLoot(tester, nicknames) {
 function getMice(tester, nicknames) {
     if (!tester)
         return;
-    tester = `${tester}`;
-    if (nicknames && (tester in nicknames) && nicknames[tester])
-        tester = nicknames[tester];
-    return getSearchedEntity(tester, mice);
+    let ltester = `${tester}`.toLowerCase();
+    if (nicknames && (ltester in nicknames) && nicknames[ltester])
+        ltester = nicknames[ltester].toLowerCase();
+    return getSearchedEntity(ltester, mice);
 }
 
 /**
@@ -508,16 +522,16 @@ async function getMinLuck() {
                     continue;
                 }
                 newMinlucks[record[0]] = {
-                    'Arcane': record[4],
-                    'Draconic': record[5],
-                    'Forgotten': record[6],
-                    'Hydro': record[7],
-                    'Parental': record[8],
-                    'Physical': record[9],
-                    'Shadow': record[10],
-                    'Tactical': record[11],
-                    'Law': record[12],
-                    'Rift': record[13],
+                    'Arcane': record[4] || '∞',
+                    'Draconic': record[5] || '∞',
+                    'Forgotten': record[6] || '∞',
+                    'Hydro': record[7] || '∞',
+                    'Parental': record[8] || '∞',
+                    'Physical': record[9] || '∞',
+                    'Shadow': record[10] || '∞',
+                    'Tactical': record[11] || '∞',
+                    'Law': record[12] || '∞',
+                    'Rift': record[13] || '∞',
                 };
             }
         })
@@ -541,11 +555,13 @@ async function getMinLuck() {
 
 /**
  * Given a mouse and an array of power types, return the minlucks that match
- * @param {String} mouse 
- * @param {Array} flags 
+ * @param {String} mouse The mouse being looked up
+ * @param {Array} flags Full named power types
+ * @param {Boolean} shorten_flags True if the output should be reduced to one line
+ * @param {Object} emojiMap Key-value pairs for power type to emoji to use
  * @returns {String} The string to report to the requester
  */
-function getMinluckString(mouse, flags) {
+function getMinluckString(mouse, flags, shorten_flag = false, emojiMap = powerEmoji) {
     let reply = '';
     if (!flags || !Array.isArray(flags))
         flags = powerFlags;
@@ -556,18 +572,56 @@ function getMinluckString(mouse, flags) {
         // Minluck for <mouse>: <power> <num>
         const lmouse = mouse.toLowerCase();
         reply = `Minluck for __${mouse}__: `;
-        const powerString = flags.map(flag => {
-            if (flag in minlucks[lmouse] && minlucks[lmouse]) {
-                return `*${flag}*: **${minlucks[lmouse][flag] || '∞'}**`;
+        const lucks = {};
+        flags.forEach(flag => {
+            if (minlucks[lmouse] && flag in minlucks[lmouse]) {
+                if (minlucks[lmouse][flag] in lucks) {
+                    lucks[minlucks[lmouse][flag]].push(flag.toLowerCase());
+                } else {
+                    lucks[minlucks[lmouse][flag]] = [flag.toLowerCase()];
+                }
             }
-        }).join(', ');
+        });
+        const powerString = Object.keys(lucks).sort(sortMinluck).map(minluck => {
+            const pString = lucks[minluck].map(power => {
+                if (power in emojiMap) {
+                    return emojiMap[power];
+                } else {
+                    return powerEmoji[power];
+                }
+            }).join(' ');
+            // const pString = lucks[minluck].join(' ');
+            return `**${minluck}**: ${pString}`;
+        }).join(`${shorten_flag ? ' / ': '\n'}`);
         if (powerString) {
-            reply += powerString;
+            reply += `\n${powerString}`;
         } else {
             reply += 'Not susceptible to those powers or something broke.';
         }
     }
     return reply;
+}
+
+/**
+ * Sort function that will make strings higher than any numbers, for minluck specifically.
+ * @param {*} a First value, if integer will attempt to compare against b but if not returns 1
+ * @param {*} b Second value, if integer will compare against a but if not returns -1
+ * @returns a-b if Integers, 1 if a is not integer, -1 if b is not integer, 0 if neither is integer
+ */
+function sortMinluck(a, b) {
+    if (Number.isInteger(a)) {
+        if (Number.isInteger(b)) {
+            return a - b;
+        } else {
+            return -1;
+        }
+    } else {
+        if (Number.isInteger(b)) {
+            return 1;
+        } else {
+            return 0;
+        }
+    }
 }
 
 /**
