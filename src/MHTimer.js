@@ -33,7 +33,7 @@ const fetch = require('node-fetch');
 const csv_parse = require('csv-parse');
 
 // Globals
-const client = new Client({ disabledEvents: ['TYPING_START'], 
+const client = new Client({ disabledEvents: ['TYPING_START'],
     intents: [Intents.FLAGS.GUILD_MESSAGES,
         Intents.FLAGS.GUILD_MESSAGE_REACTIONS,
         Intents.FLAGS.GUILDS,
@@ -225,7 +225,7 @@ function Main() {
 
                 if (message.webhookId === settings.relic_hunter_webhook)
                     handleRHWebhook(message);
-                
+
                 switch (message.channel.name) {
                     case settings.linkConversionChannel:
                         if (/(http[s]?:\/\/htgb\.co\/)/g.test(message.content.toLowerCase()))
@@ -321,7 +321,7 @@ function doSaveAll() {
 
 /**
  * Takes a settings object and performs whatever migration tasks are needed to get them to current version
- * @param {Object} original_settings The settings read from disk
+ * @param {object} original_settings The settings read from disk
  *
  * Doesn't return anything; throws on errors
  */
@@ -518,7 +518,7 @@ function parseUserMessage(message) {
         return;
     }
     // Today's hack brought to you by laziness - haven't migrated notifications/timers yet
-    if (command.toLowerCase() === 'find' && tokens.length && 
+    if (command.toLowerCase() === 'find' && tokens.length &&
             ((tokens[0].toLowerCase() === 'rh' || tokens[0].toLowerCase() === 'relic_hunter') ||
             (tokens.length >= 2 && tokens[0].toLowerCase() === 'relic' && tokens[1].toLowerCase() == 'hunter')))
         command = 'findrh';
@@ -709,7 +709,7 @@ async function convertRewardLink(message) {
 }
 
 /**
- * @typedef {Object} TimerReminder
+ * @typedef {object} TimerReminder
  * @property {User} user The Discord user who requested the reminder.
  * @property {number} count The number of remaining times this reminder will activate.
  * @property {string} area The area to which this reminder applies, e.g. "fg"
@@ -995,7 +995,7 @@ function getHelpMessage(message, tokens) {
         else
             return `I know how to ${command} but I don't know how to tell you how to ${command}`;
     }
-    else 
+    else
         return `I don't know that one, but I do know ${keywords}.`;
 }
 
