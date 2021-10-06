@@ -15,7 +15,7 @@ async function doFIND(message, tokens) {
     const opts = {};
     const urlInfo = {
         qsParams: {},
-        uri: 'https://www.agiletravels.com/attractions.php',
+        uri: 'https://www.mhct.win/attractions.php',
         type: 'mouse',
     };
     if (!tokens)
@@ -49,7 +49,7 @@ async function doFIND(message, tokens) {
                 // We have multiple options, show the interactive menu
                 urlInfo.qsParams = opts;
                 urlInfo.type = 'item';
-                urlInfo.uri = 'https://www.agiletravels.com/loot.php';
+                urlInfo.uri = 'https://www.mhct.win/loot.php';
                 sendInteractiveSearchResult(all_loot, message.channel, formatLoot,
                     ['dm', 'group'].includes(message.channel.type), urlInfo, searchString);
                 theResult.replied = true;
