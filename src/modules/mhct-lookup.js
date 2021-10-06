@@ -632,7 +632,7 @@ function sortMinluck(a, b) {
  */
 function code_name_reduce (accumulator, current) {
     // Empty entry? Skip it.
-    if (!current?.code_name)
+    if (!current || !current.code_name)
         return accumulator;
     // Existing items? Join with comma.
     if (accumulator) {
