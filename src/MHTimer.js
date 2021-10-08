@@ -269,8 +269,9 @@ function Main() {
         .then(() => client.login(settings.token))
         .catch(err => {
             Logger.error('Unhandled startup error, shutting down:', err);
-            client.destroy()
-                .then(() => process.exitCode = 1);
+            client.destroy();
+            process.exitCode = 1;
+            return quit();
         });
 }
 try {
@@ -284,7 +285,10 @@ function quit() {
     return doSaveAll()
         .then(
             () => Logger.log('Shutdown: data saves completed'),
-            (err) => Logger.error('Shutdown: error while saving:\n', err),
+            (err) => {
+                Logger.error('Shutdown: error while saving:\n', err);
+                process.exitCode = 1;
+            },
         )
         .then(() => { Logger.log('Shutdown: destroying client'); return client.destroy(); })
         .then(() => {
@@ -300,10 +304,10 @@ function quit() {
                 clearTimeout(relic_hunter.timeout);
             }
         })
-        .then(() => process.exitCode = 1)
+        .then(() => process.exit())
         .catch(err => {
             Logger.error('Shutdown: unhandled error:\n', err, '\nImmediately exiting.');
-            process.exit();
+            process.exit(1);
         });
 }
 
