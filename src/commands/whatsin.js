@@ -21,7 +21,7 @@ async function doWHATSIN(message, tokens) {
     const opts = {};
     const urlInfo = {
         qsParams: {},
-        uri: 'https://agiletravels.com/converter.php',
+        uri: 'https://www.mhct.win/converter.php',
         type: 'item',
     };
     if (!tokens)

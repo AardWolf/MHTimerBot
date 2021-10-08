@@ -5,7 +5,7 @@ const { timeLeft } = require('../modules/format-utils');
 /**
  * Inspects the current timers list to dynamically determine the text to print when informing users
  * of what timers are available.
- * @param {Array} timers_list Object with timer list and information
+ * @param {Timer[]} timers_list Object with timer list and information
  * @returns {string} a ready-to-print string of timer details, with each timer on a new line.
  */
 function getKnownTimersDetails(timers_list) {
@@ -33,7 +33,7 @@ function getKnownTimersDetails(timers_list) {
 /**
  * Attempt to find a Timer that satisfies the input tokens.
  * Returns a ReminderRequest of unknown state (may have some or all properties set).
- * @param {Array[<Timer>]} timers_list List of known timers
+ * @param {Timer[]} timers_list List of known timers
  * @param {string[]} tokens a set of tokens which may match known Timer areas or sub-areas.
  * @returns {ReminderRequest} an object that may have some or all of the needed properties to create a Reminder
  */
@@ -325,9 +325,9 @@ function parseTokenForArea(token, newReminder) {
 
 /**
  * Returns the next occurrence of the desired class of timers as a MessageEmbed.
- * @param {Array} timers_list List of known timers
+ * @param {any[]} timers_list List of known timers
  * @param {ReminderRequest} validTimerData Validated input that is known to match an area and subarea
- * @param {String} botPrefix The prefix for the bot on this guild
+ * @param {string} botPrefix The prefix for the bot on this guild
  * @returns {MessageEmbed} A rich snippet summary of the next occurrence of the matching timer.
  */
 function nextTimer(timers_list, validTimerData, botPrefix) {
@@ -357,9 +357,9 @@ function nextTimer(timers_list, validTimerData, botPrefix) {
 /**
  * List the reminders for the user, and PM them the result.
  *
- * @param {String} user A Discord Snowflake user id
- * @param {Array} reminders Array of reminders the bot is managing
- * @param {String} botPrefix The bot prefix for the channel in use
+ * @param {string} user A Discord Snowflake user id
+ * @param {any[]} reminders Array of reminders the bot is managing
+ * @param {string} botPrefix The bot prefix for the channel in use
  */
 function listRemind(user, reminders, botPrefix) {
     let timer_str = 'Your reminders:';

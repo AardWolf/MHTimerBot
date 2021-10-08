@@ -124,14 +124,14 @@ async function sendInteractiveSearchResult(searchResults, channel, dataCallback,
 /**
  * Formats loot into a nice table
  * @param {boolean} isDM Whether the command came as a DM
- * @param {Object} loot A loot object - it has an id and a value
- * @param {Object} opts Options property. It has filter and DM information
+ * @param {object} loot A loot object - it has an id and a value
+ * @param {object} opts Options property. It has filter and DM information
  * @returns {Promise<string>} Formatted loot table
  */
 async function formatLoot(isDM, loot, opts) {
     const results = await findThing('loot', loot.id, opts);
     const no_stage = ' N/A ';
-    const target_url = `<https://www.agiletravels.com/loot.php?item=${loot.id}&timefilter=${opts.timefilter ? opts.timefilter : 'all_time'}>`;
+    const target_url = `<https://www.mhct.win/loot.php?item=${loot.id}&timefilter=${opts.timefilter ? opts.timefilter : 'all_time'}>`;
     const drops = results.filter(loot => loot.total_catches > 99)
         .map(loot => {
             return {
@@ -186,8 +186,8 @@ async function formatLoot(isDM, loot, opts) {
 /**
  * Formats mice into a nice table
  * @param {boolean} isDM Whether the command came as a DM
- * @param {Object} loot A mouse object - it has an id and a value
- * @param {Object} opts Options property. It has filter and DM information
+ * @param {object} loot A mouse object - it has an id and a value
+ * @param {object} opts Options property. It has filter and DM information
  * @returns {Promise<string>} Formatted mouse AR table
  */
 async function formatMice(isDM, mouse, opts) {
@@ -197,7 +197,7 @@ async function formatMice(isDM, mouse, opts) {
         return reply;
     }
     const no_stage = ' N/A ';
-    const target_url = `<https://www.agiletravels.com/attractions.php?mouse=${mouse.id}&timefilter=${opts.timefilter ? opts.timefilter : 'all_time'}>`;
+    const target_url = `<https://www.mhct.win/attractions.php?mouse=${mouse.id}&timefilter=${opts.timefilter ? opts.timefilter : 'all_time'}>`;
     const attracts = results.filter(mouse => mouse.total_hunts > 99)
         .map(mice => {
             return {
@@ -250,13 +250,13 @@ async function formatMice(isDM, mouse, opts) {
 /**
  * Formats convertibles into a nice table
  * @param {boolean} isDM Whether the command came as a DM
- * @param {Object} convertible A convertible object - it has an id and a value
- * @param {Object} opts Options property. It has filter and DM information
+ * @param {object} convertible A convertible object - it has an id and a value
+ * @param {object} opts Options property. It has filter and DM information
  * @returns {Promise<string>} Formatted mouse AR table
  */
 async function formatConvertibles(isDM, convertible, opts) {
     const results = await findThing('convertible', convertible.id, opts);
-    const target_url = `<https://www.agiletravels.com/converter.php?item=${convertible.id}>`;
+    const target_url = `<https://www.mhct.win/converter.php?item=${convertible.id}>`;
     const minMax = (a, b) => {
         if (a && b && !isNaN(a) && !isNaN(b) && a === b)
             return integerComma(a);
@@ -336,8 +336,8 @@ async function formatConvertibles(isDM, convertible, opts) {
 
 /**
  * Determines if a string is a filter
- * @param {String} tester String to check if it's a filter
- * @returns {String} the filter as an object with code_name being the important attribute
+ * @param {string} tester String to check if it's a filter
+ * @returns {string} the filter as an object with code_name being the important attribute
  */
 function getFilter(tester) {
     // Process filter-y nicknames
@@ -366,8 +366,8 @@ function getFilter(tester) {
  * Checks if the loot listed is one we know about. Returns the highest scoring match
  *
  * @param {string} tester The loot we're looking for
- * @param {Array} nicknames The nicknames for loot
- * @returns {Array<number>} The first loot that matched
+ * @param {{ [x: string]: string }} nicknames The nicknames for loot
+ * @returns the first loot that matched
  */
 function getLoot(tester, nicknames) {
     if (!tester)
@@ -382,8 +382,8 @@ function getLoot(tester, nicknames) {
  * Checks if the mouse requested is one we know about. Returns the highest scoring match
  *
  * @param {string} tester The mouse we're looking for
- * @param {Array} nicknames The nicknames for mice
- * @returns {Array<number>} The first mice that matched
+ * @param {{ [x: string]: string }} nicknames The nicknames for mice
+ * @returns The first mice that matched
  */
 function getMice(tester, nicknames) {
     if (!tester)
@@ -398,7 +398,7 @@ function getMice(tester, nicknames) {
  * Checks if the convertible requested is one we know about. Returns the highest scoring match
  *
  * @param {string} tester The convertible we're looking for
- * @returns {Array<number>} The first convertible that matched
+ * @returns The first convertible that matched
  */
 function getConvertibles(tester) {
     if (!tester)
@@ -410,7 +410,7 @@ function getConvertibles(tester) {
 
 /**
  * Finds a thing - uses MHCT searchByItem.php
- * @param {String} type Type of thing to find, supported by searchByItem.php
+ * @param {string} type Type of thing to find, supported by searchByItem.php
  * @param {int} id The MHCT numeric id of the thing to find
  * @param {object} options Search options such as filter
  * @returns {Promise<any[]|null>} An array of things it found
@@ -423,7 +423,7 @@ async function findThing(type, id, options) {
     const qsOptions = new URLSearchParams(options);
     qsOptions.append('item_type', type);
     qsOptions.append('item_id', id);
-    const url = 'https://www.agiletravels.com/searchByItem.php?' + qsOptions.toString();
+    const url = 'https://www.mhct.win/searchByItem.php?' + qsOptions.toString();
     return await fetch(url)
         .then((response) => {
             if(response.ok){
@@ -441,7 +441,7 @@ async function findThing(type, id, options) {
 /**
  * Initialize (or refresh) a list of items from MHCT
  * @param {'mouse'|'loot' | 'convertible'} type The type of thing to get a list of
- * @param {Array} list The list to populate / re-populate
+ * @param {any[]} list The list to populate / re-populate
  */
 async function getMHCTList(type, list) {
     const now = DateTime.utc();
@@ -454,7 +454,7 @@ async function getMHCTList(type, list) {
         Logger.log(`getMHCTList: Received a request for ${type} but I don't do that yet`);
     }
     Logger.log(`MHCT list: Getting a new ${type} list`);
-    const url = `https://www.agiletravels.com/searchByItem.php?item_type=${type}&item_id=all`;
+    const url = `https://www.mhct.win/searchByItem.php?item_type=${type}&item_id=all`;
     await fetch(url)
         .then(response => (response.status === 200) ? response.json() : '')
         .then((body) => {
@@ -482,7 +482,7 @@ async function getFilterList() {
     refresh_list.filter = now;
 
     Logger.log('Filters: Requesting a new filter list.');
-    const url = 'https://www.agiletravels.com/filters.php';
+    const url = 'https://www.mhct.win/filters.php';
     return fetch(url).then(response => (response.status === 200) ? response.json() : '').then((body) => {
         if (body) {
             Logger.log('Filters: Got a new filter list');
@@ -552,11 +552,11 @@ async function getMinLuck() {
 
 /**
  * Given a mouse and an array of power types, return the minlucks that match
- * @param {String} mouse The mouse being looked up
- * @param {Array} flags Full named power types
- * @param {Boolean} shorten_flags True if the output should be reduced to one line
- * @param {Object} emojiMap Key-value pairs for power type to emoji to use
- * @returns {String} The string to report to the requester
+ * @param {string} mouse The mouse being looked up
+ * @param {string[]} flags Full named power types
+ * @param {boolean} shorten_flags True if the output should be reduced to one line
+ * @param {object} emojiMap Key-value pairs for power type to emoji to use
+ * @returns {string} The string to report to the requester
  */
 function getMinluckString(mouse, flags, shorten_flag = false, emojiMap = powerEmoji) {
     let reply = '';
@@ -638,15 +638,20 @@ function code_name_reduce (accumulator, current) {
             return `\`${current.code_name}\``;
     } else {
         return accumulator;
+    // Existing items? Join with comma.
+    if (accumulator) {
+        return `${accumulator}, \`${current.code_name}\``;
     }
+    // This is the first item in the list.
+    return `\`${current.code_name}\``;
 }
 
 /**
  * Returns all known filters as a comma-separated list with back-ticks for "code" designation
- * @returns {String} Known filters, formatted for discord
+ * @returns {string} Known filters, formatted for discord
  */
 function listFilters() {
-    return filters.reduce(code_name_reduce);
+    return filters.reduce(code_name_reduce, '');
 }
 
 async function initialize() {

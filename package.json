@@ -21,13 +21,11 @@
     "@devjacksmith"
   ],
   "dependencies": {
-    "@discordjs/rest": "^0.1.0-canary.0",
-    "csv-parse": "^4.15.4",
-    "discord-api-types": "^0.22.0",
-    "discord.js": "^13.0.1",
-    "jsdom": "^16.5.3",
-    "luxon": "^1.26.0",
-    "node-fetch": "^2.6.1",
+    "csv-parse": "^4.16.3",
+    "discord.js": "^13.2.0",
+    "jsdom": "^17.0.0",
+    "luxon": "^2.0.2",
+    "node-fetch": "^2.6.5",
     "thenby": "^1.3.4"
   },
   "scripts": {
@@ -39,11 +37,11 @@
     "test": "tape ./tests/**/*.js"
   },
   "peerDependencies": {
-    "eslint": "^6.8.0"
+    "eslint": "^7.0.0"
   },
   "devDependencies": {
-    "mock-fs": "^4.14.0",
-    "sinon": "^10.0.0",
-    "tape": "^5.2.2"
+    "mock-fs": "^5.1.1",
+    "sinon": "^11.1.2",
+    "tape": "^5.3.1"
   }
 }

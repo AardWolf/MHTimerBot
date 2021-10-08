@@ -329,7 +329,7 @@ async function doSaveAll() {
 
 /**
  * Takes a settings object and performs whatever migration tasks are needed to get them to current version
- * @param {Object} original_settings The settings read from disk
+ * @param {object} original_settings The settings read from disk
  *
  * Doesn't return anything; throws on errors
  */
@@ -730,7 +730,7 @@ async function convertRewardLink(message) {
 }
 
 /**
- * @typedef {Object} TimerReminder
+ * @typedef {object} TimerReminder
  * @property {User} user The Discord user who requested the reminder.
  * @property {number} count The number of remaining times this reminder will activate.
  * @property {string} area The area to which this reminder applies, e.g. "fg"
@@ -1196,7 +1196,7 @@ function DBGamesRHLookup() {
  * @returns {Promise<{ location: string, source: 'MHCT' }>}
  */
 function MHCTRHLookup() {
-    return fetch('https://www.agiletravels.com/tracker.json')
+    return fetch('https://www.mhct.win/tracker.json')
         .then(async (response) => {
             if (!response.ok) throw `HTTP ${response.status}`;
             const { rh } = await response.json();
