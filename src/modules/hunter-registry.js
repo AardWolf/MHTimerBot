@@ -53,17 +53,15 @@ async function initialize() {
 /**
  * Function that is called when the bot is shutting down or unloading a command
   */
-function save() {
+async function save() {
+    let saved = false;
     if (someone_initialized) {
-        Logger.log('hunter save called');
         someone_initialized = 0;
-        return saveHunters()
-            .then(clearInterval(hunterSaveInterval))
-            .then(clearInterval(hunterRefreshInterval))
-            .catch((err) => {
-                Logger.error(`Error saving hunters on save call: ${err}`);
-            });
+        saved = await saveHunters();
+        clearInterval(hunterSaveInterval);
+        clearInterval(hunterRefreshInterval);
     }
+    return saved;
 }
 
 /**
@@ -98,10 +96,12 @@ function migrateData() {
  * @returns {Promise <{}>} Data from the given file, as an object to be consumed by the caller.
  */
 async function loadHunterData(path = hunter_ids_filename) {
-    return loadDataFromJSON(path).catch(err => {
+    try {
+        return await loadDataFromJSON(path);
+    } catch (err) {
         Logger.error(`Hunters: Error loading data from '${path}':\n`, err);
         return {};
-    });
+    }
 }
 
 /**
@@ -111,11 +111,10 @@ async function loadHunterData(path = hunter_ids_filename) {
  * @returns {Promise <boolean>} Whether the save operation completed without error.
  */
 async function saveHunters(path = hunter_ids_filename) {
-    Logger.log('Attempting to save hunter data');
-    return saveDataAsJSON(path, hunters).then(didSave => {
-        Logger.log(`Hunters: ${didSave ? 'Saved' : 'Failed to save'} ${Object.keys(hunters).length} to '${path}'.`);
-        return didSave;
-    });
+    Logger.log('Hunters: Attempting to save data');
+    const didSave = await saveDataAsJSON(path, hunters);
+    Logger.log(`Hunters: ${didSave ? 'Saved' : 'Failed to save'} ${Object.keys(hunters).length} to '${path}'.`);
+    return didSave;
 }
 
 
