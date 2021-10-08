@@ -638,12 +638,7 @@ function code_name_reduce (accumulator, current) {
             return `\`${current.code_name}\``;
     } else {
         return accumulator;
-    // Existing items? Join with comma.
-    if (accumulator) {
-        return `${accumulator}, \`${current.code_name}\``;
     }
-    // This is the first item in the list.
-    return `\`${current.code_name}\``;
 }
 
 /**
