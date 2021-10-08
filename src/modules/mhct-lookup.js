@@ -671,6 +671,7 @@ async function initialize() {
 
 async function save() {
     intervals.forEach(i => clearInterval(i));
+    return true;
 }
 
 module.exports.getMHCTList = getMHCTList;

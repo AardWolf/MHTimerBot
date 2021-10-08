@@ -316,12 +316,15 @@ function quit() {
  * the bot shuts down, to minimize data loss.
  * @returns {Promise<boolean>} Whether volatile data was serialized, or perhaps not serialized.
  */
-function doSaveAll() {
-    client.commands.filter(command => command.save).every((command => {
-        Logger.log(`Saving ${command.name}`);
-        Promise.resolve(command.save());
+async function doSaveAll() {
+    const saveableCommands = client.commands.filter(command => typeof command.save === 'function');
+    const settingsSaved = await saveSettings();
+    const remindersSaved = await saveReminders();
+    const commandsSaved = await Promise.all(saveableCommands.map(c => {
+        Logger.log(`Saving data for command "${c.name}"`);
+        return c.save();
     }));
-    return (saveSettings().then(saveReminders()));
+    return settingsSaved && remindersSaved && commandsSaved.every(saved => saved);
 }
 
 /**
@@ -418,10 +421,13 @@ function loadSettings(path = main_settings_filename) {
  * @returns {Promise<boolean>}
  */
 function saveSettings(path = main_settings_filename) {
-    const outobj = {};
-    Object.assign(outobj, client.settings);
-    for (const guild in outobj.guilds) {
-        outobj.guilds[guild].timedAnnouncementChannels = Array.from(outobj.guilds[guild].timedAnnouncementChannels);
+    // If we couldn't read settings in, don't overwrite the existing settings.
+    if (!client.settings || !Object.keys(client.settings).length) {
+        return Promise.resolve(false);
+    }
+    const outobj = Object.assign({}, client.settings);
+    for (const guild of Object.values(outobj.guilds)) {
+        guild.timedAnnouncementChannels = Array.from(guild.timedAnnouncementChannels);
     }
     return saveDataAsJSON(path, outobj);
 }
