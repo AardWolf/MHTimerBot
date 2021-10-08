@@ -33,7 +33,7 @@ const fetch = require('node-fetch');
 const csv_parse = require('csv-parse');
 
 // Globals
-const client = new Client({ disabledEvents: ['TYPING_START'], 
+const client = new Client({ disabledEvents: ['TYPING_START'],
     intents: [Intents.FLAGS.GUILD_MESSAGES,
         Intents.FLAGS.GUILD_MESSAGE_REACTIONS,
         Intents.FLAGS.GUILDS,
@@ -190,7 +190,7 @@ function Main() {
             // Configure the bot behavior.
             client.once('ready', () => {
                 Logger.log('I am alive!');
-                //Migrate settings at this point since connection required for some pieces
+                // Migrate settings at this point since connection required for some pieces
                 migrateSettings(client.settings);
 
                 // Find all text channels on which to send announcements.
@@ -226,7 +226,7 @@ function Main() {
 
                 if (message.webhookId === settings.relic_hunter_webhook)
                     handleRHWebhook(message);
-                
+
                 switch (message.channel.name) {
                     case settings.linkConversionChannel:
                         if (/(http[s]?:\/\/htgb\.co\/)/g.test(message.content.toLowerCase()))
@@ -314,7 +314,7 @@ function quit() {
 /**
  * Any object which stores user-entered data should be periodically saved, or at minimum saved before
  * the bot shuts down, to minimize data loss.
- * @returns {boolean} Whether volatile data was serialized, or perhaps not serialized.
+ * @returns {Promise<boolean>} Whether volatile data was serialized, or perhaps not serialized.
  */
 function doSaveAll() {
     client.commands.filter(command => command.save).every((command => {
@@ -533,7 +533,7 @@ function parseUserMessage(message) {
         return;
     }
     // Today's hack brought to you by laziness - haven't migrated notifications/timers yet
-    if (command.toLowerCase() === 'find' && tokens.length && 
+    if (command.toLowerCase() === 'find' && tokens.length &&
             ((tokens[0].toLowerCase() === 'rh' || tokens[0].toLowerCase() === 'relic_hunter') ||
             (tokens.length >= 2 && tokens[0].toLowerCase() === 'relic' && tokens[1].toLowerCase() == 'hunter')))
         command = 'findrh';
@@ -1010,7 +1010,7 @@ function getHelpMessage(message, tokens) {
         else
             return `I know how to ${command} but I don't know how to tell you how to ${command}`;
     }
-    else 
+    else
         return `I don't know that one, but I do know ${keywords}.`;
 }
 
