@@ -1,8 +1,6 @@
-const Discord = require('discord.js');
-
 // Extract type-hinting definitions for Discord classes.
 // eslint-disable-next-line no-unused-vars
-const { Client, Collection, Guild, GuildMember, User } = Discord;
+const { Client, Collection, Guild, GuildMember, Permissions, User } = require('discord.js');
 
 /**
  * Checks the permissions of the member to see if they're at the minimum level
@@ -20,14 +18,14 @@ function checkPerms(member, level) {
         if ('adminrole' in member.client.settings.guilds[guild.id]) {
             authCheck = member.roles.cache.some(role => role.name === member.client.settings.guilds[guild.id].adminrole);
         } else {
-            authCheck = member.hasPermission('ADMINISTRATOR');
+            authCheck = member.permissions.has(Permissions.FLAGS.ADMINISTRATOR);
         }
     }
     if (!authCheck && (level === 'mod')) {
         if ('modrole' in member.client.settings.guilds[guild.id]) {
             authCheck = member.roles.cache.some(role => role.name === member.client.settings.guilds[guild.id].modrole);
         } else {
-            authCheck = member.hasPermission('MANAGE_MESSAGES');
+            authCheck = member.permissions.has(Permissions.FLAGS.MANAGE_MESSAGES);
         }
     }
     return authCheck;

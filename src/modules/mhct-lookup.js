@@ -413,7 +413,7 @@ function getConvertibles(tester) {
  * @param {string} type Type of thing to find, supported by searchByItem.php
  * @param {int} id The MHCT numeric id of the thing to find
  * @param {object} options Search options such as filter
- * @returns {any[]} An array of things it found
+ * @returns {Promise<any[]|null>} An array of things it found
  */
 async function findThing(type, id, options) {
     if (!type || !id)
@@ -448,7 +448,7 @@ async function getMHCTList(type, list) {
     if (type && refresh_list[type]) {
         const next_refresh = refresh_list[type].plus(refresh_rate);
         if (now < next_refresh)
-            return [];
+            return;
         refresh_list[type] = now;
     } else {
         Logger.log(`getMHCTList: Received a request for ${type} but I don't do that yet`);
@@ -477,7 +477,7 @@ async function getFilterList() {
     if (refresh_list.filter) {
         const next_refresh = refresh_list.filter.plus(refresh_rate);
         if (now < next_refresh)
-            return Promise.resolve();
+            return;
     }
     refresh_list.filter = now;
 
@@ -504,7 +504,7 @@ async function getMinLuck() {
     if (refresh_list.minluck) {
         const next_refresh = refresh_list.minluck.plus(refresh_rate);
         if (now < next_refresh)
-            return Promise.resolve();
+            return;
     }
     refresh_list.minluck = now;
 
@@ -515,8 +515,7 @@ async function getMinLuck() {
     const parser = csv_parse({ delimiter: ',' })
         .on('readable', () => {
             let record;
-            // eslint-disable-next-line no-cond-assign
-            while (record = parser.read()) {
+            while ((record = parser.read())) {
                 if (record.length < 14) {
                     Logger.log(`Minluck: Short entry found: ${record}`);
                     continue;
@@ -549,8 +548,6 @@ async function getMinLuck() {
             Logger.log(`Minlucks: ${Object.keys(minlucks).length} minlucks loaded.`);
         });
     }).catch(err => Logger.error('Minlucks: request for minlucks failed with error:', err));
-
-    // Logger.log(`Minluck: New minlucks downloaded - ${Object.keys(minlucks).length} mice`);
 }
 
 /**
@@ -626,20 +623,22 @@ function sortMinluck(a, b) {
 
 /**
  *
- * @param {string} accumulator -- the string to grow
- * @param {{ code_name: string}} current -- something with code_name as a property
- * @returns {string} the fully grown string.
+ * @param {Object} accumulator -- string or something with code_name as a property
+ * @param {Object} current -- something with code_name as a property
+ * @returns {String} Grows a string, meant to be with Array.reduce
  */
 function code_name_reduce (accumulator, current) {
-    // Empty entry? Skip it.
-    if (!current || !current.code_name)
-        return accumulator;
-    // Existing items? Join with comma.
-    if (accumulator) {
-        return `${accumulator}, \`${current.code_name}\``;
+    if (accumulator.code_name) {
+        accumulator = `\`${accumulator.code_name}\``;
     }
-    // This is the first item in the list.
-    return `\`${current.code_name}\``;
+    if (current.code_name) {
+        if (accumulator)
+            return accumulator + `, \`${current.code_name}\``;
+        else
+            return `\`${current.code_name}\``;
+    } else {
+        return accumulator;
+    }
 }
 
 /**
@@ -672,6 +671,7 @@ async function initialize() {
 
 async function save() {
     intervals.forEach(i => clearInterval(i));
+    return true;
 }
 
 module.exports.getMHCTList = getMHCTList;

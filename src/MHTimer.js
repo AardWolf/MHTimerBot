@@ -190,24 +190,25 @@ function Main() {
             // Configure the bot behavior.
             client.once('ready', () => {
                 Logger.log('I am alive!');
-                //Migrate settings at this point since connection required for some pieces
+                // Migrate settings at this point since connection required for some pieces
                 migrateSettings(client.settings);
 
                 // Find all text channels on which to send announcements.
                 const announcables = client.guilds.cache.reduce((channels, guild) => {
+                    const requested = client.settings.guilds[guild.id].timedAnnouncementChannels;
                     const candidates = guild.channels.cache
-                        .filter(c => client.settings.guilds[guild.id].timedAnnouncementChannels.has(c.name) && textChannelTypes.has(c.type))
-                        .map(tc => tc);
-                    if (candidates.length)
-                        Array.prototype.push.apply(channels, candidates);
-                    else
+                        .filter(c => requested.has(c.name) && textChannelTypes.has(c.type));
+                    if (candidates.size)
+                        Array.prototype.push.apply(channels, Array.from(candidates.values()));
+                    else if (requested.size) {
                         Logger.warn(`Timers: No valid channels in ${guild.name} for announcements.`);
+                    }
                     return channels;
                 }, []);
 
                 // Use one timeout per timer to manage default reminders and announcements.
                 client.timers_list.forEach(timer => scheduleTimer(timer, announcables));
-                Logger.log(`Timers: Initialized ${timer_config.size} timers on channels ${announcables}.`);
+                Logger.log(`Timers: Initialized ${timer_config.size} timers on channels ${oxfordStringifyValues(announcables.map(c => `${c.guild.name}#${c.name}`))}.`);
 
                 // If we disconnect and then reconnect, do not bother rescheduling the already-scheduled timers.
                 client.on('ready', () => Logger.log('I am inVINCEeble!'));
@@ -268,8 +269,9 @@ function Main() {
         .then(() => client.login(settings.token))
         .catch(err => {
             Logger.error('Unhandled startup error, shutting down:', err);
-            client.destroy()
-                .then(() => process.exitCode = 1);
+            client.destroy();
+            process.exitCode = 1;
+            return quit();
         });
 }
 try {
@@ -283,7 +285,10 @@ function quit() {
     return doSaveAll()
         .then(
             () => Logger.log('Shutdown: data saves completed'),
-            (err) => Logger.error('Shutdown: error while saving:\n', err),
+            (err) => {
+                Logger.error('Shutdown: error while saving:\n', err);
+                process.exitCode = 1;
+            },
         )
         .then(() => { Logger.log('Shutdown: destroying client'); return client.destroy(); })
         .then(() => {
@@ -299,24 +304,27 @@ function quit() {
                 clearTimeout(relic_hunter.timeout);
             }
         })
-        .then(() => process.exitCode = 1)
+        .then(() => process.exit())
         .catch(err => {
             Logger.error('Shutdown: unhandled error:\n', err, '\nImmediately exiting.');
-            process.exit();
+            process.exit(1);
         });
 }
 
 /**
  * Any object which stores user-entered data should be periodically saved, or at minimum saved before
  * the bot shuts down, to minimize data loss.
- * @returns {boolean} Whether volatile data was serialized, or perhaps not serialized.
+ * @returns {Promise<boolean>} Whether volatile data was serialized, or perhaps not serialized.
  */
-function doSaveAll() {
-    client.commands.filter(command => command.save).every((command => {
-        Logger.log(`Saving ${command.name}`);
-        Promise.resolve(command.save());
+async function doSaveAll() {
+    const saveableCommands = client.commands.filter(command => typeof command.save === 'function');
+    const settingsSaved = await saveSettings();
+    const remindersSaved = await saveReminders();
+    const commandsSaved = await Promise.all(saveableCommands.map(c => {
+        Logger.log(`Saving data for command "${c.name}"`);
+        return c.save();
     }));
-    return (saveSettings().then(saveReminders()));
+    return settingsSaved && remindersSaved && commandsSaved.every(saved => saved);
 }
 
 /**
@@ -327,20 +335,26 @@ function doSaveAll() {
  */
 function migrateSettings(original_settings) {
     if (!('version' in original_settings)) {
-        //OG Settings file detected
-        Logger.log('SETTINGS: Migrating from version 0');
+        Logger.log('Settings: Migrating from version 0');
         const guild_settings = {
-            timedAnnouncementChannels: Array.from(original_settings.timedAnnouncementChannels),
+            timedAnnouncementChannels: new Set(Array.from(original_settings.timedAnnouncementChannels)),
             linkConversionChannel: original_settings.linkConversionChannel,
             botPrefix: original_settings.botPrefix.trim(),
         };
-        //Logger.log(`SETTINGS: ${typeof(client.guilds.cache)} - ${JSON.stringify(client.guilds.cache)}`);
-        const guilds = client.guilds.cache;
-        original_settings.guilds = {};
-        guilds.forEach((guild) => {
-            original_settings.guilds[guild.id] = guild_settings;
-        });
+        original_settings.guilds = client.guilds.cache.reduce((acc, guild) => {
+            acc[guild.id] = guild_settings;
+            return acc;
+        }, {});
         original_settings.version = '1.00';
+        delete original_settings.timedAnnouncementChannels;
+        delete original_settings.linkConversionChannel;
+    }
+    // Perform additional updates based on the source version.
+    switch (original_settings.version) {
+        case '1.00':
+            break;
+        default:
+            Logger.warn(`Unknown settings version "${original_settings.version}"`);
     }
 }
 
@@ -355,6 +369,10 @@ function loadSettings(path = main_settings_filename) {
     return loadDataFromJSON(path).then(data => {
         // (Re)initialize any keys to the value specified in the file.
         Object.assign(settings, data);
+        // Version-agnostic defaults
+        settings.relic_hunter_webhook = settings.relic_hunter_webhook || '283571156236107777';
+        settings.owner = settings.owner || '0'; // So things don't fail if it's unset
+
         // Pre version 1.00 logic
         if (!('version' in settings)) {
             // Set defaults if they were not specified.
@@ -363,31 +381,29 @@ function loadSettings(path = main_settings_filename) {
 
             if (!settings.timedAnnouncementChannels)
                 settings.timedAnnouncementChannels = ['timers'];
-            Logger.log(`TAC: ${JSON.stringify(settings.timedAnnouncementChannels)}`);
             if (!Array.isArray(settings.timedAnnouncementChannels)) {
-                settings.timedAnnouncementChannels = settings.timedAnnouncementChannels.split(',').map(s => s.trim());
-                Logger.log('Not an array so we turned it into one, sort of');
+                Logger.warn('Settings: attempting to parse unexpected "timed announcement channel" format');
+                if (typeof settings.timedAnnouncementChannels === 'string') {
+                    settings.timedAnnouncementChannels = settings.timedAnnouncementChannels.split(',').map(s => s.trim());
+                } else if (typeof settings.timedAnnouncementChannels === 'object') {
+                    settings.timedAnnouncementChannels = Object.keys(settings.timedAnnouncementChannels);
+                }
             }
             settings.timedAnnouncementChannels = new Set(settings.timedAnnouncementChannels);
-
-            settings.relic_hunter_webhook = settings.relic_hunter_webhook || '283571156236107777';
-
             settings.botPrefix = settings.botPrefix ? settings.botPrefix.trim() : '-mh';
-
-            settings.owner = settings.owner || '0'; // So things don't fail if it's unset
         } else {
-            for (const guild in settings.guilds) {
-                settings.guilds[guild].timedAnnouncementChannels = new Set(settings.guilds[guild].timedAnnouncementChannels);
-                if (settings.guilds[guild].newBotPrefix) {
-                    Logger.log(`Migrating bot prefix to ${settings.guilds[guild].newBotPrefix} for ${guild}`);
-                    settings.guilds[guild].botPrefix = settings.guilds[guild].newBotPrefix;
-                    delete settings.guilds[guild].newBotPrefix;
+            for (const guild of Object.values(settings.guilds)) {
+                guild.timedAnnouncementChannels = new Set(guild.timedAnnouncementChannels);
+                if (guild.newBotPrefix) {
+                    Logger.log(`Settings: Migrating bot prefix to ${guild.newBotPrefix} for ${guild}`);
+                    guild.botPrefix = guild.newBotPrefix;
+                    delete guild.newBotPrefix;
                 }
             }
         }
         if (settings.DBGames && !isValidURL(settings.DBGames)) {
             settings.DBGames = false;
-            Logger.log('Settings: invalid value for DBGames, set to false');
+            Logger.warn('Settings: invalid value for DBGames, set to false');
         }
         client.settings = settings;
 
@@ -405,10 +421,13 @@ function loadSettings(path = main_settings_filename) {
  * @returns {Promise<boolean>}
  */
 function saveSettings(path = main_settings_filename) {
-    const outobj = {};
-    Object.assign(outobj, client.settings);
-    for (const guild in outobj.guilds) {
-        outobj.guilds[guild].timedAnnouncementChannels = Array.from(outobj.guilds[guild].timedAnnouncementChannels);
+    // If we couldn't read settings in, don't overwrite the existing settings.
+    if (!client.settings || !Object.keys(client.settings).length) {
+        return Promise.resolve(false);
+    }
+    const outobj = Object.assign({}, client.settings);
+    for (const guild of Object.values(outobj.guilds)) {
+        guild.timedAnnouncementChannels = Array.from(guild.timedAnnouncementChannels);
     }
     return saveDataAsJSON(path, outobj);
 }
@@ -476,6 +495,8 @@ function createTimersFromList(timerData) {
 function scheduleTimer(timer, channels) {
     if (timer.isSilent())
         return;
+    if (!channels.length)
+        return;
     const msUntilActivation = timer.getNext().diffNow().minus(timer.getAdvanceNotice()).as('milliseconds');
     timer.storeTimeout('scheduling',
         setTimeout(t => {
@@ -490,7 +511,7 @@ function scheduleTimer(timer, channels) {
             doAnnounce(t);
         }, msUntilActivation, timer),
     );
-    timer_config.set(timer.id, { active: true, channels: channels, inactiveChannels: [] });
+    timer_config.set(timer.id, { active: true, channels, inactiveChannels: [] });
 }
 
 /**
@@ -1043,8 +1064,7 @@ function getNicknames(type) {
     const parser = csv_parse({ delimiter: ',' })
         .on('readable', () => {
             let record;
-            // eslint-disable-next-line no-cond-assign
-            while (record = parser.read())
+            while ((record = parser.read()))
                 newData[record[0]] = record[1];
         })
         .on('error', err => Logger.error(err.message));

@@ -1,5 +1,6 @@
 const test = require('tape');
 const sinon = require('sinon');
+const { Permissions } = require('discord.js');
 
 // Stub Logger methods to minimize crosstalk.
 const { stubLogger, restoreLogger } = require('../helpers/logging');
@@ -63,8 +64,8 @@ test('commands - NOTIAM', suite => {
 
         const messageStub = mockMessage();
         const memberStub = mockMember();
-        memberStub.hasPermission.withArgs('ADMINISTRATOR').returns(true);
-        memberStub.hasPermission.withArgs('MANAGE_MESSAGES').returns(false);
+        memberStub.permissions.has.withArgs(Permissions.FLAGS.ADMINISTRATOR).returns(true);
+        memberStub.permissions.has.withArgs(Permissions.FLAGS.MANAGE_MESSAGES).returns(false);
         const breakup = true; // does nothing, makes my editor happy
         messageStub.guild = memberStub.guild;
         messageStub.client = memberStub.client;
@@ -84,7 +85,7 @@ test('commands - NOTIAM', suite => {
 
         const messageStub = mockMessage();
         const memberStub = mockMember();
-        memberStub.hasPermission.withArgs('ADMINISTRATOR').returns(true);
+        memberStub.permissions.has.withArgs(Permissions.FLAGS.ADMINISTRATOR).returns(true);
         messageStub.guild = memberStub.guild;
         messageStub.client = memberStub.client;
         messageStub.member = memberStub;
@@ -100,8 +101,8 @@ test('commands - NOTIAM', suite => {
 
         const messageStub = mockMessage();
         const memberStub = mockMember();
-        memberStub.hasPermission.withArgs('ADMINISTRATOR').returns(false);
-        memberStub.hasPermission.withArgs('MANAGE_MESSAGES').returns(true);
+        memberStub.permissions.has.withArgs(Permissions.FLAGS.ADMINISTRATOR).returns(false);
+        memberStub.permissions.has.withArgs(Permissions.FLAGS.MANAGE_MESSAGES).returns(true);
         const breakup = true; // does nothing, makes my editor happy
         messageStub.guild = memberStub.guild;
         messageStub.client = memberStub.client;
@@ -121,7 +122,7 @@ test('commands - NOTIAM', suite => {
 
         const messageStub = mockMessage();
         const memberStub = mockMember();
-        memberStub.hasPermission.withArgs('MANAGE_MESSAGES').returns(true);
+        memberStub.permissions.has.withArgs(Permissions.FLAGS.MANAGE_MESSAGES).returns(true);
         messageStub.guild = memberStub.guild;
         messageStub.client = memberStub.client;
         messageStub.member = memberStub;
