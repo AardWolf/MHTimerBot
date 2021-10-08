@@ -366,6 +366,10 @@ function loadSettings(path = main_settings_filename) {
     return loadDataFromJSON(path).then(data => {
         // (Re)initialize any keys to the value specified in the file.
         Object.assign(settings, data);
+        // Version-agnostic defaults
+        settings.relic_hunter_webhook = settings.relic_hunter_webhook || '283571156236107777';
+        settings.owner = settings.owner || '0'; // So things don't fail if it's unset
+
         // Pre version 1.00 logic
         if (!('version' in settings)) {
             // Set defaults if they were not specified.
@@ -374,31 +378,29 @@ function loadSettings(path = main_settings_filename) {
 
             if (!settings.timedAnnouncementChannels)
                 settings.timedAnnouncementChannels = ['timers'];
-            Logger.log(`TAC: ${JSON.stringify(settings.timedAnnouncementChannels)}`);
             if (!Array.isArray(settings.timedAnnouncementChannels)) {
-                settings.timedAnnouncementChannels = settings.timedAnnouncementChannels.split(',').map(s => s.trim());
-                Logger.log('Not an array so we turned it into one, sort of');
+                Logger.warn('Settings: attempting to parse unexpected "timed announcement channel" format');
+                if (typeof settings.timedAnnouncementChannels === 'string') {
+                    settings.timedAnnouncementChannels = settings.timedAnnouncementChannels.split(',').map(s => s.trim());
+                } else if (typeof settings.timedAnnouncementChannels === 'object') {
+                    settings.timedAnnouncementChannels = Object.keys(settings.timedAnnouncementChannels);
+                }
             }
             settings.timedAnnouncementChannels = new Set(settings.timedAnnouncementChannels);
-
-            settings.relic_hunter_webhook = settings.relic_hunter_webhook || '283571156236107777';
-
             settings.botPrefix = settings.botPrefix ? settings.botPrefix.trim() : '-mh';
-
-            settings.owner = settings.owner || '0'; // So things don't fail if it's unset
         } else {
-            for (const guild in settings.guilds) {
-                settings.guilds[guild].timedAnnouncementChannels = new Set(settings.guilds[guild].timedAnnouncementChannels);
-                if (settings.guilds[guild].newBotPrefix) {
-                    Logger.log(`Migrating bot prefix to ${settings.guilds[guild].newBotPrefix} for ${guild}`);
-                    settings.guilds[guild].botPrefix = settings.guilds[guild].newBotPrefix;
-                    delete settings.guilds[guild].newBotPrefix;
+            for (const guild of Object.values(settings.guilds)) {
+                guild.timedAnnouncementChannels = new Set(guild.timedAnnouncementChannels);
+                if (guild.newBotPrefix) {
+                    Logger.log(`Settings: Migrating bot prefix to ${guild.newBotPrefix} for ${guild}`);
+                    guild.botPrefix = guild.newBotPrefix;
+                    delete guild.newBotPrefix;
                 }
             }
         }
         if (settings.DBGames && !isValidURL(settings.DBGames)) {
             settings.DBGames = false;
-            Logger.log('Settings: invalid value for DBGames, set to false');
+            Logger.warn('Settings: invalid value for DBGames, set to false');
         }
         client.settings = settings;
 
