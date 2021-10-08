@@ -3,7 +3,7 @@ const { DateTime, Duration, Interval } = require('luxon');
 const Logger = require('./logger');
 
 /**
- * @typedef {Object} TimerSeed A serializable representation of a timer, suitable for reading and writing with JSON files.
+ * @typedef {object} TimerSeed A serializable representation of a timer, suitable for reading and writing with JSON files.
  *
  * @property {string} area The area shorthand (e.g. fg) that this timer is for
  * @property {string} sub_area Areas may have multiple things to care about, such as "close" or "open"
@@ -12,7 +12,7 @@ const Logger = require('./logger');
  * @property {string} announce_string The message printed when this timer activates, i.e. "X is happening right now"
  * @property {string} demand_string The message printed when this timer is upcoming, i.e. "do this before X happens"
  * @property {number | {}} announce_offset How far in advance of the actual "activation time" the timer should be activated to send reminders, in milliseconds or luxon Duration object format.
- * @property {Boolean} silent If it's silent it doesn't get announced but otherwise works
+ * @property {boolean} silent If it's silent it doesn't get announced but otherwise works
 */
 
 /**
@@ -321,7 +321,7 @@ class Timer {
      * Lets the silent property be inspected
      *
      * @instance
-     * @returns {Boolean} whether this is a silent timer, meaning it shouldn't be scheduled
+     * @returns {boolean} whether this is a silent timer, meaning it shouldn't be scheduled
      */
     isSilent() {
         return this._silent;

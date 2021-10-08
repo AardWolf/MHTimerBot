@@ -124,8 +124,8 @@ async function sendInteractiveSearchResult(searchResults, channel, dataCallback,
 /**
  * Formats loot into a nice table
  * @param {boolean} isDM Whether the command came as a DM
- * @param {Object} loot A loot object - it has an id and a value
- * @param {Object} opts Options property. It has filter and DM information
+ * @param {object} loot A loot object - it has an id and a value
+ * @param {object} opts Options property. It has filter and DM information
  * @returns {Promise<string>} Formatted loot table
  */
 async function formatLoot(isDM, loot, opts) {
@@ -186,8 +186,8 @@ async function formatLoot(isDM, loot, opts) {
 /**
  * Formats mice into a nice table
  * @param {boolean} isDM Whether the command came as a DM
- * @param {Object} loot A mouse object - it has an id and a value
- * @param {Object} opts Options property. It has filter and DM information
+ * @param {object} loot A mouse object - it has an id and a value
+ * @param {object} opts Options property. It has filter and DM information
  * @returns {Promise<string>} Formatted mouse AR table
  */
 async function formatMice(isDM, mouse, opts) {
@@ -250,8 +250,8 @@ async function formatMice(isDM, mouse, opts) {
 /**
  * Formats convertibles into a nice table
  * @param {boolean} isDM Whether the command came as a DM
- * @param {Object} convertible A convertible object - it has an id and a value
- * @param {Object} opts Options property. It has filter and DM information
+ * @param {object} convertible A convertible object - it has an id and a value
+ * @param {object} opts Options property. It has filter and DM information
  * @returns {Promise<string>} Formatted mouse AR table
  */
 async function formatConvertibles(isDM, convertible, opts) {
@@ -271,7 +271,7 @@ async function formatConvertibles(isDM, convertible, opts) {
                 item: convertible.item.substring(0, 30),
                 average_qty: calculateRate(convertible.total, convertible.total_items),
                 min_max: minMax(convertible.min_item_quantity, convertible.max_item_quantity),
-                average_when: calculateRate(convertible.times_with_any, 
+                average_when: calculateRate(convertible.times_with_any,
                     convertible.total_quantity_when_any),
                 chance: pctDisplay(convertible.single_opens, convertible.times_with_any),
                 total: convertible.total,
@@ -279,9 +279,9 @@ async function formatConvertibles(isDM, convertible, opts) {
             };
         });
     const order = ['item', 'average_qty', 'chance', 'min_max', 'average_when'];
-    const labels = { 
-        item: 'Item', 
-        average_qty: 'Per Open', 
+    const labels = {
+        item: 'Item',
+        average_qty: 'Per Open',
         min_max: 'Min-Max',
         chance: 'Chance',
         average_when: 'Per Slot',
@@ -336,8 +336,8 @@ async function formatConvertibles(isDM, convertible, opts) {
 
 /**
  * Determines if a string is a filter
- * @param {String} tester String to check if it's a filter
- * @returns {String} the filter as an object with code_name being the important attribute
+ * @param {string} tester String to check if it's a filter
+ * @returns {string} the filter as an object with code_name being the important attribute
  */
 function getFilter(tester) {
     // Process filter-y nicknames
@@ -366,8 +366,8 @@ function getFilter(tester) {
  * Checks if the loot listed is one we know about. Returns the highest scoring match
  *
  * @param {string} tester The loot we're looking for
- * @param {Array} nicknames The nicknames for loot
- * @returns {Array<number>} The first loot that matched
+ * @param {{ [x: string]: string }} nicknames The nicknames for loot
+ * @returns the first loot that matched
  */
 function getLoot(tester, nicknames) {
     if (!tester)
@@ -382,8 +382,8 @@ function getLoot(tester, nicknames) {
  * Checks if the mouse requested is one we know about. Returns the highest scoring match
  *
  * @param {string} tester The mouse we're looking for
- * @param {Array} nicknames The nicknames for mice
- * @returns {Array<number>} The first mice that matched
+ * @param {{ [x: string]: string }} nicknames The nicknames for mice
+ * @returns The first mice that matched
  */
 function getMice(tester, nicknames) {
     if (!tester)
@@ -398,7 +398,7 @@ function getMice(tester, nicknames) {
  * Checks if the convertible requested is one we know about. Returns the highest scoring match
  *
  * @param {string} tester The convertible we're looking for
- * @returns {Array<number>} The first convertible that matched
+ * @returns The first convertible that matched
  */
 function getConvertibles(tester) {
     if (!tester)
@@ -410,10 +410,10 @@ function getConvertibles(tester) {
 
 /**
  * Finds a thing - uses MHCT searchByItem.php
- * @param {String} type Type of thing to find, supported by searchByItem.php
+ * @param {string} type Type of thing to find, supported by searchByItem.php
  * @param {int} id The MHCT numeric id of the thing to find
- * @param {Object} options Search options such as filter
- * @returns {Array} An array of things it found
+ * @param {object} options Search options such as filter
+ * @returns {any[]} An array of things it found
  */
 async function findThing(type, id, options) {
     if (!type || !id)
@@ -441,7 +441,7 @@ async function findThing(type, id, options) {
 /**
  * Initialize (or refresh) a list of items from MHCT
  * @param {'mouse'|'loot' | 'convertible'} type The type of thing to get a list of
- * @param {Array} list The list to populate / re-populate
+ * @param {any[]} list The list to populate / re-populate
  */
 async function getMHCTList(type, list) {
     const now = DateTime.utc();
@@ -555,11 +555,11 @@ async function getMinLuck() {
 
 /**
  * Given a mouse and an array of power types, return the minlucks that match
- * @param {String} mouse The mouse being looked up
- * @param {Array} flags Full named power types
- * @param {Boolean} shorten_flags True if the output should be reduced to one line
- * @param {Object} emojiMap Key-value pairs for power type to emoji to use
- * @returns {String} The string to report to the requester
+ * @param {string} mouse The mouse being looked up
+ * @param {string[]} flags Full named power types
+ * @param {boolean} shorten_flags True if the output should be reduced to one line
+ * @param {object} emojiMap Key-value pairs for power type to emoji to use
+ * @returns {string} The string to report to the requester
  */
 function getMinluckString(mouse, flags, shorten_flag = false, emojiMap = powerEmoji) {
     let reply = '';
@@ -625,31 +625,29 @@ function sortMinluck(a, b) {
 }
 
 /**
- * 
- * @param {Object} accumulator -- string or something with code_name as a property
- * @param {Object} current -- something with code_name as a property
- * @returns {String} Grows a string, meant to be with Array.reduce
+ *
+ * @param {string} accumulator -- the string to grow
+ * @param {{ code_name: string}} current -- something with code_name as a property
+ * @returns {string} the fully grown string.
  */
 function code_name_reduce (accumulator, current) {
-    if (accumulator.code_name) {
-        accumulator = `\`${accumulator.code_name}\``;
-    }
-    if (current.code_name) {
-        if (accumulator)
-            return accumulator + `, \`${current.code_name}\``;
-        else   
-            return `\`${current.code_name}\``;
-    } else {
+    // Empty entry? Skip it.
+    if (!current || !current.code_name)
         return accumulator;
+    // Existing items? Join with comma.
+    if (accumulator) {
+        return `${accumulator}, \`${current.code_name}\``;
     }
+    // This is the first item in the list.
+    return `\`${current.code_name}\``;
 }
 
 /**
  * Returns all known filters as a comma-separated list with back-ticks for "code" designation
- * @returns {String} Known filters, formatted for discord
+ * @returns {string} Known filters, formatted for discord
  */
 function listFilters() {
-    return filters.reduce(code_name_reduce);
+    return filters.reduce(code_name_reduce, '');
 }
 
 async function initialize() {

@@ -7,8 +7,8 @@ const { Client, Collection, Guild, GuildMember, User } = Discord;
 /**
  * Checks the permissions of the member to see if they're at the minimum level
  * @param {GuildMember} member Guild member to confirm permissions for
- * @param {String} level Minimum level required ('admin' or 'mod')
- * @returns boolean Whether the user is at that level or higher
+ * @param {'admin'|'mod'} level Minimum level required ('admin' or 'mod')
+ * @returns {boolean} Whether the user is at that level or higher
  */
 function checkPerms(member, level) {
     if (!member || !level || !member.guild || !member.id || !('client' in member)) return false;

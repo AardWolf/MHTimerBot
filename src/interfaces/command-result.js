@@ -18,7 +18,7 @@ class CommandResult {
     // message = null;
 
     /**
-     * @param {Object} c Config object
+     * @param {object} c Config object
      * @param {boolean} c.success Whether the command was successful
      * @param {boolean} c.botError Whether the bot encountered an error processing the command
      * @param {boolean} c.sentDm Whether the command sent a DM
