@@ -1043,8 +1043,7 @@ function getNicknames(type) {
     const parser = csv_parse({ delimiter: ',' })
         .on('readable', () => {
             let record;
-            // eslint-disable-next-line no-cond-assign
-            while (record = parser.read())
+            while ((record = parser.read()))
                 newData[record[0]] = record[1];
         })
         .on('error', err => Logger.error(err.message));

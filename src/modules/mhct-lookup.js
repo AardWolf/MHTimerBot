@@ -515,8 +515,7 @@ async function getMinLuck() {
     const parser = csv_parse({ delimiter: ',' })
         .on('readable', () => {
             let record;
-            // eslint-disable-next-line no-cond-assign
-            while (record = parser.read()) {
+            while ((record = parser.read())) {
                 if (record.length < 14) {
                     Logger.log(`Minluck: Short entry found: ${record}`);
                     continue;
