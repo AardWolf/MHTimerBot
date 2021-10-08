@@ -1,5 +1,6 @@
 const test = require('tape');
 const sinon = require('sinon');
+const { Permissions } = require('discord.js');
 
 // Stub Logger methods to minimize crosstalk.
 const { stubLogger, restoreLogger } = require('../helpers/logging');
@@ -92,7 +93,7 @@ test('commands - config', suite => {
         const memberStub = mockMember();
         messageStub.guild = memberStub.guild;
         messageStub.client = memberStub.client;
-        memberStub.hasPermission.withArgs('ADMINISTRATOR').returns(true);
+        memberStub.permissions.has.withArgs(Permissions.FLAGS.ADMINISTRATOR).returns(true);
         messageStub.member = memberStub;
         const result = await CONFIG.execute(messageStub, []);
         t.true(result.replied, 'should reply to admin');
@@ -106,8 +107,8 @@ test('commands - config', suite => {
         t.plan(3);
         const messageStub = mockMessage();
         const memberStub = mockMember();
-        memberStub.hasPermission.withArgs('ADMINISTRATOR').returns(true);
-        memberStub.hasPermission.withArgs('MANAGE_MESSAGES').returns(false);
+        memberStub.permissions.has.withArgs(Permissions.FLAGS.ADMINISTRATOR).returns(true);
+        memberStub.permissions.has.withArgs(Permissions.FLAGS.MANAGE_MESSAGES).returns(false);
         messageStub.client = memberStub.client;
         messageStub.guild = memberStub.guild;
         messageStub.member = memberStub;
@@ -124,7 +125,7 @@ test('commands - config', suite => {
 
         const messageStub = mockMessage();
         const memberStub = mockMember();
-        memberStub.hasPermission.withArgs('ADMINISTRATOR').returns(true);
+        memberStub.permissions.has.withArgs(Permissions.FLAGS.ADMINISTRATOR).returns(true);
         messageStub.guild = memberStub.guild;
         messageStub.client = memberStub.client;
         messageStub.member = memberStub;
@@ -143,8 +144,8 @@ test('commands - config', suite => {
         const memberStub = mockMember();
         messageStub.guild = memberStub.guild;
         messageStub.client = memberStub.client;
-        memberStub.hasPermission.withArgs('ADMINISTRATOR').returns(false);
-        memberStub.hasPermission.withArgs('MANAGE_MESSAGES').returns(true);
+        memberStub.permissions.has.withArgs(Permissions.FLAGS.ADMINISTRATOR).returns(false);
+        memberStub.permissions.has.withArgs(Permissions.FLAGS.MANAGE_MESSAGES).returns(true);
         const result = await CONFIG.execute(messageStub, []);
         t.true(result.replied, 'should reply to mod');
         t.strictEqual(messageStub.channel.send.callCount, 1, 'should call channel.send');
