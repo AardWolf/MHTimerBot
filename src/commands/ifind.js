@@ -15,7 +15,7 @@ async function doIFIND(message, tokens) {
     const opts = {};
     const urlInfo = {
         qsParams: {},
-        uri: 'https://www.agiletravels.com/loot.php',
+        uri: 'https://www.mhct.win/loot.php',
         type: 'item',
     };
     if (!tokens)
@@ -50,7 +50,7 @@ async function doIFIND(message, tokens) {
                 // We have multiple options, show the interactive menu
                 urlInfo.qsParams = opts;
                 urlInfo.type = 'mouse';
-                urlInfo.uri = 'https://www.agiletravels.com/attractions.php';
+                urlInfo.uri = 'https://www.mhct.win/attractions.php';
                 sendInteractiveSearchResult(all_mice, message.channel, formatMice,
                     ['dm', 'group'].includes(message.channel.type), urlInfo, searchString);
                 theResult.replied = true;
