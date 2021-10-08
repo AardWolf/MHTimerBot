@@ -195,19 +195,20 @@ function Main() {
 
                 // Find all text channels on which to send announcements.
                 const announcables = client.guilds.cache.reduce((channels, guild) => {
+                    const requested = client.settings.guilds[guild.id].timedAnnouncementChannels;
                     const candidates = guild.channels.cache
-                        .filter(c => client.settings.guilds[guild.id].timedAnnouncementChannels.has(c.name) && textChannelTypes.has(c.type))
-                        .map(tc => tc);
-                    if (candidates.length)
-                        Array.prototype.push.apply(channels, candidates);
-                    else
+                        .filter(c => requested.has(c.name) && textChannelTypes.has(c.type));
+                    if (candidates.size)
+                        Array.prototype.push.apply(channels, Array.from(candidates.values()));
+                    else if (requested.size) {
                         Logger.warn(`Timers: No valid channels in ${guild.name} for announcements.`);
+                    }
                     return channels;
                 }, []);
 
                 // Use one timeout per timer to manage default reminders and announcements.
                 client.timers_list.forEach(timer => scheduleTimer(timer, announcables));
-                Logger.log(`Timers: Initialized ${timer_config.size} timers on channels ${announcables}.`);
+                Logger.log(`Timers: Initialized ${timer_config.size} timers on channels ${oxfordStringifyValues(announcables.map(c => `${c.guild.name}#${c.name}`))}.`);
 
                 // If we disconnect and then reconnect, do not bother rescheduling the already-scheduled timers.
                 client.on('ready', () => Logger.log('I am inVINCEeble!'));
@@ -476,6 +477,8 @@ function createTimersFromList(timerData) {
 function scheduleTimer(timer, channels) {
     if (timer.isSilent())
         return;
+    if (!channels.length)
+        return;
     const msUntilActivation = timer.getNext().diffNow().minus(timer.getAdvanceNotice()).as('milliseconds');
     timer.storeTimeout('scheduling',
         setTimeout(t => {
@@ -490,7 +493,7 @@ function scheduleTimer(timer, channels) {
             doAnnounce(t);
         }, msUntilActivation, timer),
     );
-    timer_config.set(timer.id, { active: true, channels: channels, inactiveChannels: [] });
+    timer_config.set(timer.id, { active: true, channels, inactiveChannels: [] });
 }
 
 /**
