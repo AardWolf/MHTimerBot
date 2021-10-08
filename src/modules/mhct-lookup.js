@@ -271,7 +271,7 @@ async function formatConvertibles(isDM, convertible, opts) {
                 item: convertible.item.substring(0, 30),
                 average_qty: calculateRate(convertible.total, convertible.total_items),
                 min_max: minMax(convertible.min_item_quantity, convertible.max_item_quantity),
-                average_when: calculateRate(convertible.times_with_any, 
+                average_when: calculateRate(convertible.times_with_any,
                     convertible.total_quantity_when_any),
                 chance: pctDisplay(convertible.single_opens, convertible.times_with_any),
                 total: convertible.total,
@@ -279,9 +279,9 @@ async function formatConvertibles(isDM, convertible, opts) {
             };
         });
     const order = ['item', 'average_qty', 'chance', 'min_max', 'average_when'];
-    const labels = { 
-        item: 'Item', 
-        average_qty: 'Per Open', 
+    const labels = {
+        item: 'Item',
+        average_qty: 'Per Open',
         min_max: 'Min-Max',
         chance: 'Chance',
         average_when: 'Per Slot',
@@ -412,8 +412,8 @@ function getConvertibles(tester) {
  * Finds a thing - uses MHCT searchByItem.php
  * @param {String} type Type of thing to find, supported by searchByItem.php
  * @param {int} id The MHCT numeric id of the thing to find
- * @param {Object} options Search options such as filter
- * @returns {Array} An array of things it found
+ * @param {object} options Search options such as filter
+ * @returns {Promise<any[]|null>} An array of things it found
  */
 async function findThing(type, id, options) {
     if (!type || !id)
@@ -448,7 +448,7 @@ async function getMHCTList(type, list) {
     if (type && refresh_list[type]) {
         const next_refresh = refresh_list[type].plus(refresh_rate);
         if (now < next_refresh)
-            return [];
+            return;
         refresh_list[type] = now;
     } else {
         Logger.log(`getMHCTList: Received a request for ${type} but I don't do that yet`);
@@ -477,7 +477,7 @@ async function getFilterList() {
     if (refresh_list.filter) {
         const next_refresh = refresh_list.filter.plus(refresh_rate);
         if (now < next_refresh)
-            return Promise.resolve();
+            return;
     }
     refresh_list.filter = now;
 
@@ -504,7 +504,7 @@ async function getMinLuck() {
     if (refresh_list.minluck) {
         const next_refresh = refresh_list.minluck.plus(refresh_rate);
         if (now < next_refresh)
-            return Promise.resolve();
+            return;
     }
     refresh_list.minluck = now;
 
@@ -548,8 +548,6 @@ async function getMinLuck() {
             Logger.log(`Minlucks: ${Object.keys(minlucks).length} minlucks loaded.`);
         });
     }).catch(err => Logger.error('Minlucks: request for minlucks failed with error:', err));
-
-    // Logger.log(`Minluck: New minlucks downloaded - ${Object.keys(minlucks).length} mice`);
 }
 
 /**
@@ -624,7 +622,7 @@ function sortMinluck(a, b) {
 }
 
 /**
- * 
+ *
  * @param {Object} accumulator -- string or something with code_name as a property
  * @param {Object} current -- something with code_name as a property
  * @returns {String} Grows a string, meant to be with Array.reduce
@@ -636,7 +634,7 @@ function code_name_reduce (accumulator, current) {
     if (current.code_name) {
         if (accumulator)
             return accumulator + `, \`${current.code_name}\``;
-        else   
+        else
             return `\`${current.code_name}\``;
     } else {
         return accumulator;
