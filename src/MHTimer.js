@@ -332,20 +332,26 @@ function doSaveAll() {
  */
 function migrateSettings(original_settings) {
     if (!('version' in original_settings)) {
-        //OG Settings file detected
-        Logger.log('SETTINGS: Migrating from version 0');
+        Logger.log('Settings: Migrating from version 0');
         const guild_settings = {
-            timedAnnouncementChannels: Array.from(original_settings.timedAnnouncementChannels),
+            timedAnnouncementChannels: new Set(Array.from(original_settings.timedAnnouncementChannels)),
             linkConversionChannel: original_settings.linkConversionChannel,
             botPrefix: original_settings.botPrefix.trim(),
         };
-        //Logger.log(`SETTINGS: ${typeof(client.guilds.cache)} - ${JSON.stringify(client.guilds.cache)}`);
-        const guilds = client.guilds.cache;
-        original_settings.guilds = {};
-        guilds.forEach((guild) => {
-            original_settings.guilds[guild.id] = guild_settings;
-        });
+        original_settings.guilds = client.guilds.cache.reduce((acc, guild) => {
+            acc[guild.id] = guild_settings;
+            return acc;
+        }, {});
         original_settings.version = '1.00';
+        delete original_settings.timedAnnouncementChannels;
+        delete original_settings.linkConversionChannel;
+    }
+    // Perform additional updates based on the source version.
+    switch (original_settings.version) {
+        case '1.00':
+            break;
+        default:
+            Logger.warn(`Unknown settings version "${original_settings.version}"`);
     }
 }
 
