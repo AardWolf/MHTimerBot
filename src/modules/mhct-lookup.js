@@ -4,7 +4,8 @@ const { DateTime, Duration } = require('luxon');
 const DatabaseFilter = require('../models/dbFilter');
 const { calculateRate, prettyPrintArrayAsString, intToHuman, integerComma } = require('../modules/format-utils');
 const { getSearchedEntity } = require('../modules/search-helpers');
-const { MessageEmbed, Util } = require('discord.js');
+// eslint-disable-next-line no-unused-vars
+const { MessageEmbed, Util, TextChannel } = require('discord.js');
 const { firstBy } = require('thenby');
 const csv_parse = require('csv-parse');
 
@@ -164,7 +165,7 @@ async function formatLoot(isDM, loot, opts) {
             columnWidth: labels[key].length,
             alignRight: !isNaN(parseInt(drops[0][key], 10)),
         };
-        return { 'key': key, 'label': labels[key] };
+        return { key, label: labels[key] };
     });
     // Give the numeric column proper formatting.
     // TODO: toLocaleString - can it replace integerComma too?
@@ -669,17 +670,25 @@ async function initialize() {
         getFilterList(),
         getMinLuck(),
     ]);
-    intervals.push(setInterval(() => { getMHCTList('mouse', mice); }, refresh_rate));
-    intervals.push(setInterval(() => { getMHCTList('loot', loot); }, refresh_rate));
-    intervals.push(setInterval(() => { getMHCTList('convertible', convertibles); }, refresh_rate));
-    intervals.push(setInterval(() => { getFilterList(); }, refresh_rate));
-    intervals.push(setInterval(() => { getMinLuck(); }, refresh_rate));
+    intervals.push(
+        setInterval(() => getMHCTList('mouse', mice), refresh_rate),
+        setInterval(() => getMHCTList('loot', loot), refresh_rate),
+        setInterval(() => getMHCTList('convertible', convertibles), refresh_rate),
+        setInterval(() => getFilterList(), refresh_rate),
+        setInterval(() => getMinLuck(), refresh_rate),
+    );
     Logger.log(`MHCT Initialized: Loot: ${loot.length}, mice: ${mice.length}, Convertibles: ${convertibles.length}, filters: ${filters.length}`);
     return true;
 }
 
+/**
+ * Deactivate and clear all data-fetching tasks.
+ * @returns {Promise<true>}
+ */
 async function save() {
-    intervals.forEach(i => clearInterval(i));
+    let timeout;
+    while ((timeout = intervals.pop()))
+        clearInterval(timeout);
     return true;
 }
 
