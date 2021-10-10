@@ -1,5 +1,5 @@
 const Logger = require('../modules/logger');
-const { getFilter, getLoot, formatLoot, 
+const { getFilter, getLoot, formatLoot,
     sendInteractiveSearchResult, listFilters, getMice, formatMice } = require('../modules/mhct-lookup');
 const CommandResult = require('../interfaces/command-result');
 
@@ -21,14 +21,23 @@ async function doIFIND(message, tokens) {
     if (!tokens)
         reply = 'I just cannot find what you\'re looking for (since you didn\'t tell me what it was).';
     else {
-        //Set the filter if it's requested
-        if (tokens[0] === '-e')
-            tokens.shift();
-        const filter = getFilter(tokens[0]);
-        if (filter && 'code_name' in filter && tokens.length > 1) {
-            opts.timefilter = filter.code_name;
-            tokens.shift();
+        // Set the filter if it's requested.
+        if (tokens.includes('-e')) {
+            const introducerIndex = tokens.findIndex((token) => token === '-e');
+            // The index of the filter term must immediately follow the introducer token.
+            const filterIndex = introducerIndex + 1;
+            let spliceCount = 1;
+            if (filterIndex < tokens.length) {
+                const filter = getFilter(tokens[filterIndex]);
+                if (filter && tokens.length > 2) {
+                    opts.timefilter = filter.code_name;
+                    ++spliceCount;
+                }
+            }
+            // Remove the processed tokens.
+            tokens.splice(introducerIndex, spliceCount);
         }
+
         // Figure out what they're searching for (remove mouse at the end in case of fallthrough)
         if (tokens[tokens.length - 1].toLowerCase() === 'mouse') {
             tokens.pop();
@@ -69,7 +78,7 @@ async function doIFIND(message, tokens) {
             theResult.success = true;
             theResult.sentDM = ['dm', 'group'].includes(message.channel.type);
         } catch (err) {
-            Logger.error('WHOIS: failed to send reply', err);
+            Logger.error('IFIND: failed to send reply', err);
             theResult.botError = true;
         }
     }
