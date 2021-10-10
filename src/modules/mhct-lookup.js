@@ -1,6 +1,7 @@
 const fetch = require('node-fetch');
 const Logger = require('../modules/logger');
 const { DateTime, Duration } = require('luxon');
+const DatabaseFilter = require('../models/dbFilter');
 const { calculateRate, prettyPrintArrayAsString, intToHuman, integerComma } = require('../modules/format-utils');
 const { getSearchedEntity } = require('../modules/search-helpers');
 const { MessageEmbed, Util } = require('discord.js');
@@ -15,13 +16,15 @@ const refresh_list = {
     convertible: DateTime.utc().minus(refresh_rate),
     minluck: DateTime.utc().minus(refresh_rate),
 };
+/** @type {NodeJS.Timeout[]} Stored setInterval timers, to be cleaned up during shutdown. */
 const intervals = [];
-const filters = [],
-    mice = [],
-    loot = [],
-    convertibles = [];
+/** @type {DatabaseFilter[]} Database filters, populated by mhct.win/filters.php */
+const filters = [];
+const mice = [];
+const loot = [];
+const convertibles = [];
 const minlucks = {};
-let someone_initialized = 0;
+let someone_initialized = false;
 
 const emojis = [
     { id: '1%E2%83%A3', text: ':one:' },
@@ -148,7 +151,7 @@ async function formatLoot(isDM, loot, opts) {
     const order = ['location', 'stage', 'cheese', 'pct', 'dr', 'total_catches'];
     const labels = { location: 'Location', stage: 'Stage', total_catches: 'Catches',
         dr: '/Catch', cheese: 'Cheese', pct: 'Chance' };
-    //Sort the results
+    // Sort the results by overall drop rate.
     drops.sort((a, b) => parseFloat(b.dr) - parseFloat(a.dr));
     drops.splice(isDM ? 100 : 10);
     if (drops.every(row => row.stage === no_stage))
@@ -335,9 +338,9 @@ async function formatConvertibles(isDM, convertible, opts) {
 }
 
 /**
- * Determines if a string is a filter
+ * Gets the filter that matches the given string, if possible.
  * @param {string} tester String to check if it's a filter
- * @returns {string} the filter as an object with code_name being the important attribute
+ * @returns {DatabaseFilter|undefined} The closest matching filter, if any.
  */
 function getFilter(tester) {
     // Process filter-y nicknames
@@ -352,10 +355,10 @@ function getFilter(tester) {
         tester = 'alltime';
     else if (tester === 'current') {
         tester = '1_month';
+        // If there is an ongoing event, use that instead of the 1-month filter.
         for (const filter of filters) {
             if (filter.start_time && !filter.end_time && filter.code_name !== tester) {
-                tester = filter.code_name;
-                break;
+                return filter;
             }
         }
     }
@@ -367,7 +370,7 @@ function getFilter(tester) {
  *
  * @param {string} tester The loot we're looking for
  * @param {{ [x: string]: string }} nicknames The nicknames for loot
- * @returns the first loot that matched
+ * @returns the first ten loots that matched
  */
 function getLoot(tester, nicknames) {
     if (!tester)
@@ -383,7 +386,7 @@ function getLoot(tester, nicknames) {
  *
  * @param {string} tester The mouse we're looking for
  * @param {{ [x: string]: string }} nicknames The nicknames for mice
- * @returns The first mice that matched
+ * @returns The first ten mice that matched
  */
 function getMice(tester, nicknames) {
     if (!tester)
@@ -398,14 +401,13 @@ function getMice(tester, nicknames) {
  * Checks if the convertible requested is one we know about. Returns the highest scoring match
  *
  * @param {string} tester The convertible we're looking for
- * @returns The first convertible that matched
+ * @returns The first ten convertibles that matched
  */
 function getConvertibles(tester) {
     if (!tester)
         return;
-    tester = `${tester}`;
 
-    return getSearchedEntity(tester, convertibles);
+    return getSearchedEntity(`${tester}`, convertibles);
 }
 
 /**
@@ -483,16 +485,25 @@ async function getFilterList() {
 
     Logger.log('Filters: Requesting a new filter list.');
     const url = 'https://www.mhct.win/filters.php';
-    return fetch(url).then(response => (response.status === 200) ? response.json() : '').then((body) => {
-        if (body) {
-            Logger.log('Filters: Got a new filter list');
-            filters.length = 0;
-            Array.prototype.push.apply(filters, body);
-            filters.forEach(filter => filter.lowerValue = filter.code_name.toLowerCase());
-        } else {
-            Logger.warn('Filters: request returned non-200 response');
+    try {
+        const response = await fetch(url);
+        if (response.status !== 200) {
+            Logger.warn(`Filters: request returned non-200 response code "${response.status}`);
+            return;
         }
-    }).catch(err => Logger.error('Filters: request returned error:', err));
+        const body = await response.json();
+        if (!Array.isArray(body) || !body.length) {
+            Logger.warn('Filters: request body was empty or incompatible');
+            return;
+        }
+        filters.length = 0;
+        Array.prototype.push.apply(filters, body
+            .filter((f) => f && typeof f.code_name === 'string')
+            .map(({ code_name, ...rest }) => new DatabaseFilter(code_name, rest)));
+        Logger.log(`Filters: Replaced filter list with ${filters.length} items`);
+    } catch (err) {
+        Logger.error('Filters: request returned error:', err);
+    }
 }
 
 /**
@@ -623,22 +634,20 @@ function sortMinluck(a, b) {
 
 /**
  *
- * @param {Object} accumulator -- string or something with code_name as a property
- * @param {Object} current -- something with code_name as a property
- * @returns {String} Grows a string, meant to be with Array.reduce
+ * @param {string} accumulator -- the string to grow
+ * @param {DatabaseFilter} current -- something with code_name as a property
+ * @returns {string} the fully grown string.
  */
 function code_name_reduce (accumulator, current) {
-    if (accumulator.code_name) {
-        accumulator = `\`${accumulator.code_name}\``;
-    }
-    if (current.code_name) {
-        if (accumulator)
-            return accumulator + `, \`${current.code_name}\``;
-        else
-            return `\`${current.code_name}\``;
-    } else {
+    // Empty entry? Skip it.
+    if (!current?.code_name)
         return accumulator;
+    // Existing items? Join with comma.
+    if (accumulator) {
+        return `${accumulator}, \`${current.code_name}\``;
     }
+    // This is the first item in the list.
+    return `\`${current.code_name}\``;
 }
 
 /**
