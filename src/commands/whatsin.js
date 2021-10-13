@@ -1,7 +1,10 @@
-const Logger = require('../modules/logger');
-const { initialize, getConvertibles, sendInteractiveSearchResult, 
-    save, formatConvertibles } = require('../modules/mhct-lookup');
+// eslint-disable-next-line no-unused-vars
+const { Message, Util } = require('discord.js');
+
 const CommandResult = require('../interfaces/command-result');
+const Logger = require('../modules/logger');
+const { initialize, getConvertibles, sendInteractiveSearchResult,
+    save, formatConvertibles } = require('../modules/mhct-lookup');
 
 const usage = [
     '<convertible> will report stats about what is inside that convertible',
@@ -12,7 +15,7 @@ const usage = [
 /**
  *
  * @param {Message} message The message that triggered the action
- * @param {Array} tokens The tokens of the command
+ * @param {string[]} tokens The tokens of the command
  * @returns {Promise<CommandResult>} Status of the execution
  */
 async function doWHATSIN(message, tokens) {
@@ -38,16 +41,15 @@ async function doWHATSIN(message, tokens) {
             theResult.success = true;
             theResult.sentDM = ['dm', 'group'].includes(message.channel.type);
         } else {
-             
             reply = `I don't know anything about "${searchString}"`;
-            
         }
     }
     if (reply) {
         try {
             // Note that a lot of this is handled by sendInteractiveSearchResult
-            Logger.log(`Reply size: ${reply.length}`);
-            await message.channel.send(reply, { split: { prepend: '```\n', append: '\n```' } });
+            for (const msg of Util.splitMessage(reply, { prepend: '```\n', append: '\n```' })) {
+                await message.channel.send(msg);
+            }
             theResult.replied = true;
             theResult.success = true;
             theResult.sentDM = ['dm', 'group'].includes(message.channel.type);

@@ -1,6 +1,10 @@
-const Logger = require('../modules/logger');
+// eslint-disable-next-line no-unused-vars
+const { Message } = require('discord.js');
+
 const CommandResult = require('../interfaces/command-result');
+const Logger = require('../modules/logger');
 const { getKnownTimersDetails, timerAliases, nextTimer } = require('../modules/timer-helper');
+
 const usage = [
     '<area> or <sub-area> will provide a message about the next related occurrence.',
     'Areas are Seasonal Garden (sg), Forbidden Grove (fg), Toxic Spill (ts), Balack\'s Cove (cove), and the daily reset (reset).',
@@ -12,7 +16,7 @@ const usage = [
 /**
  *
  * @param {Message} message The message that triggered the action
- * @param {Array} tokens The tokens of the command
+ * @param {string[]} tokens The tokens of the command
  * @returns {Promise<CommandResult>} Status of the execution
  */
 async function doNEXT(message, tokens) {
@@ -21,11 +25,11 @@ async function doNEXT(message, tokens) {
 
     const aboutTimers = `I know these timers:\n${getKnownTimersDetails(message.client.timers_list)}`;
     // Parse the message to see if it matches any known timer areas, sub-areas, or has count information.
-    const reminderRequest = tokens.length ? timerAliases(message.client.timers_list, tokens) : {};
+    const reminderRequest = timerAliases(message.client.timers_list, tokens);
     if (!tokens.length) {
         // TODO: pretty-print known timer info
         reply = aboutTimers;
-    } else if (!reminderRequest || !reminderRequest['area']) {
+    } else if (!reminderRequest.area) {
         // received "-mh next <words>", but the words didn't match any known timer information.
         // Currently, the only other information we handle is RONZA.
         switch (tokens[0].toLowerCase()) {

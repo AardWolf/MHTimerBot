@@ -1,6 +1,6 @@
 // Type-hinting imports
 // eslint-disable-next-line no-unused-vars
-const { Message } = require('discord.js');
+const { Message, Util } = require('discord.js');
 
 const CommandResult = require('../interfaces/command-result');
 const Logger = require('../modules/logger');
@@ -54,7 +54,9 @@ async function doIAM(message, tokens) {
     }
     if (reply) {
         try {
-            await message.channel.send(reply, { split: true });
+            for (const msg of Util.splitMessage(reply)) {
+                await message.channel.send(msg);
+            }
             theResult.replied = true;
             if (message.channel.type === 'dm') theResult.sentDm = true;
             theResult.success = true;

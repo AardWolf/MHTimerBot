@@ -1,6 +1,8 @@
 const Logger = require('../modules/logger');
 const { initialize, getMice, getMinluckString, save } = require('../modules/mhct-lookup');
 const CommandResult = require('../interfaces/command-result');
+// eslint-disable-next-line no-unused-vars
+const { Message } = require('discord.js');
 
 const usage = [
     'minluck [-A] [-a] [-d] [-f] [-h] [-l] [-p] [-P] [-s] [-t] [-r] <mouse>',
@@ -34,7 +36,7 @@ const typeMap = {
 /**
  * Get the minluck of a mouse
  * @param {Message} message The message that triggered the action
- * @param {Array} tokens The tokens of the command
+ * @param {string[]} tokens The tokens of the command
  * @returns {Promise<CommandResult>} Status of the execution
  */
 
@@ -85,16 +87,12 @@ async function doMINLUCK(message, tokens) {
     }
     if (reply) {
         try {
-            if (typeof reply === 'string') {
-                await message.channel.send(reply);
-            } else {
-                await message.channel.send('', { embeds: [reply] });
-            }
+            await message.channel.send((typeof reply === 'string') ? reply : { embeds: [reply] });
             theResult.replied = true;
             theResult.success = true;
             theResult.sentDM = ['dm', 'group'].includes(message.channel.type);
         } catch (err) {
-            Logger.error('NEXT: failed to send reply', err);
+            Logger.error('MINLUCK: failed to send reply', err);
             theResult.botError = true;
         }
     }

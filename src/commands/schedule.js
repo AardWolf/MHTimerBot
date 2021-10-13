@@ -1,8 +1,11 @@
-const Logger = require('../modules/logger');
-const CommandResult = require('../interfaces/command-result');
-const { timerAliases } = require('../modules/timer-helper');
+// eslint-disable-next-line no-unused-vars
+const { Message, Util } = require('discord.js');
+
 const { DateTime, Duration } = require('luxon');
+const CommandResult = require('../interfaces/command-result');
 const { timeLeft } = require('../modules/format-utils');
+const Logger = require('../modules/logger');
+const { timerAliases } = require('../modules/timer-helper');
 
 const usage = [
     'Displays upcoming reminders know or filtered to an area or sub-area.',
@@ -16,10 +19,15 @@ const usage = [
 ].join('\n\t');
 
 
+/**
+ * @param {Message} message
+ * @param {string[]} tokens
+ * @returns {Promise<CommandResult>}
+ */
 async function doSCHED(message, tokens) {
     const theResult = new CommandResult({ message, success: false, sentDM: false });
     let reply = '';
-    const timerRequest = tokens.length ? timerAliases(message.client.timers_list, tokens) : {};
+    const timerRequest = timerAliases(message.client.timers_list, tokens);
     // Default the searched time period to 24 hours if it was not specified.
     timerRequest.count = timerRequest.count || 24;
 
@@ -31,10 +39,10 @@ async function doSCHED(message, tokens) {
         try {
             await message.channel.send('Invalid timespan given - how many hours did you want to look ahead?');
             theResult.replied = true;
-            theResult.success = true;
+            theResult.success = false;
             theResult.sentDM = ['dm', 'group'].includes(message.channel.type);
         } catch (err) {
-            Logger.error('NEXT: failed to send reply', err);
+            Logger.error('SCHED: failed to send reply', err);
             theResult.botError = true;
         }
         return theResult;
@@ -53,7 +61,7 @@ async function doSCHED(message, tokens) {
         .forEach(timer => {
             const message = timer.getDemand();
             for (const time of timer.upcoming(until))
-                upcoming_timers.push({ time: time, message: message });
+                upcoming_timers.push({ time, message });
         });
 
     // Sort the list of upcoming timers in this area by time, so that the soonest is printed first.
@@ -75,15 +83,17 @@ async function doSCHED(message, tokens) {
         try {
             // Note that a lot of this is handled by sendInteractiveSearchResult
             if (typeof reply === 'string') {
-                await message.channel.send(reply, { split: true });
+                for (const msg of Util.splitMessage(reply)) {
+                    await message.channel.send(msg);
+                }
             } else {
-                await message.channel.send('', { embeds: [reply] });
+                await message.channel.send({ embeds: [reply] });
             }
             theResult.replied = true;
             theResult.success = true;
             theResult.sentDM = ['dm', 'group'].includes(message.channel.type);
         } catch (err) {
-            Logger.error('NEXT: failed to send reply', err);
+            Logger.error('SCHED: failed to send reply', err);
             theResult.botError = true;
         }
     }

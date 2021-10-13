@@ -731,7 +731,7 @@ async function convertRewardLink(message) {
 
 /**
  * @typedef {object} TimerReminder
- * @property {User} user The Discord user who requested the reminder.
+ * @property {string} user A Snowflake representing the user who requested the reminder.
  * @property {number} count The number of remaining times this reminder will activate.
  * @property {string} area The area to which this reminder applies, e.g. "fg"
  * @property {string} [sub_area] A logical "location" within the area, e.g. "close" or "open" for Forbidden Grove.

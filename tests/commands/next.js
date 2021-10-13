@@ -59,6 +59,7 @@ test('commands - NEXT', suite => {
     });
     suite.test('when called with exactly "ronza" - returns known string', async t => {
         t.plan(2);
+        timerStubs.timerAliases.returns({});
 
         const messageStub = mockMessage();
         await NEXT.execute(messageStub, ['ronza']);

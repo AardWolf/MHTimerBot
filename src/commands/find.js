@@ -1,3 +1,6 @@
+// eslint-disable-next-line no-unused-vars
+const { Message, Util } = require('discord.js');
+
 const Logger = require('../modules/logger');
 const { initialize, getFilter, getMice, formatMice, sendInteractiveSearchResult,
     listFilters, getLoot, formatLoot, save } = require('../modules/mhct-lookup');
@@ -6,7 +9,7 @@ const CommandResult = require('../interfaces/command-result');
 /**
  *
  * @param {Message} message The message that triggered the action
- * @param {Array} tokens The tokens of the command
+ * @param {string[]} tokens The tokens of the command
  * @returns {Promise<CommandResult>} Status of the execution
  */
 async function doFIND(message, tokens) {
@@ -72,7 +75,9 @@ async function doFIND(message, tokens) {
     if (reply) {
         try {
             // Note that a lot of this is handled by sendInteractiveSearchResult
-            await message.channel.send(reply, { split: { prepend: '```\n', append: '\n```' } });
+            for (const msg of Util.splitMessage(reply, { prepend: '```\n', append: '\n```' })) {
+                await message.channel.send(msg);
+            }
             theResult.replied = true;
             theResult.success = true;
             theResult.sentDM = ['dm', 'group'].includes(message.channel.type);

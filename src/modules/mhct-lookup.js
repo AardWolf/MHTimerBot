@@ -120,9 +120,12 @@ async function sendInteractiveSearchResult(searchResults, channel, dataCallback,
         }).catch(err => Logger.error('Reactions: error setting reactions:\n', err));
 
     // Always send one result to the channel.
-    sent.then(() => dataCallback(isDM, matches[0].match, urlInfo.qsParams).then(
-        result => channel.send({ content: result || `Not enough quality data for ${searchInput}`, split: { prepend: '```\n', append: '\n```' } })),
-    ).catch(err => Logger.error(err));
+    sent.then(() => dataCallback(isDM, matches[0].match, urlInfo.qsParams))
+        .then(async (result) => {
+            for (const msg of Util.splitMessage(result || `Not enough quality data for ${searchInput}`, { prepend: '```\n', append: '\n```' })) {
+                await channel.send(msg);
+            }
+        }).catch(err => Logger.error('SendInteractive: error responding in channel', err));
 }
 
 /**

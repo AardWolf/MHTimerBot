@@ -161,7 +161,9 @@ async function doSet(message, tokens) {
     }
     if (reply) {
         try {
-            Util.splitMessage(reply).forEach(r => message.channel.send(r));
+            for (const msg of Util.splitMessage(reply)) {
+                await message.channel.send(msg);
+            }
             theResult.replied = true;
             if (message.channel.type === 'dm') theResult.sentDm = true;
             theResult.success = true;

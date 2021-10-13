@@ -1,17 +1,19 @@
 // Type-hinting imports
 // eslint-disable-next-line no-unused-vars
-const { Message, GuildMember, Snowflake } = require('discord.js');
+const { Message, Util } = require('discord.js');
 
 const CommandResult = require('../interfaces/command-result');
 const Logger = require('../modules/logger');
 const { unsetHunterID, setHunterID, setHunterProperty, cleanHunters } = require('../modules/hunter-registry');
+const security = require('../modules/security');
+
 const usage = [
     'user USER - Removes the user from the registry',
     'block USER - Removes and blocks the user from re-registering, `user` undoes the block',
     'hid USER <hid> - sets a hunter ID for a user and turns on stalker mode',
     'clean - triggers a cleaning cycle to remove users no longer in the server [admin only]',
 ].join('\n\t');
-const security = require('../modules/security');
+
 /**
  * @param {Message} message The message that triggered the command
  * @param {string[]} tokens The arguments to the command
@@ -41,6 +43,7 @@ async function doNOT_IAM(message, tokens) {
                 hunter = '';
             }
         }
+
         if ((subCommand === 'user' || subCommand === 'remove') && hunter) {
             reply = await unsetHunterID(hunter);
         }
@@ -57,7 +60,9 @@ async function doNOT_IAM(message, tokens) {
     }
     if (reply) {
         try {
-            await message.channel.send(reply, { split: true });
+            for (const msg of Util.splitMessage(reply)) {
+                await message.channel.send(msg);
+            }
             theResult.replied = true;
             theResult.success = true;
         } catch (err) {

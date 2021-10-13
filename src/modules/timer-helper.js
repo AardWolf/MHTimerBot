@@ -3,6 +3,22 @@ const { MessageEmbed } = require('discord.js');
 const { timeLeft } = require('../modules/format-utils');
 
 /**
+ * @typedef {Object} ReminderRequest
+ * @property {string|null} area
+ * @property {string|null} sub_area
+ * @property {number|null} count
+ */
+
+/**
+ * @typedef {object} TimerReminder
+ * @property {string} user A Snowflake representing the user who requested the reminder.
+ * @property {number} count The number of remaining times this reminder will activate.
+ * @property {string} area The area to which this reminder applies, e.g. "fg"
+ * @property {string} [sub_area] A logical "location" within the area, e.g. "close" or "open" for Forbidden Grove.
+ * @property {number} [fail] The number of times this particular reminder encountered an error (during send, etc.)
+ */
+
+/**
  * Inspects the current timers list to dynamically determine the text to print when informing users
  * of what timers are available.
  * @param {Timer[]} timers_list Object with timer list and information
@@ -325,7 +341,7 @@ function parseTokenForArea(token, newReminder) {
 
 /**
  * Returns the next occurrence of the desired class of timers as a MessageEmbed.
- * @param {any[]} timers_list List of known timers
+ * @param {Timer[]} timers_list List of known timers
  * @param {ReminderRequest} validTimerData Validated input that is known to match an area and subarea
  * @param {string} botPrefix The prefix for the bot on this guild
  * @returns {MessageEmbed} A rich snippet summary of the next occurrence of the matching timer.
@@ -358,7 +374,7 @@ function nextTimer(timers_list, validTimerData, botPrefix) {
  * List the reminders for the user, and PM them the result.
  *
  * @param {string} user A Discord Snowflake user id
- * @param {any[]} reminders Array of reminders the bot is managing
+ * @param {TimerReminder[]} reminders Array of reminders the bot is managing
  * @param {string} botPrefix The bot prefix for the channel in use
  */
 function listRemind(user, reminders, botPrefix) {
