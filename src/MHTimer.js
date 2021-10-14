@@ -610,15 +610,16 @@ function parseUserMessage(message) {
             }
             case 'shutdown': {
                 if (message.author.id === settings.owner) {
-                    message.channel.send('Good-bye');
-                    quit().then(didSave => didSave ? process.exit() : message.channel.send('Uhhh, save failed'));
+                    message.channel.send('So long, and thank\'s for all the fish.')
+                        .then(() => quit()); // Quit will _always_ terminate.
                 }
                 break;
             }
             case 'save': {
                 if (message.author.id === settings.owner) {
-                    message.channel.send('Asynchronous save started');
-                    doSaveAll().then(didSaveAll => message.channel.send(`Save complete: ${didSaveAll ? 'success': 'failure'}`));
+                    message.channel.send('Asynchronous save started')
+                        .then(() => doSaveAll())
+                        .then(didSaveAll => message.channel.send(`Save complete: ${didSaveAll ? 'success': 'failure'}`));
                 }
                 break;
             }
@@ -673,7 +674,7 @@ async function convertRewardLink(message) {
         } else {
             return '';
         }
-    }))).filter(nl => !!nl);
+    }))).filter(nl => Boolean(nl));
     if (!newLinks.length)
         return;
 
