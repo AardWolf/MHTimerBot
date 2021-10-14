@@ -79,7 +79,7 @@ async function doREMIND(message, tokens) {
     // Assume the desired timer is the one that matched the given criteria and occurs next.
     const [timer] = choices;
     if (!timer) {
-        return sendDM(`I'm sorry, there weren't any timers I know of that match your request. I know\n${getKnownTimersDetails()}`, message.author, theResult)
+        return sendDM(`I'm sorry, there weren't any timers I know of that match your request. I know\n${getKnownTimersDetails()}`, message.author, theResult);
     }
 
     // If the reminder already exists, set its new count to the requested count.
