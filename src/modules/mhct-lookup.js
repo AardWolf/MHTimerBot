@@ -101,12 +101,9 @@ async function sendInteractiveSearchResult(searchResults, channel, dataCallback,
             result = await dataCallback(asDM, entity, urlInfo.qsParams);
         } catch (err) {
             Logger.error(`SendInteractive: error executing data callback for "${entity.value}"`, err);
-            result = `Sorry, I had an issue looking up "${entity.value}"`;
+            return `Sorry, I had an issue looking up "${entity.value}"`;
         }
-        if (!result) {
-            result = `Sorry, I didn't find anything when looking up "${entity.value}"`;
-        }
-        return result;
+        return result ? result : `Sorry, I didn't find anything when looking up "${entity.value}"`;
     };
 
     const sendResponse = async (ctx, text, errMsg) => {
