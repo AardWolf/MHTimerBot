@@ -118,19 +118,19 @@ test('commands - NOTIAM', suite => {
         sinon.reset();
     });
     suite.test('when user is mod; clean, does NOT call cleanHunters', async t => {
-        t.plan(3);
+        t.plan(4);
 
-        const messageStub = mockMessage();
         const memberStub = mockMember();
+        const messageStub = mockMessage({ clientStub: memberStub.client });
         memberStub.permissions.has.withArgs(Permissions.FLAGS.MANAGE_MESSAGES).returns(true);
         messageStub.guild = memberStub.guild;
-        messageStub.client = memberStub.client;
         messageStub.member = memberStub;
         const result = await NOTIAM.execute(messageStub, ['clean']);
-        t.true(result.replied, 'should NOT reply to mods');
+        t.true(result.replied, 'should reply to mods');
         t.strictEqual(hunterStubs.cleanHunters.callCount, 0, 'should NOT call cleanHunters');
         const reply = messageStub.channel.send.getCall(0).args[0];
-        t.match(reply, /not sure what to do with that./, 'should give usage error');
+        t.match(reply, /I'm afraid I can't do that/, 'should give usage error');
+        t.match(logStubs.log.getCall(0).args[0], /Unauthorized use of "clean"/, 'should log attempt');
 
         sinon.reset();
     });
