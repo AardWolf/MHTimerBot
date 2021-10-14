@@ -81,7 +81,7 @@ class Timer {
         this._advanceNotice = getAsDuration(seed.announce_offset || 0, true);
 
         // Default to not silent
-        this._silent = !!seed.silent;
+        this._silent = Boolean(seed.silent);
 
         /** @type {Object <string, NodeJS.Timer>} the NodeJS.Timer object created by NodeJS.setTimeout() */
         this._timeout = {};

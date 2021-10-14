@@ -59,7 +59,7 @@ async function doMINLUCK(message, tokens) {
                 if (flag.charAt(1).toLowerCase() in typeMap)
                     return flag.charAt(1).toLowerCase();
             }
-        }).filter(word => !!word);
+        }).filter(word => Boolean(word));
         if (!flags.length)
             flags = allFlags;
         flags = flags.flat().filter((value, index, self) => self.indexOf(value) === index);

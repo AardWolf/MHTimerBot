@@ -877,7 +877,7 @@ function doRemind(timer) {
             if (a.count === b.count)
                 // The two reminder quotas are equal: coerce the sub-areas from string -> bool -> int
                 // and then return a descending sort (since true -> 1 and true means it was specific).
-                return (!!b.sub_area) * 1 - (!!a.sub_area) * 1;
+                return Boolean(b.sub_area) * 1 - Boolean(a.sub_area) * 1;
 
             // For dissimilar quotas, we know only one can be perpetual. If one is perpetual, sort descending.
             // Else, sort ascending.
