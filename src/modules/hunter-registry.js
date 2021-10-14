@@ -1,6 +1,6 @@
 // Type-hinting imports
 // eslint-disable-next-line no-unused-vars
-const { Message } = require('discord.js');
+const { Message, Snowflake } = require('discord.js');
 const { Duration } = require('luxon');
 // These two added to auto-populate some values
 const fetch = require('node-fetch');
@@ -125,13 +125,11 @@ async function saveHunters(path = hunter_ids_filename) {
  * @param {Snowflake} hunter A Discord ID snowflake
  */
 function unsetHunterID(hunter) {
-    let response = '';
-    if (hunters[hunter]) {
+    if (hunter in hunters) {
         delete hunters[hunter];
-        response = '*POOF*, all gone!';
-    } else
-        response = 'I didn\'t do anything but that\'s because you didn\'t do anything either.';
-    return response;
+        return '*POOF*, all gone!';
+    }
+    return 'I didn\'t do anything but that\'s because you didn\'t do anything either.';
 }
 
 /**
@@ -190,7 +188,7 @@ function setHunterProperty(discordId, property, value) {
 /**
  * Returns a stringified version of the hunter's object
  *
- * @param {bigint} hunter the discordId for the user to look up
+ * @param {Snowflake} hunter the discordId for the user to look up
  * @returns {string} The property string for that ID
  */
 function getHunterProperties(hunter) {
@@ -230,24 +228,26 @@ function getHuntersByProperty(property, criterion, limit = 5) {
  * Find the self-registered account for the user identified by the given Discord ID.
  * Returns undefined if the user has not self-registered.
  *
- * @param {message} message a Discord message object
- * @param {string} discordId the Discord ID of a registered hunter.
+ * @param {Snowflake} discordId the Discord ID of a registered hunter.
  * @returns {string?} the hunter ID of the registered hunter having that Discord ID.
  */
 function getHunterByDiscordID(discordId) {
-    if (hunters[discordId] && !('block' in hunters[discordId]))
+    if (discordId in hunters && !('block' in hunters[discordId]))
         return hunters[discordId]['hid'];
 }
 
 /**
  * Populates some values based on the discordId
- * @param hunterId
+ * @param {Snowflake} hunterId
+ * @returns {Promise<boolean>}
  */
 async function populateHunter(discordId) {
-    if (!hunters[discordId] || !hunters[discordId]['hid'])
+    const hunter = hunters[discordId];
+    const hid = hunter?.hid;
+    if (!hid)
         return false;
 
-    const url = `https://www.mousehuntgame.com/p.php?id=${hunters[discordId]['hid']}`;
+    const url = `https://www.mousehuntgame.com/p.php?id=${hid}`;
     try {
         const response = await fetch(url);
         const body = await response.text();
@@ -272,19 +272,19 @@ async function populateHunter(discordId) {
 /**
  * Clean up hunters who are no longer in the server
  * TODO: This needs to work with multiple servers -- might be handled in unsetHunterID
- * @param message message that triggered the action
+ * @param {Message} message message that triggered the action
  */
 function cleanHunters(message) {
-    const author = message.author;
-    Logger.log(`Hunter: cleaning cycle triggered by ${author.id} for guild ${message.guild.id}`);
-    Object.keys(hunters)
-        .filter(key => hunters[key].hid)
-        .forEach((discordID) => {
-            if(!message.guild.members.cache.get(discordID)) {
-                Logger.log(`Cleaning up ${discordID} from ${message.guild.id}`);
-                unsetHunterID(discordID);
-            }
-        });
+    Logger.log(`Hunter: cleaning cycle triggered by "${message.author.id}" for guild "${message.guild.id}"`);
+    const guildMembers = message.guild.members.cache;
+    const removed = Object.keys(hunters)
+        .filter(discordID => hunters[discordID].hid && !guildMembers.get(discordID))
+        .map((discordID) => ((unsetHunterID(discordID) === '*POOF*, all gone!') ? discordID : null))
+        .filter((id) => Boolean(id));
+
+    if (removed.length) {
+        Logger.log(`Hunters: Cleaned up ${removed.length} hunters that left: "${removed.join('", "')}"`);
+    }
     return 'Clean cycle complete';
 }
 
