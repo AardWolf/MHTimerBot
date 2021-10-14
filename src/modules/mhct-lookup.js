@@ -1,13 +1,14 @@
-const fetch = require('node-fetch');
-const Logger = require('../modules/logger');
-const { DateTime, Duration } = require('luxon');
-const DatabaseFilter = require('../models/dbFilter');
-const { calculateRate, prettyPrintArrayAsString, intToHuman, integerComma } = require('../modules/format-utils');
-const { getSearchedEntity } = require('../modules/search-helpers');
 // eslint-disable-next-line no-unused-vars
-const { MessageEmbed, Util, TextChannel } = require('discord.js');
+const { Message, MessageEmbed, MessageReaction, Util, TextChannel } = require('discord.js');
+const { DateTime, Duration } = require('luxon');
+const fetch = require('node-fetch');
 const { firstBy } = require('thenby');
 const csv_parse = require('csv-parse');
+
+const DatabaseFilter = require('../models/dbFilter');
+const { calculateRate, prettyPrintArrayAsString, intToHuman, integerComma } = require('../modules/format-utils');
+const Logger = require('../modules/logger');
+const { getSearchedEntity } = require('../modules/search-helpers');
 
 const refresh_rate = Duration.fromObject({ minutes: 30 });
 const refresh_list = {
@@ -93,39 +94,70 @@ async function sendInteractiveSearchResult(searchResults, channel, dataCallback,
     const searchResponse = (isDM && matches.length === 1)
         ? `I found a single result for '${searchInput}':`
         : { embeds: [embed] };
+
+    const executeCallback = async (asDM, entity) => {
+        let result = '';
+        try {
+            result = await dataCallback(asDM, entity, urlInfo.qsParams);
+        } catch (err) {
+            Logger.error(`SendInteractive: error executing data callback for "${entity.value}"`, err);
+            result = `Sorry, I had an issue looking up "${entity.value}"`;
+        }
+        if (!result) {
+            result = `Sorry, I didn't find anything when looking up "${entity.value}"`;
+        }
+        return result;
+    };
+
+    const sendResponse = async (ctx, text, errMsg) => {
+        try {
+            for (const content of Util.splitMessage(text, { prepend: '```', append: '```' })) {
+                await ctx.send({ content });
+            }
+        } catch (sendError) {
+            Logger.error(`SendInteractive: ${errMsg}`, sendError);
+        }
+    };
+
+    /**
+     * Enable users to react to the given message to get detailed DB results for their selection.
+     * @param {Message} msg The bot's interactive query message
+     */
+    const addReactivity = async (msg) => {
+        const ids = matches.map((m) => m.emojiId);
+        // Add a reaction listener to the message first, to eliminate latency issues in processing reactions.
+        const filter = (reaction, user) => !user.bot && ids.includes(reaction.emoji.identifier);
+        const rc = msg.createReactionCollector({ filter, time: 5 * 60 * 1000 });
+        rc.on('collect', async (mr, user) => {
+            // Fetch the response and DM it to the user.
+            const entity = matches.find(m => m.emojiId === mr.emoji.identifier)?.match;
+            if (!entity) {
+                Logger.warn(`SendInteractive: Collected unexpected reaction "${mr.emoji}" from "${user.tag}"`);
+                return;
+            }
+            // Get the DB response for the given entity.
+            const result = await executeCallback(true, entity);
+            await sendResponse(user, result, `Error while DMing user "${user.tag}"`);
+        });
+        rc.on('end', () => rc.message.delete().catch((err) => Logger.error('SendInteractive: Failed to delete interactive message', err)));
+        // Add the reactions
+        for (const m of matches) {
+            try {
+                await msg.react(m.emojiId);
+            } catch (reactErr) {
+                Logger.error(`SendInteractive: error adding reaction emoji ${m.emojiId}`, reactErr);
+            }
+        }
+    };
+
     const sent = channel.send(searchResponse);
-    // To ensure a sensible order of emojis, we have to await the previous react's resolution.
-    if (!isDM || matches.length > 1)
-        sent.then(async (msg) => {
-            /** @type MessageReaction[] */
-            const mrxns = [];
-            for (const m of matches)
-                mrxns.push(await msg.react(m.emojiId).catch(err => Logger.error(err)));
-            return mrxns;
-        }).then(msgRxns => {
-            // Set a 5-minute listener on the message for these reactions.
-            const msg = msgRxns[0].message,
-                allowed = msgRxns.map(mr => mr.emoji.name),
-                filter = (reaction, user) => allowed.includes(reaction.emoji.name) && !user.bot,
-                rc = msg.createReactionCollector({ filter, time: 5 * 60 * 1000 });
-            rc.on('collect', (mr, user) => {
-                // Fetch the response and send it to the user.
-                const match = matches.filter(m => m.emojiId === mr.emoji.identifier)[0];
-                if (match) dataCallback(true, match.match, urlInfo.qsParams).then(
-                    result => Util.splitMessage(result || `Not enough quality data for ${searchInput}`, { prepend: '```', append: '```' })
-                        .forEach(part => user.send({ content: part })),
-                    result => user.send(result || 'Not enough quality data to display this'),
-                ).catch(err => Logger.error(err));
-            }).on('end', () => rc.message.delete().catch(() => Logger.log('Unable to delete reaction message')));
-        }).catch(err => Logger.error('Reactions: error setting reactions:\n', err));
+    if (!isDM || matches.length > 1) {
+        sent.then(addReactivity);
+    }
 
     // Always send one result to the channel.
-    sent.then(() => dataCallback(isDM, matches[0].match, urlInfo.qsParams))
-        .then(async (result) => {
-            for (const msg of Util.splitMessage(result || `Not enough quality data for ${searchInput}`, { prepend: '```\n', append: '\n```' })) {
-                await channel.send(msg);
-            }
-        }).catch(err => Logger.error('SendInteractive: error responding in channel', err));
+    const query = executeCallback(isDM, matches[0].match);
+    sent.then(async () => sendResponse(channel, await query, 'error responding in channel'));
 }
 
 /**
