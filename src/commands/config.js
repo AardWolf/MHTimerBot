@@ -99,9 +99,7 @@ async function doSet(message, tokens) {
         Logger.log(`Roles: ${[...guild.roles.cache.values()]}`);
     }
     else if (action === 'timers') {
-        let subAction = '';
-        if (tokens.length)
-            subAction = tokens.shift().toLowerCase();
+        const subAction = (tokens.length) ? tokens.shift().toLowerCase() : '';
         if (subAction === 'add') {
             // Next argument should be a channel reference, add it to the array of timer channels.
             const [channel] = Array.from(message.mentions.channels.values());
@@ -112,30 +110,27 @@ async function doSet(message, tokens) {
             else if (!('name' in channel))
                 reply = `Didn't add ${channel.toString()} because it has no name`;
             else if (guildSettings.timedAnnouncementChannels.has(channel.name))
-                reply = `Didn't add ${channel.name} because it's already in the list`;
+                reply = `Didn't add ${channel.toString()} because it's already in the list`;
             else {
                 guildSettings.timedAnnouncementChannels.add(channel.name);
-                reply = `I added ${channel.name} but because Aard is lazy it won't be used until next restart`;
+                reply = `I added ${channel.toString()} but because Aard is lazy it won't be used until next restart`;
+                Logger.log(`CONFIG: Added channel ${channel.id} (${channel.name}) to timers for guild ${guild.id} (${guild.name})`);
             }
         }
         else if (subAction === 'remove') {
             // Next argument should be a channel reference, remove it from the array of timer channels.
-            const channels = message.mentions.channels.array();
-            if (channels && channels.length > 0) {
-                const channel = channels.shift();
-                if (!channel)
-                    reply = 'I don\'t think you gave me a channel to remove';
-                else if (!channel.name)
-                    reply = `Didn't remove ${channel.toString()} because I couldn't figure out its name`;
-                else if (guildSettings.timedAnnouncementChannels.has(channel.name)) {
-                    guildSettings.timedAnnouncementChannels.delete(channel.name);
-                    reply = `Removed ${channel.name} but because Aard is lazy it won't stop being used until next restart`;
-                }
-                else {
-                    reply = `I didn't remove ${channel.name} because it's not in use`;
-                }
-            } else {
-                reply = 'I only work with mentions of channels and none was mentioned';
+            const [channel] = Array.from(message.mentions.channels.values());
+            if (!channel)
+                reply = 'I don\'t think you gave me a channel to remove';
+            else if (!('name' in channel))
+                reply = `Didn't remove ${channel.toString()} because I couldn't figure out its name`;
+            else if (guildSettings.timedAnnouncementChannels.has(channel.name)) {
+                guildSettings.timedAnnouncementChannels.delete(channel.name);
+                reply = `Removed ${channel.toString()} but because Aard is lazy it won't stop being used until next restart`;
+                Logger.log(`CONFIG: Removed channel ${channel.id} (${channel.name}) from timers for guild ${guild.id} (${guild.name})`);
+            }
+            else {
+                reply = `I didn't remove ${channel.toString()} because it's not in use`;
             }
         }
         else {
@@ -163,7 +158,7 @@ async function doSet(message, tokens) {
             if (message.channel.type === 'DM') theResult.sentDm = true;
             theResult.success = true;
         } catch (err) {
-            Logger.error('IAM: failed to send reply', err);
+            Logger.error('CONFIG: failed to send reply', err);
             theResult.botError = true;
         }
     }
