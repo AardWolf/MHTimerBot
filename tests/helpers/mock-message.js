@@ -1,3 +1,4 @@
+const { Collection } = require('discord.js');
 const sinon = require('sinon');
 
 /**
@@ -19,6 +20,7 @@ const mockMessage = ({
     rankNicknames = {},
     authorId = '123456789',
     clientStub = {},
+    mentionedChannels = [],
 } = {}) => {
     // Stub the client, and its nicknames Map.
     const baseClient = {
@@ -27,7 +29,7 @@ const mockMessage = ({
     };
     baseClient.nicknames.get.withArgs('locations').returns(locationNicknames);
     baseClient.nicknames.get.withArgs('ranks').returns(rankNicknames);
-    const clientWithSettings = Object.assign({}, baseClient, clientStub);
+    const clientWithSettings = { ...baseClient, ...clientStub };
 
     const stub = {
         client: clientWithSettings,
@@ -38,6 +40,9 @@ const mockMessage = ({
         },
         react: reactStub,
         reply: replyStub,
+        mentions: {
+            channels: new Collection(mentionedChannels),
+        },
     };
     return stub;
 };

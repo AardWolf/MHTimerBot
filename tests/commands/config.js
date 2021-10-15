@@ -1,6 +1,6 @@
 const test = require('tape');
 const sinon = require('sinon');
-const { Collection, Permissions } = require('discord.js');
+const { Permissions } = require('discord.js');
 
 // Stub Logger methods to minimize crosstalk.
 const { stubLogger, restoreLogger } = require('../helpers/logging');
@@ -17,7 +17,6 @@ const stubAsOwner = () => {
     const messageStub = mockMessage({ authorId: '1', clientStub: memberStub.client });
     messageStub.guild = memberStub.guild;
     messageStub.member = memberStub;
-    messageStub.mentions = { channels: new Collection() };
     return messageStub;
 };
 
@@ -26,7 +25,6 @@ function stubAsAdmin() {
     const messageStub = mockMessage({ clientStub: memberStub.client });
     messageStub.guild = memberStub.guild;
     messageStub.member = memberStub;
-    messageStub.mentions = { channels: new Collection() };
     memberStub.permissions.has.withArgs(Permissions.FLAGS.ADMINISTRATOR).returns(true);
     memberStub.permissions.has.withArgs(Permissions.FLAGS.MANAGE_MESSAGES).returns(true);
     return messageStub;
@@ -178,7 +176,7 @@ test('commands - config', suite => {
         t.true(result.replied);
         t.strictEqual(messageStub.channel.send.callCount, 1, 'should call channel.send');
         const reply = messageStub.channel.send.getCall(0).args[0];
-        t.match(reply, /I don\'t think you gave me a channel to add/, 'should request channel mention');
+        t.match(reply, /I don't think you gave me a channel to add/, 'should request channel mention');
     });
     suite.test('when user is admin; timers; remove w/o channel', async t => {
         t.plan(3);
@@ -189,7 +187,7 @@ test('commands - config', suite => {
         t.true(result.replied);
         t.strictEqual(messageStub.channel.send.callCount, 1, 'should call channel.send');
         const reply = messageStub.channel.send.getCall(0).args[0];
-        t.match(reply, /I don\'t think you gave me a channel to remove/, 'should request channel mention');
+        t.match(reply, /I don't think you gave me a channel to remove/, 'should request channel mention');
     });
 
     suite.test('Restore Loggers - config', t => {
