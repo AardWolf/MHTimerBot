@@ -11,6 +11,7 @@ const fs = require('fs');
 const { Client, Collection, Constants, Guild, GuildMember, Intents, Message, MessageReaction, MessageEmbed, TextChannel, User } = Discord;
 
 // Import our own local classes and functions.
+const { isDMChannel } = require('./modules/channel-utils.js');
 const Timer = require('./modules/timers.js');
 const CommandResult = require('./interfaces/command-result');
 const {
@@ -233,7 +234,7 @@ function Main() {
                             convertRewardLink(message);
                         break;
                     default:
-                        if (message.channel.type === 'DM' || message.channel.type === 'GROUP_DM')
+                        if (isDMChannel(message.channel.type))
                             parseUserMessage(message);
                         else if (re[message.guild.id].test(message.content))
                             parseUserMessage(message);
@@ -555,7 +556,7 @@ function parseUserMessage(message) {
                 `\t${dynCommand.usage.replace('\n', '\t\n')}\n\`\`\``;
             message.reply({ content: reply });
         }
-        else if (!dynCommand.canDM && message.channel.type === 'DM') {
+        else if (!dynCommand.canDM && isDMChannel(message.channel.type)) {
             const reply = `\`${command.toLowerCase()}\` is not allowed in DMs`;
             message.reply({ content: reply });
         }

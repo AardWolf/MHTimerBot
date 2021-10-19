@@ -2,6 +2,7 @@
 const { Message, Util } = require('discord.js');
 
 const CommandResult = require('../interfaces/command-result');
+const { isDMChannel } = require('../modules/channel-utils');
 const Logger = require('../modules/logger');
 const { getFilter, getLoot, formatLoot,
     sendInteractiveSearchResult, listFilters, getMice, formatMice } = require('../modules/mhct-lookup');
@@ -52,10 +53,10 @@ async function doIFIND(message, tokens) {
             // We have multiple options, show the interactive menu
             urlInfo.qsParams = opts;
             sendInteractiveSearchResult(all_loot, message.channel, formatLoot,
-                ['DM', 'GROUP_DM'].includes(message.channel.type), urlInfo, searchString);
+                isDMChannel(message.channel), urlInfo, searchString);
             theResult.replied = true;
             theResult.success = true;
-            theResult.sentDM = ['DM', 'GROUP_DM'].includes(message.channel.type);
+            theResult.sentDM = isDMChannel(message.channel);
         } else {
             const all_mice = getMice(searchString, message.client.nicknames.get('mice'));
             if (all_mice && all_mice.length) {
@@ -64,10 +65,10 @@ async function doIFIND(message, tokens) {
                 urlInfo.type = 'mouse';
                 urlInfo.uri = 'https://www.mhct.win/attractions.php';
                 sendInteractiveSearchResult(all_mice, message.channel, formatMice,
-                    ['DM', 'GROUP_DM'].includes(message.channel.type), urlInfo, searchString);
+                    isDMChannel(message.channel), urlInfo, searchString);
                 theResult.replied = true;
                 theResult.success = true;
-                theResult.sentDM = ['DM', 'GROUP_DM'].includes(message.channel.type);
+                theResult.sentDM = isDMChannel(message.channel);
             } else {
                 reply = `I don't know anything about "${searchString}"`;
             }
@@ -81,7 +82,7 @@ async function doIFIND(message, tokens) {
             }
             theResult.replied = true;
             theResult.success = true;
-            theResult.sentDM = ['DM', 'GROUP_DM'].includes(message.channel.type);
+            theResult.sentDM = isDMChannel(message.channel);
         } catch (err) {
             Logger.error('IFIND: failed to send reply', err);
             theResult.botError = true;

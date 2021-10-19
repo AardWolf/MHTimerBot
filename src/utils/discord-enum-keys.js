@@ -4,5 +4,5 @@
  * @returns {ReadonlySet<string>}
  */
 module.exports = (discordEnum) => Object.freeze(
-    new Set(Object.values(discordEnum).filter((value) => typeof value === 'string'))
+    new Set(Object.values(discordEnum).filter((value) => typeof value === 'string')),
 );

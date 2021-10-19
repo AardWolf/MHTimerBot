@@ -3,6 +3,7 @@ const { Message, Util } = require('discord.js');
 
 const { DateTime, Duration } = require('luxon');
 const CommandResult = require('../interfaces/command-result');
+const { isDMChannel } = require('../modules/channel-utils');
 const { timeLeft } = require('../modules/format-utils');
 const Logger = require('../modules/logger');
 const { timerAliases } = require('../modules/timer-helper');
@@ -40,7 +41,7 @@ async function doSCHED(message, tokens) {
             await message.channel.send('Invalid timespan given - how many hours did you want to look ahead?');
             theResult.replied = true;
             theResult.success = false;
-            theResult.sentDM = ['DM', 'GROUP_DM'].includes(message.channel.type);
+            theResult.sentDM = isDMChannel(message.channel);
         } catch (err) {
             Logger.error('SCHED: failed to send reply', err);
             theResult.botError = true;
@@ -91,7 +92,7 @@ async function doSCHED(message, tokens) {
             }
             theResult.replied = true;
             theResult.success = true;
-            theResult.sentDM = ['DM', 'GROUP_DM'].includes(message.channel.type);
+            theResult.sentDM = isDMChannel(message.channel);
         } catch (err) {
             Logger.error('SCHED: failed to send reply', err);
             theResult.botError = true;

@@ -2,6 +2,7 @@
 const { Message } = require('discord.js');
 
 const CommandResult = require('../interfaces/command-result');
+const { isDMChannel } = require('../modules/channel-utils');
 const Logger = require('../modules/logger');
 const { getKnownTimersDetails, timerAliases, nextTimer } = require('../modules/timer-helper');
 
@@ -56,7 +57,7 @@ async function doNEXT(message, tokens) {
             }
             theResult.replied = true;
             theResult.success = true;
-            theResult.sentDM = ['DM', 'GROUP_DM'].includes(message.channel.type);
+            theResult.sentDM = isDMChannel(message.channel);
         } catch (err) {
             Logger.error('NEXT: failed to send reply', err);
             theResult.botError = true;

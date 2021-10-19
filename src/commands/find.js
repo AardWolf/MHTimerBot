@@ -1,10 +1,11 @@
 // eslint-disable-next-line no-unused-vars
 const { Message, Util } = require('discord.js');
 
+const CommandResult = require('../interfaces/command-result');
+const { isDMChannel } = require('../modules/channel-utils');
 const Logger = require('../modules/logger');
 const { initialize, getFilter, getMice, formatMice, sendInteractiveSearchResult,
     listFilters, getLoot, formatLoot, save } = require('../modules/mhct-lookup');
-const CommandResult = require('../interfaces/command-result');
 
 /**
  *
@@ -51,10 +52,10 @@ async function doFIND(message, tokens) {
             // We have multiple options, show the interactive menu
             urlInfo.qsParams = opts;
             sendInteractiveSearchResult(all_mice, message.channel, formatMice,
-                ['DM', 'GROUP_DM'].includes(message.channel.type), urlInfo, searchString);
+                isDMChannel(message.channel), urlInfo, searchString);
             theResult.replied = true;
             theResult.success = true;
-            theResult.sentDM = ['DM', 'GROUP_DM'].includes(message.channel.type);
+            theResult.sentDM = isDMChannel(message.channel);
         } else {
             const all_loot = getLoot(searchString, message.client.nicknames.get('loot'));
             if (all_loot && all_loot.length) {
@@ -63,10 +64,10 @@ async function doFIND(message, tokens) {
                 urlInfo.type = 'item';
                 urlInfo.uri = 'https://www.mhct.win/loot.php';
                 sendInteractiveSearchResult(all_loot, message.channel, formatLoot,
-                    ['DM', 'GROUP_DM'].includes(message.channel.type), urlInfo, searchString);
+                    isDMChannel(message.channel), urlInfo, searchString);
                 theResult.replied = true;
                 theResult.success = true;
-                theResult.sentDM = ['DM', 'GROUP_DM'].includes(message.channel.type);
+                theResult.sentDM = isDMChannel(message.channel);
             } else {
                 reply = `I don't know anything about "${searchString}"`;
             }
@@ -80,7 +81,7 @@ async function doFIND(message, tokens) {
             }
             theResult.replied = true;
             theResult.success = true;
-            theResult.sentDM = ['DM', 'GROUP_DM'].includes(message.channel.type);
+            theResult.sentDM = isDMChannel(message.channel);
         } catch (err) {
             Logger.error('FIND: failed to send reply', err);
             theResult.botError = true;

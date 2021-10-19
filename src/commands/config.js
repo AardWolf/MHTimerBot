@@ -3,6 +3,7 @@
 const { Message, Util } = require('discord.js');
 
 const CommandResult = require('../interfaces/command-result');
+const { isDMChannel } = require('../modules/channel-utils');
 const Logger = require('../modules/logger');
 const security = require('../modules/security');
 const usage = [
@@ -155,7 +156,7 @@ async function doSet(message, tokens) {
                 await message.channel.send(msg);
             }
             theResult.replied = true;
-            if (message.channel.type === 'DM') theResult.sentDm = true;
+            theResult.sentDm = isDMChannel(message.channel);
             theResult.success = true;
         } catch (err) {
             Logger.error('CONFIG: failed to send reply', err);

@@ -3,8 +3,10 @@
 const { Message, Util } = require('discord.js');
 
 const CommandResult = require('../interfaces/command-result');
+const { isDMChannel } = require('../modules/channel-utils');
 const Logger = require('../modules/logger');
 const { unsetHunterID, setHunterID, setHunterProperty, initialize, save, getHunterProperties } = require('../modules/hunter-registry');
+
 const usage = [
     '#### - provide a number to set your hunter ID (**Must be done first**)',
     'rank <rank> - identify your rank',
@@ -58,7 +60,7 @@ async function doIAM(message, tokens) {
                 await message.channel.send(msg);
             }
             theResult.replied = true;
-            if (['DM', 'GROUP_DM'].includes(message.channel.type)) theResult.sentDm = true;
+            theResult.sentDm = isDMChannel(message.channel);
             theResult.success = true;
         } catch (err) {
             Logger.error('IAM: failed to send reply', err);
