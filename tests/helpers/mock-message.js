@@ -1,10 +1,12 @@
-const { Collection } = require('discord.js');
+const { Collection, Constants } = require('discord.js');
+const { ChannelTypes } = Constants;
+const Keys = require('../../src/utils/discord-enum-keys');
 const sinon = require('sinon');
 
 /**
  * A facsimile of a Discord Message, for use in tests
  * @param {object} c Config object
- * @param {'DM'|'GROUP_DM'|'GUILD_TEXT'} c.channelType Type of the channel the message was received in (default = GUILD_TEXT)
+ * @param {keyof ChannelTypes} c.channelType Type of the channel the message was received in (default = GUILD_TEXT)
  * @param {Function} c.reactStub A stub for message#react
  * @param {Function} c.replyStub A stub for message#reply
  * @param {Function} c.sendStub A stub for message.channel#send
@@ -22,6 +24,9 @@ const mockMessage = ({
     clientStub = {},
     mentionedChannels = [],
 } = {}) => {
+    // Require valid channel type usage.
+    if (!Keys(ChannelTypes).has(channelType)) throw new Error(`"${channelType} is not valid; expected one of [${[...Keys(ChannelTypes).values()]}]`);
+
     // Stub the client, and its nicknames Map.
     const baseClient = {
         settings: { botPrefix: '-mh' },
