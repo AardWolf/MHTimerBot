@@ -8,7 +8,7 @@ const fs = require('fs');
 
 // Extract type-hinting definitions for Discord classes.
 // eslint-disable-next-line no-unused-vars
-const { Client, Collection, Guild, GuildMember, Intents, Message, MessageReaction, MessageEmbed, TextChannel, User } = Discord;
+const { Client, Collection, Constants, Guild, GuildMember, Intents, Message, MessageReaction, MessageEmbed, TextChannel, User } = Discord;
 
 // Import our own local classes and functions.
 const Timer = require('./modules/timers.js');
@@ -26,6 +26,7 @@ const {
     addMessageReaction,
 } = require('./modules/message-utils');
 const security = require('./modules/security.js');
+const EnumKeys = require('./utils/discord-enum-keys');
 
 // Access external URIs, like @devjacksmith 's tools.
 const fetch = require('node-fetch');
@@ -41,7 +42,6 @@ const client = new Client({ disabledEvents: ['TYPING_START'],
         Intents.FLAGS.DIRECT_MESSAGES,
         Intents.FLAGS.DIRECT_MESSAGE_REACTIONS],
     partials: ['MESSAGE', 'CHANNEL', 'REACTION'] });
-const textChannelTypes = new Set(['GUILD_TEXT', 'DM', 'GROUP_DM', 'GUILD_NEWS', 'GUILD_NEWS_THREAD', 'GUILD_PUBLIC_THREAD', 'GUILD_PRIVATE_THREAD']);
 const main_settings_filename = 'data/settings.json',
     timer_settings_filename = 'data/timer_settings.json',
     reminder_filename = 'data/reminders.json',
@@ -197,7 +197,7 @@ function Main() {
                 const announcables = client.guilds.cache.reduce((channels, guild) => {
                     const requested = client.settings.guilds[guild.id].timedAnnouncementChannels;
                     const candidates = guild.channels.cache
-                        .filter(c => requested.has(c.name) && textChannelTypes.has(c.type));
+                        .filter(c => requested.has(c.name) && EnumKeys(Constants.TextBasedChannelTypes).has(c.type));
                     if (candidates.size)
                         Array.prototype.push.apply(channels, Array.from(candidates.values()));
                     else if (requested.size) {
