@@ -35,8 +35,8 @@ async function addMessageReaction(executedCommand) {
 
     if (!inputResult.message) {
         ourResult.botError = true;
-    } else if (inputResult.message.channel.type === 'dm') {
-        // The requesting message was a DM, so we likely replied via DM.
+    } else if (inputResult.message.channel.type === 'DM') {
+        // The requesting message was a private DM, so we likely replied via DM.
         shouldAddReaction = !inputResult.sentDm;
     } else if (inputResult.sentDm) {
         // We sent a DM, but the request came from a non-DM channel (e.g. group DM or regular TextChannel)

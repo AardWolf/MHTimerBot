@@ -52,10 +52,10 @@ async function doIFIND(message, tokens) {
             // We have multiple options, show the interactive menu
             urlInfo.qsParams = opts;
             sendInteractiveSearchResult(all_loot, message.channel, formatLoot,
-                ['dm', 'group'].includes(message.channel.type), urlInfo, searchString);
+                ['DM', 'GROUP_DM'].includes(message.channel.type), urlInfo, searchString);
             theResult.replied = true;
             theResult.success = true;
-            theResult.sentDM = ['dm', 'group'].includes(message.channel.type);
+            theResult.sentDM = ['DM', 'GROUP_DM'].includes(message.channel.type);
         } else {
             const all_mice = getMice(searchString, message.client.nicknames.get('mice'));
             if (all_mice && all_mice.length) {
@@ -64,10 +64,10 @@ async function doIFIND(message, tokens) {
                 urlInfo.type = 'mouse';
                 urlInfo.uri = 'https://www.mhct.win/attractions.php';
                 sendInteractiveSearchResult(all_mice, message.channel, formatMice,
-                    ['dm', 'group'].includes(message.channel.type), urlInfo, searchString);
+                    ['DM', 'GROUP_DM'].includes(message.channel.type), urlInfo, searchString);
                 theResult.replied = true;
                 theResult.success = true;
-                theResult.sentDM = ['dm', 'group'].includes(message.channel.type);
+                theResult.sentDM = ['DM', 'GROUP_DM'].includes(message.channel.type);
             } else {
                 reply = `I don't know anything about "${searchString}"`;
             }
@@ -81,7 +81,7 @@ async function doIFIND(message, tokens) {
             }
             theResult.replied = true;
             theResult.success = true;
-            theResult.sentDM = ['dm', 'group'].includes(message.channel.type);
+            theResult.sentDM = ['DM', 'GROUP_DM'].includes(message.channel.type);
         } catch (err) {
             Logger.error('IFIND: failed to send reply', err);
             theResult.botError = true;

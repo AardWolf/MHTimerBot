@@ -56,7 +56,7 @@ test('addMessageReaction', suite => {
         t.plan(inputs.length);
         inputs.forEach(async (success) => {
             const message = {
-                channel: { type: 'dm' },
+                channel: { type: 'DM' },
                 react: sinon.spy(),
             };
             const input = new CommandResult({ success, sentDm: true, message });
@@ -72,7 +72,7 @@ test('addMessageReaction', suite => {
         t.plan(inputs.length * 2);
         inputs.forEach(async ({ success, emoji }) => {
             const message = {
-                channel: { type: 'dm' },
+                channel: { type: 'DM' },
                 react: sinon.spy(),
             };
             const input = new CommandResult({ success, sentDm: false, message });
@@ -84,7 +84,7 @@ test('addMessageReaction', suite => {
     suite.test('when origin was DM - when replied via DM - when command errored - does not react', async t => {
         t.plan(1);
         const message = {
-            channel: { type: 'dm' },
+            channel: { type: 'DM' },
             react: sinon.spy(),
         };
         const input = new CommandResult({ sentDm: true, botError: true, message });
@@ -96,7 +96,7 @@ test('addMessageReaction', suite => {
         t.plan(inputs.length * 2);
         inputs.forEach(async (success) => {
             const message = {
-                channel: { type: 'dm' },
+                channel: { type: 'DM' },
                 react: sinon.spy(),
             };
             const input = new CommandResult({ success, sentDm: false, botError: true, message });

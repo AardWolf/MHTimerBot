@@ -27,7 +27,7 @@ test('commands - IAM', suite => {
     suite.test('when channel is dm - when replying - signals caller', async t => {
         t.plan(2);
 
-        const messageStub = mockMessage({ channelType: 'dm' });
+        const messageStub = mockMessage({ channelType: 'DM' });
         const result = await IAM.execute(messageStub, []);
         t.true(result.replied, 'should reply');
         t.true(result.sentDm, 'should indicate DM was sent');
@@ -37,7 +37,7 @@ test('commands - IAM', suite => {
     suite.test('when channel is text - when replying - signals caller', async t => {
         t.plan(2);
 
-        const messageStub = mockMessage({ channelType: 'text' });
+        const messageStub = mockMessage({ channelType: 'GUILD_TEXT' });
         const result = await IAM.execute(messageStub, []);
         t.true(result.replied, 'should reply');
         t.false(result.sentDm, 'should reply publically');

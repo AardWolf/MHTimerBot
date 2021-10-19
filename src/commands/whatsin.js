@@ -36,10 +36,10 @@ async function doWHATSIN(message, tokens) {
             // We have multiple options, show the interactive menu
             urlInfo.qsParams = opts;
             sendInteractiveSearchResult(all_convertibles, message.channel, formatConvertibles,
-                ['dm', 'group'].includes(message.channel.type), urlInfo, searchString);
+                ['DM', 'GROUP_DM'].includes(message.channel.type), urlInfo, searchString);
             theResult.replied = true;
             theResult.success = true;
-            theResult.sentDM = ['dm', 'group'].includes(message.channel.type);
+            theResult.sentDM = ['DM', 'GROUP_DM'].includes(message.channel.type);
         } else {
             reply = `I don't know anything about "${searchString}"`;
         }
@@ -52,7 +52,7 @@ async function doWHATSIN(message, tokens) {
             }
             theResult.replied = true;
             theResult.success = true;
-            theResult.sentDM = ['dm', 'group'].includes(message.channel.type);
+            theResult.sentDM = ['DM', 'GROUP_DM'].includes(message.channel.type);
         } catch (err) {
             Logger.error('WHATSIN: failed to send reply', err);
             theResult.botError = true;

@@ -4,7 +4,7 @@ const sinon = require('sinon');
 /**
  * A facsimile of a Discord Message, for use in tests
  * @param {object} c Config object
- * @param {'dm'|'group'|'text'} c.channelType Type of the channel the message was received in (default = text)
+ * @param {'DM'|'GROUP_DM'|'GUILD_TEXT'} c.channelType Type of the channel the message was received in (default = GUILD_TEXT)
  * @param {Function} c.reactStub A stub for message#react
  * @param {Function} c.replyStub A stub for message#reply
  * @param {Function} c.sendStub A stub for message.channel#send
@@ -12,7 +12,7 @@ const sinon = require('sinon');
  * @param {object} c.clientStub An object representing the bot client
  */
 const mockMessage = ({
-    channelType = 'text',
+    channelType = 'GUILD_TEXT',
     reactStub = sinon.stub(),
     replyStub = sinon.stub(),
     sendStub = sinon.stub(),

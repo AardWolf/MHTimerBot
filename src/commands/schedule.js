@@ -40,7 +40,7 @@ async function doSCHED(message, tokens) {
             await message.channel.send('Invalid timespan given - how many hours did you want to look ahead?');
             theResult.replied = true;
             theResult.success = false;
-            theResult.sentDM = ['dm', 'group'].includes(message.channel.type);
+            theResult.sentDM = ['DM', 'GROUP_DM'].includes(message.channel.type);
         } catch (err) {
             Logger.error('SCHED: failed to send reply', err);
             theResult.botError = true;
@@ -91,7 +91,7 @@ async function doSCHED(message, tokens) {
             }
             theResult.replied = true;
             theResult.success = true;
-            theResult.sentDM = ['dm', 'group'].includes(message.channel.type);
+            theResult.sentDM = ['DM', 'GROUP_DM'].includes(message.channel.type);
         } catch (err) {
             Logger.error('SCHED: failed to send reply', err);
             theResult.botError = true;

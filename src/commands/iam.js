@@ -58,7 +58,7 @@ async function doIAM(message, tokens) {
                 await message.channel.send(msg);
             }
             theResult.replied = true;
-            if (message.channel.type === 'dm') theResult.sentDm = true;
+            if (['DM', 'GROUP_DM'].includes(message.channel.type)) theResult.sentDm = true;
             theResult.success = true;
         } catch (err) {
             Logger.error('IAM: failed to send reply', err);

@@ -90,7 +90,7 @@ async function doMINLUCK(message, tokens) {
             await message.channel.send((typeof reply === 'string') ? reply : { embeds: [reply] });
             theResult.replied = true;
             theResult.success = true;
-            theResult.sentDM = ['dm', 'group'].includes(message.channel.type);
+            theResult.sentDM = ['DM', 'GROUP_DM'].includes(message.channel.type);
         } catch (err) {
             Logger.error('MINLUCK: failed to send reply', err);
             theResult.botError = true;

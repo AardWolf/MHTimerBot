@@ -122,7 +122,7 @@ async function doREMIND(message, tokens) {
 
     // TODO: I don't think this "new user" block will get triggered any more since we added `newReminder` already.
     // Inform a new user of the reminder functionality (i.e. PM only).
-    if (message.channel.type !== 'dm' && !message.client.reminders.some(r => r.user === message.author.id))
+    if (message.channel.type !== 'DM' && !message.client.reminders.some(r => r.user === message.author.id))
         responses.unshift('Hi there! Reminders are only sent via PM, and I\'m just making sure I can PM you.');
 
     // Send notice of the update via PM.
