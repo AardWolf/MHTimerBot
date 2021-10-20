@@ -27,6 +27,7 @@ for (const type of DM_CHANNELS.values())
  * @returns {boolean}
  */
 function isDMChannel({ type }, privateOnly = false) {
+    if (typeof type !== 'string') throw new TypeError(`Invalid argument "${arguments[0]}": expected a Channel object`);
     return privateOnly
         ? DM_CHANNELS.has(type)
         : type === ChannelTypes[API_TYPE_VALUES.DM];

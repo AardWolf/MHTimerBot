@@ -35,14 +35,17 @@ const fetch = require('node-fetch');
 const csv_parse = require('csv-parse');
 
 // Globals
-const client = new Client({ disabledEvents: ['TYPING_START'],
-    intents: [Intents.FLAGS.GUILD_MESSAGES,
-        Intents.FLAGS.GUILD_MESSAGE_REACTIONS,
+const client = new Client({
+    intents: [
         Intents.FLAGS.GUILDS,
+        Intents.FLAGS.GUILD_MESSAGES,
+        Intents.FLAGS.GUILD_MESSAGE_REACTIONS,
         Intents.FLAGS.GUILD_EMOJIS_AND_STICKERS,
         Intents.FLAGS.DIRECT_MESSAGES,
-        Intents.FLAGS.DIRECT_MESSAGE_REACTIONS],
-    partials: ['MESSAGE', 'CHANNEL', 'REACTION'] });
+        Intents.FLAGS.DIRECT_MESSAGE_REACTIONS,
+    ],
+    partials: ['MESSAGE', 'CHANNEL', 'REACTION'],
+});
 const main_settings_filename = 'data/settings.json',
     timer_settings_filename = 'data/timer_settings.json',
     reminder_filename = 'data/reminders.json',
@@ -221,22 +224,45 @@ function Main() {
                 if (client.settings.guilds[guild].botPrefix)
                     re[guild] = new RegExp('^' + client.settings.guilds[guild].botPrefix.trim() + '\\s');
             }
-            client.on('messageCreate', message => {
-                if (message.author.id === client.user.id)
+            client.on('messageCreate', async message => {
+                if (message.partial) {
+                    try {
+                        message = await message.fetch();
+                    } catch (err) {
+                        Logger.error('MessageCreate: failed to resolve partial Message', err);
+                        return;
+                    }
+                }
+
+                // Ignore the bot's messages, and those of other bots.
+                if (message.author.id === client.user.id || message.author.bot)
                     return;
 
-                if (message.webhookId === settings.relic_hunter_webhook)
+                // A DM can only be a user message.
+                if (isDMChannel(message.channel)) {
+                    parseUserMessage(message);
+                    return;
+                } else if (!message.channel.isText()) {
+                    return;
+                }
+
+                const guildId = message.guild.id;
+                const guildSettings = client.settings.guilds[guildId];
+                if (message.webhookId && [
+                    guildSettings.relic_hunter_webhook,
+                    settings.relic_hunter_webhook,
+                ].includes(message.webhookId)) {
                     handleRHWebhook(message);
+                    return;
+                }
 
                 switch (message.channel.name) {
-                    case settings.linkConversionChannel:
+                    case guildSettings.linkConversionChannel:
                         if (/(http[s]?:\/\/htgb\.co\/)/g.test(message.content.toLowerCase()))
                             convertRewardLink(message);
                         break;
                     default:
-                        if (isDMChannel(message.channel.type))
-                            parseUserMessage(message);
-                        else if (re[message.guild.id].test(message.content))
+                        if (re[guildId].test(message.content))
                             parseUserMessage(message);
                         break;
                 }
