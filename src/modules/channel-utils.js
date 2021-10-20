@@ -1,9 +1,24 @@
-const { Constants } = require('discord.js');
+const { Constants: { ChannelTypes } } = require('discord.js');
+
+// The ChannelType constants map between the REST API representation (number) and the programmer-friendly
+// string representation. So, we need to map between them as well here, to ensure we are always comparing
+// a Message object's channel.type to the appropriate literal, even if the literal's spelling changes in
+// a future major version.
+
+/** @type {{'DM': number, 'GROUP_DM': number}} */
+const API_TYPE_VALUES = {
+    DM: ChannelTypes.DM,
+    GROUP_DM: ChannelTypes.GROUP_DM,
+};
 
 const DM_CHANNELS = Object.freeze(new Set([
-    Constants.ChannelTypes.DM,
-    Constants.ChannelTypes.GROUP_DM,
+    ChannelTypes[API_TYPE_VALUES.DM],
+    ChannelTypes[API_TYPE_VALUES.GROUP_DM],
 ]));
+// If the above mapping fails, for whatever reason, ensure the bot does not start up:
+for (const type of DM_CHANNELS.values())
+    if (typeof type !== 'string')
+        throw new TypeError(`static assertion failed: DM_CHANNELS holds "${typeof type}" and not "string"`);
 
 /**
  * Determines if the given channel is a DM channel (either private or group)
@@ -14,7 +29,7 @@ const DM_CHANNELS = Object.freeze(new Set([
 function isDMChannel({ type }, privateOnly = false) {
     return privateOnly
         ? DM_CHANNELS.has(type)
-        : type === Constants.ChannelTypes.DM;
+        : type === ChannelTypes[API_TYPE_VALUES.DM];
 }
 
 exports.isDMChannel = isDMChannel;
