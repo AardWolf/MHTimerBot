@@ -261,7 +261,7 @@ function Main() {
                     convertRewardLink(message);
                 } else if (message.author.bot) {
                     // The only supported bot-to-bot interaction is reward link conversion.
-                } else if (re[guildId].test(message.content)) {
+                } else if (re[guildId].test(message.content) || message.content === guildSettings.botPrefix) {
                     parseUserMessage(message);
                 }
             });
@@ -553,16 +553,23 @@ function parseUserMessage(message) {
     if (tokens[0] === botPrefix)
         tokens.shift();
 
-    let command = tokens.shift(); // changed from const for RH case. TODO: Change back to const
-    if (!command) {
-        message.channel.send('I didn\'t understand, but you can ask me for help.');
-        return;
-    }
-    // Today's hack brought to you by laziness - haven't migrated notifications/timers yet
-    if (command.toLowerCase() === 'find' && tokens.length &&
-            ((tokens[0].toLowerCase() === 'rh' || tokens[0].toLowerCase() === 'relic_hunter') ||
-            (tokens.length >= 2 && tokens[0].toLowerCase() === 'relic' && tokens[1].toLowerCase() == 'hunter')))
-        command = 'findrh';
+    /**
+     * Detect the command based on the first few tokens, allowing some shortcuts and also phone autocapitalization.
+     * @param  {string} [cmd]
+     * @param  {string} [first]
+     * @param  {string} [second]
+     */
+    const getCommand = (cmd, first, second) => {
+        if (!cmd) return 'help';
+        if (cmd !== 'find' || !first) return cmd;
+        // Special case for finding the Relic Hunter, since it isn't a normal mouse.
+        if (first === 'rh' || first === 'relic_hunter' || (first === 'relic' && second === 'hunter')) return 'findrh';
+        // Received "find <some non-RH mouse>"
+        return cmd;
+    };
+    const command = getCommand(...tokens);
+    // Don't pass the command to the command's argument handler:
+    tokens.shift();
 
     const dynCommand = client.commands.get(command.toLowerCase())
         || client.commands.find(cmd => cmd.aliases && cmd.aliases.includes(command));
