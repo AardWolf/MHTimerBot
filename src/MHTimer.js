@@ -571,8 +571,8 @@ function parseUserMessage(message) {
     // Don't pass the command to the command's argument handler:
     tokens.shift();
 
-    const dynCommand = client.commands.get(command.toLowerCase())
-        || client.commands.find(cmd => cmd.aliases && cmd.aliases.includes(command));
+    const dynCommand = client.commands.get(command)
+        ?? client.commands.find(cmd => cmd.aliases && cmd.aliases.includes(command));
     if (dynCommand) {
         if (dynCommand.requiresArgs && !tokens.length) {
             const reply = 'You didn\'t provide arguments.\n' +
@@ -580,8 +580,8 @@ function parseUserMessage(message) {
                 `\t${dynCommand.usage.replace('\n', '\t\n')}\n\`\`\``;
             message.reply({ content: reply });
         }
-        else if (!dynCommand.canDM && isDMChannel(message.channel.type)) {
-            const reply = `\`${command.toLowerCase()}\` is not allowed in DMs`;
+        else if (!dynCommand.canDM && isDMChannel(message.channel)) {
+            const reply = `\`${command}\` is not allowed in DMs`;
             message.reply({ content: reply });
         }
         else {
@@ -601,8 +601,8 @@ function parseUserMessage(message) {
                     // that occur during their execution) and instead just return the appropriate command result.
                     // In case they leak an exception, catch it here.
                     .catch((commandErr) => {
-                        Logger.error(`Error executing dynamic command ${command.toLowerCase()}`, commandErr);
-                        return message.reply({ content: `Sorry, I couldn't do ${command.toLowerCase()} for ... reasons.` })
+                        Logger.error(`Error executing dynamic command ${command}`, commandErr);
+                        return message.reply({ content: `Sorry, I couldn't do ${command} for ... reasons.` })
                             .then(() => new CommandResult({
                                 replied: true,
                                 botError: true,
@@ -620,14 +620,14 @@ function parseUserMessage(message) {
                     // we can process further.
                     .then((cmdResult) => addMessageReaction(cmdResult));
             } else {
-                const reply = `You do not have permission to use \`${command.toLowerCase()}\``;
+                const reply = `You do not have permission to use \`${command}\``;
                 message.reply({ content: reply });
             }
         }
     }
     else
     {
-        switch (command.toLowerCase()) {
+        switch (command) {
 
             case 'findrh': {
                 findRH(message.channel, { split: true });
