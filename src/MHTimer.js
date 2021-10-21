@@ -218,24 +218,28 @@ function Main() {
                 client.on('ready', () => Logger.log('I am inVINCEeble!'));
             });
 
-            // Message handling.
-            const re = {};
-            for (const guild in client.settings.guilds) {
-                if (client.settings.guilds[guild].botPrefix)
-                    re[guild] = new RegExp('^' + client.settings.guilds[guild].botPrefix.trim() + '\\s');
-            }
+            // Discord will trim leading & trailing spaces from messages automatically, so our prefix
+            // regexps do not need to handle that. If a space follows the prefix, we are guaranteed at
+            // least one additional token to process.
+            const re = Object.freeze(Object.entries(client.settings.guilds).reduce((res, [guildId, guild]) => {
+                if (guild.botPrefix) {
+                    res[guildId] = new RegExp(`^${guild.botPrefix.trim()} `);
+                }
+                return res;
+            }, { hgReward: /(http[s]?:\/\/htgb\.co\/)/ }));
             client.on('messageCreate', async message => {
                 if (message.partial) {
                     try {
                         message = await message.fetch();
+                        Logger.log('MessageCreate: Handled partial Message');
                     } catch (err) {
                         Logger.error('MessageCreate: failed to resolve partial Message', err);
                         return;
                     }
                 }
 
-                // Ignore the bot's messages, and those of other bots.
-                if (message.author.id === client.user.id || message.author.bot)
+                // Ignore the bot's own messages (we do allow some bot-to-bot interactions).
+                if (message.author.id === client.user.id)
                     return;
 
                 // A DM can only be a user message.
@@ -253,18 +257,12 @@ function Main() {
                     settings.relic_hunter_webhook,
                 ].includes(message.webhookId)) {
                     handleRHWebhook(message);
-                    return;
-                }
-
-                switch (message.channel.name) {
-                    case guildSettings.linkConversionChannel:
-                        if (/(http[s]?:\/\/htgb\.co\/)/g.test(message.content.toLowerCase()))
-                            convertRewardLink(message);
-                        break;
-                    default:
-                        if (re[guildId].test(message.content))
-                            parseUserMessage(message);
-                        break;
+                } else if (message.channel.name === guildSettings.linkConversionChannel && re.hgReward.test(message.content.toLowerCase())) {
+                    convertRewardLink(message);
+                } else if (message.author.bot) {
+                    // The only supported bot-to-bot interaction is reward link conversion.
+                } else if (re[guildId].test(message.content)) {
+                    parseUserMessage(message);
                 }
             });
 
