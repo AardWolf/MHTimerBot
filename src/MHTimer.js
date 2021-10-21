@@ -546,16 +546,11 @@ function scheduleTimer(timer, channels) {
  * @param {Message} message a Discord message to parse
  */
 function parseUserMessage(message) {
-    const tokens = splitString(message.content);
-    if (!tokens.length) {
-        message.channel.send('What is happening???');
-        return;
-    }
-
+    const tokens = splitString(message.content).map((s) => s.toLocaleLowerCase());
     // Messages that come in from public chat channels will be prefixed with the bot's command prefix.
-    const prefix = message.guild ? message.client.settings.guilds[message.guild.id].botPrefix.trim() :
+    const botPrefix = message.guild ? message.client.settings.guilds[message.guild.id].botPrefix.trim() :
         message.client.settings.botPrefix.trim();
-    if (tokens[0] === prefix)
+    if (tokens[0] === botPrefix)
         tokens.shift();
 
     let command = tokens.shift(); // changed from const for RH case. TODO: Change back to const
@@ -571,8 +566,6 @@ function parseUserMessage(message) {
 
     const dynCommand = client.commands.get(command.toLowerCase())
         || client.commands.find(cmd => cmd.aliases && cmd.aliases.includes(command));
-    const botPrefix = message.guild ? message.client.settings.guilds[message.guild.id].botPrefix.trim() :
-        message.client.settings.botPrefix.trim();
     if (dynCommand) {
         if (dynCommand.requiresArgs && !tokens.length) {
             const reply = 'You didn\'t provide arguments.\n' +
