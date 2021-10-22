@@ -390,22 +390,32 @@ function migrateSettings(original_settings) {
  * @param {string} [path] The path to a JSON file to read data from. Default is the 'main_settings_filename'.
  * @returns {Promise <boolean>} Whether the read was successful.
  */
-function loadSettings(path = main_settings_filename) {
-    return loadDataFromJSON(path).then(data => {
-        // (Re)initialize any keys to the value specified in the file.
-        Object.assign(settings, data);
-        // Version-agnostic defaults
-        settings.relic_hunter_webhook = settings.relic_hunter_webhook || '283571156236107777';
-        settings.owner = settings.owner || '0'; // So things don't fail if it's unset
+async function loadSettings(path = main_settings_filename) {
+    let data;
+    try {
+        data = await loadDataFromJSON(path);
+    } catch (err) {
+        Logger.error(`Settings: error while reading settings from '${path}':\n`, err);
+        return false;
+    }
+    // (Re)initialize any keys to the value specified in the file.
+    Object.assign(settings, data);
+    // Set version-agnostic defaults, in case they have not been set.
+    settings.relic_hunter_webhook ??= '283571156236107777';
+    settings.owner ??= '0';
+    if (settings.DBGames && !isValidURL(settings.DBGames)) {
+        settings.DBGames = false;
+        Logger.warn('Settings: invalid value for DBGames, set to false');
+    }
 
+    // Load based on the current specified settings version.
+    if (!('version' in settings)) {
         // Pre version 1.00 logic
-        if (!('version' in settings)) {
+        try {
             // Set defaults if they were not specified.
-            if (!settings.linkConversionChannel)
-                settings.linkConversionChannel = 'larrys-freebies';
+            settings.linkConversionChannel ??= 'larrys-freebies';
 
-            if (!settings.timedAnnouncementChannels)
-                settings.timedAnnouncementChannels = ['timers'];
+            settings.timedAnnouncementChannels ??= ['timers'];
             if (!Array.isArray(settings.timedAnnouncementChannels)) {
                 Logger.warn('Settings: attempting to parse unexpected "timed announcement channel" format');
                 if (typeof settings.timedAnnouncementChannels === 'string') {
@@ -416,7 +426,12 @@ function loadSettings(path = main_settings_filename) {
             }
             settings.timedAnnouncementChannels = new Set(settings.timedAnnouncementChannels);
             settings.botPrefix = settings.botPrefix ? settings.botPrefix.trim() : '-mh';
-        } else {
+        } catch (err) {
+            Logger.error('Settings: error while parsing unversioned settings file', err);
+            return false;
+        }
+    } else {
+        try {
             for (const guild of Object.values(settings.guilds)) {
                 guild.timedAnnouncementChannels = new Set(guild.timedAnnouncementChannels);
                 if (guild.newBotPrefix) {
@@ -425,18 +440,15 @@ function loadSettings(path = main_settings_filename) {
                     delete guild.newBotPrefix;
                 }
             }
+        } catch (err) {
+            Logger.error(`Settings: error while parsing settings file with version "${settings.version}"`, err);
+            return false;
         }
-        if (settings.DBGames && !isValidURL(settings.DBGames)) {
-            settings.DBGames = false;
-            Logger.warn('Settings: invalid value for DBGames, set to false');
-        }
-        client.settings = settings;
+    }
 
-        return true;
-    }).catch(err => {
-        Logger.error(`Settings: error while reading settings from '${path}':\n`, err);
-        return false;
-    });
+    // Stash the settings on the client, so they are available to dynamic commands.
+    client.settings = settings;
+    return true;
 }
 
 /**
@@ -464,11 +476,13 @@ function saveSettings(path = main_settings_filename) {
  * @param {string} [path] The path to a JSON file to read data from. Default is the 'dbgames_filename'
  * @returns {Promise <Object>} keys of short names with values of long/pretty names
  */
-function loadDBGamesLocations(path = dbgames_filename) {
-    return loadDataFromJSON(path).catch(err => {
+async function loadDBGamesLocations(path = dbgames_filename) {
+    try {
+        return await loadDataFromJSON(path);
+    } catch (err) {
         Logger.error(`DBGamesLocation: Error loading data from '${path}':\n`, err);
         return {};
-    });
+    }
 }
 
 /**
@@ -479,13 +493,14 @@ function loadDBGamesLocations(path = dbgames_filename) {
  * @param {string} [path] The path to a JSON file to read data from. Default is the 'timer_settings_filename'
  * @returns {Promise <TimerSeed[]>} All local information for creating timers
  */
-function loadTimers(path = timer_settings_filename) {
-    return loadDataFromJSON(path).then(data => {
+async function loadTimers(path = timer_settings_filename) {
+    try {
+        const data = await loadDataFromJSON(path);
         return Array.isArray(data) ? data : Array.from(data);
-    }).catch(err => {
+    } catch (err) {
         Logger.error(`Timers: error during load from '${path}'. None loaded.\n`, err);
         return [];
-    });
+    }
 }
 
 /**
@@ -502,7 +517,7 @@ function createTimersFromList(timerData) {
         try {
             timer = new Timer(seed);
         } catch (err) {
-            Logger.error(`Timers: error occured while constructing timer: '${err}'. Received object:\n`, seed);
+            Logger.error(`Timers: error occurred while constructing timer: '${err}'. Received object:\n`, seed);
             continue;
         }
         client.timers_list.push(timer);
@@ -772,13 +787,14 @@ async function convertRewardLink(message) {
  * @param {string} [path] The path to a JSON file to read data from. Default is the 'reminder_filename'.
  * @returns {Promise <ReminderSeed[]>} Local data that can be used to create reminders.
  */
-function loadReminders(path = reminder_filename) {
-    return loadDataFromJSON(path).then(data => {
+async function loadReminders(path = reminder_filename) {
+    try {
+        const data = await loadDataFromJSON(path);
         return Array.isArray(data) ? data : Array.from(data);
-    }).catch(err => {
+    } catch (err) {
         Logger.error(`Reminders: error during loading from '${path}':\n`, err);
         return [];
-    });
+    }
 }
 
 /**
@@ -1055,11 +1071,13 @@ function getHelpMessage(message, tokens) {
  * @param {string} [path] The path to a JSON file to read data from. Default is the 'nickname_urls_filename'.
  * @returns {Promise <{}>} Data from the given file, as an object to be consumed by the caller.
  */
-function loadNicknameURLs(path = nickname_urls_filename) {
-    return loadDataFromJSON(path).catch(err => {
+async function loadNicknameURLs(path = nickname_urls_filename) {
+    try {
+        return await loadDataFromJSON(path);
+    } catch (err) {
         Logger.error(`Nicknames: Error loading data from '${path}':\n`, err);
         return {};
-    });
+    }
 }
 
 /**
