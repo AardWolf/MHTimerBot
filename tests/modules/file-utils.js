@@ -4,17 +4,19 @@ const sinon = require('sinon');
 // const mock = require('mock-fs');
 
 // Stub IO
-// Just in case modules are already loaded, including promisified versions
-delete require.cache[require.resolve('fs')];
+// Just in case modules are already loaded:
+delete require.cache[require.resolve('fs/promises')];
 delete require.cache[require.resolve('../../src/modules/file-utils')];
-const fs = require('fs');
+const fs = require('fs/promises');
 const { stubLogger, restoreLogger } = require('../helpers/logging');
 let logStubs;
 
 // Functionality to be tested.
 let load;
+/** @type {sinon.SinonStub} */
 let readStub;
 let save;
+/** @type {sinon.SinonStub} */
 let writeStub;
 test('Module Setup - file-utils', t => {
     logStubs = stubLogger();
@@ -34,7 +36,7 @@ test('Module Setup - file-utils', t => {
 test('loadDataFromJSON', suite => {
     suite.test('given path - calls fs.readFile with path', async t => {
         t.plan(2);
-        readStub.yields(null, '{}');
+        readStub.resolves('{}');
 
         const filePath = 'path/to/file.json';
         await load(filePath);
@@ -45,7 +47,7 @@ test('loadDataFromJSON', suite => {
     });
     suite.test('given input - logs input', async t => {
         t.plan(2);
-        readStub.yields(null, '{}');
+        readStub.resolves('{}');
 
         const filePath = 'path/to/other/file.json';
         await load(filePath);
@@ -57,7 +59,7 @@ test('loadDataFromJSON', suite => {
     suite.test('given path to JSON - returns parsed content', async t => {
         t.plan(1);
         const input = [{ key: 'value' }];
-        readStub.yields(null, JSON.stringify(input));
+        readStub.resolves(JSON.stringify(input));
 
         const result = await load('path/to/file.json');
         t.deepEqual(result, input, 'should return parsed JSON');
@@ -66,7 +68,7 @@ test('loadDataFromJSON', suite => {
     });
     suite.test('given path to non-JSON - throws SyntaxError', async t => {
         t.plan(1);
-        readStub.yields(null, 'hello there');
+        readStub.resolves('hello there');
 
         try {
             await load('path/to/file.txt');
@@ -79,7 +81,7 @@ test('loadDataFromJSON', suite => {
     });
     suite.test('given bad path - throws err', async t => {
         t.plan(1);
-        readStub.yields(Error('ENOENT'));
+        readStub.rejects(Error('ENOENT'));
 
         try {
             await load('path/to/file.txt');
@@ -97,7 +99,7 @@ test('loadDataFromJSON', suite => {
 test('saveDataAsJSON', suite => {
     suite.test('given path - calls fs.writeFile with path', async t => {
         t.plan(2);
-        writeStub.yields(null);
+        writeStub.resolves();
 
         const filePath = 'path/to/file.json';
         await save(filePath, {});
@@ -109,7 +111,7 @@ test('saveDataAsJSON', suite => {
     });
     suite.test('given data - stringifies data before write', async t => {
         t.plan(1);
-        writeStub.yields(null);
+        writeStub.resolves();
 
         const data = {};
         await save('path/to/file.json', data);
@@ -120,7 +122,7 @@ test('saveDataAsJSON', suite => {
     });
     suite.test('when successful - returns true', async t => {
         t.plan(1);
-        writeStub.yields(null);
+        writeStub.resolves();
 
         t.true(await save('path/to/file.json', {}), 'should return true');
 
@@ -128,7 +130,7 @@ test('saveDataAsJSON', suite => {
     });
     suite.test('when successful - logs success', async t => {
         t.plan(2);
-        writeStub.yields(null);
+        writeStub.resolves();
 
         const filePath = 'path/to/file.json';
         await save(filePath, {});
@@ -139,7 +141,7 @@ test('saveDataAsJSON', suite => {
     });
     suite.test('when unsuccessful - returns false', async t => {
         t.plan(1);
-        writeStub.yields(Error());
+        writeStub.rejects(Error());
 
         t.false(await save('path/to/file.json', {}), 'should return false');
 
@@ -149,7 +151,7 @@ test('saveDataAsJSON', suite => {
         t.plan(3);
         const err = Error('EACCES');
         err.stack = 'Hello there';
-        writeStub.yields(err);
+        writeStub.rejects(err);
 
         const filePath = 'path/to/file.json';
         await save(filePath, {});
