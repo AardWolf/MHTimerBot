@@ -11,12 +11,11 @@ const Logger = require('./logger');
 const { loadDataFromJSON, saveDataAsJSON } = require('../modules/file-utils');
 const hunter_ids_filename = 'data/hunters.json';
 const hunters = {};
-//const hunters = require('../../data/hunters.json');
 const save_frequency = Duration.fromObject({ minutes: 5 });
 const refresh_frequency = Duration.fromObject({ minutes: 90 });
-let someone_initialized = 0;
-let hunterSaveInterval ;
-let hunterRefreshInterval ;
+let someone_initialized = false;
+let hunterSaveInterval = null;
+let hunterRefreshInterval = null;
 
 //If a user sets these they go into manual mode
 const manual_properties = ['rank', 'location'];
@@ -27,27 +26,28 @@ const manual_properties = ['rank', 'location'];
  * @returns {Promise<boolean>}
  */
 async function initialize() {
+    // Initialize only once.
     if (someone_initialized) {
-        //Initialize once only
         return true;
     }
     someone_initialized = true;
+
+    // Schedule timers.
+    Logger.log(`Hunters: Configuring save every ${save_frequency / (60 * 1000)} min.`);
+    hunterSaveInterval = setInterval(saveHunters, save_frequency);
+    hunterRefreshInterval = setInterval(refreshHunters, refresh_frequency);
+
+    // If we don't have any hunters yet, promptly fetch them.
     if (Object.keys(hunters).length > 0) {
-        Logger.log('Hunters already loaded');
+        Logger.warn('Hunters: Hunters already loaded when initialize called');
         return true;
     }
-    const hasHunters = loadHunterData()
-        .then(hunterData => {
-            Object.assign(hunters, hunterData);
-            Logger.log(`Hunters: imported ${Object.keys(hunterData).length} from file.`);
-            return Object.keys(hunters).length > 0;
-        });
-    hasHunters.then(() => migrateData())
-        .then(() => {
-            Logger.log(`Hunters: Configuring save every ${save_frequency / (60 * 1000)} min.`);
-            hunterSaveInterval = setInterval(saveHunters, save_frequency);
-            hunterRefreshInterval = setInterval(refreshHunters, refresh_frequency);
-        });
+
+    const hunterData = await loadHunterData();
+    Object.assign(hunters, hunterData);
+    Logger.log(`Hunters: imported ${Object.keys(hunterData).length} from file.`);
+    migrateData();
+    return Object.keys(hunters).length > 0;
 }
 
 /**
@@ -55,12 +55,13 @@ async function initialize() {
   */
 async function save() {
     let saved = false;
+    if (hunterSaveInterval !== null) clearInterval(hunterSaveInterval);
+    if (hunterRefreshInterval !== null) clearInterval(hunterRefreshInterval);
     if (someone_initialized) {
-        someone_initialized = 0;
         saved = await saveHunters();
-        clearInterval(hunterSaveInterval);
-        clearInterval(hunterRefreshInterval);
+        someone_initialized = false;
     }
+
     return saved;
 }
 
@@ -71,10 +72,10 @@ async function save() {
  */
 function migrateData() {
     if (Object.keys(hunters).length === 0) {
-        return false;
+        return;
     }
     if (!hunters.version) {
-        //First version of the object is version 1.
+        // First version of the object is version 1.
         hunters.version = 1.00;
     }
     if (hunters.version < 1.01) {
