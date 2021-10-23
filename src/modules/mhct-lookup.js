@@ -377,9 +377,8 @@ async function formatConvertibles(isDM, convertible, opts) {
  */
 function getFilter(tester) {
     // Process filter-y nicknames
-    if (!tester)
+    if (!tester || typeof tester !== 'string')
         return;
-    tester = `${tester}`;
     if (tester.startsWith('3_d') || tester.startsWith('3d'))
         tester = '3_days';
     else if (tester.startsWith('3_m') || tester.startsWith('3m'))
