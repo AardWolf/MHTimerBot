@@ -16,6 +16,7 @@ const getConvertibles = mhct_lookup.getConvertibles;
 
 test('getFilter', suite => {
     suite.test('given non-string input - returns undefined', t => {
+        t.teardown(() => sinon.reset());
         const inputs = [
             true,
             undefined,
@@ -26,10 +27,10 @@ test('getFilter', suite => {
             t.equal(getFilter(input), undefined, `should return undefined for non-string ${typeof input}`);
             t.false(getSearchedEntityStub.called, 'should not call "getSearchedEntity"');
         });
-        sinon.reset();
     });
 
     suite.test('given shorthand string - returns known shortcuts', t => {
+        t.teardown(() => sinon.reset());
         const inputs = [
             { input: '3_d', expected: '3_days' },
             { input: '3days', expected: '3_days' },
@@ -47,10 +48,10 @@ test('getFilter', suite => {
             t.deepEqual(getSearchedEntityStub.args[0][0], input.expected, `should convert shorthand ${input.input} correctly`);
             getSearchedEntityStub.resetHistory();
         });
-        sinon.reset();
     });
 
     suite.test('given input that can\'t be turned into a truthy string - returns undefined', t => {
+        t.teardown(() => sinon.reset());
         const inputs = [
             '',
             undefined,
@@ -61,10 +62,10 @@ test('getFilter', suite => {
             undefined,
             `should return undefined for random and empty stuff - ${typeof input}`,
         ));
-        sinon.reset();
     });
 
     suite.test('given input that can\'t be turned into a truthy string - returns undefined', t => {
+        t.teardown(() => sinon.reset());
         const inputs = [
             '',
             undefined,
@@ -75,12 +76,12 @@ test('getFilter', suite => {
             undefined,
             `should return undefined for random and empty stuff - ${typeof input}`,
         ));
-        sinon.reset();
     });
 });
 
 test('getConvertibles', suite => {
     suite.test('given input that can\'t be turned into a truthy string - returns undefined', t => {
+        t.teardown(() => sinon.reset());
         const inputs = [
             '',
             undefined,
@@ -91,10 +92,10 @@ test('getConvertibles', suite => {
             undefined,
             `should return undefined for random and empty stuff - ${typeof input}`,
         ));
-        sinon.reset();
     });
 
     suite.test('given valid input - calls getSearchedEntity correctly', t => {
+        t.teardown(() => sinon.reset());
         const inputs = [
             '10th',
             'birthday',
@@ -110,7 +111,6 @@ test('getConvertibles', suite => {
             t.true(Array.isArray(callArgs[1]), 'should pass convertible "db" as second arg');
             getSearchedEntityStub.resetHistory();
         });
-        sinon.reset();
     });
 });
 

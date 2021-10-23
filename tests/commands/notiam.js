@@ -28,6 +28,7 @@ test('commands - NOTIAM', suite => {
     });
 
     suite.test('when user is owner; no args - fails', async t => {
+        t.teardown(() => sinon.reset());
         t.plan(3);
 
         const messageStub = mockMessage({ authorId: '1' });
@@ -40,10 +41,10 @@ test('commands - NOTIAM', suite => {
         t.strictEqual(messageStub.channel.send.callCount, 1, 'should call channel.send');
         const reply = messageStub.channel.send.getCall(0).args[0];
         t.match(reply, /You have permissions to use this command but not like that./, 'should return settings');
-
-        sinon.reset();
     });
+
     suite.test('when user is owner; clean, calls cleanHunters', async t => {
+        t.teardown(() => sinon.reset());
         t.plan(2);
 
         const messageStub = mockMessage({ authorId: '1' });
@@ -55,11 +56,11 @@ test('commands - NOTIAM', suite => {
         const result = await NOTIAM.execute(messageStub, ['clean']);
         t.true(result.replied, 'should reply to owner');
         t.strictEqual(hunterStubs.cleanHunters.callCount, 1, 'should call cleanHunters');
-
-        sinon.reset();
     });
+
     // Testing deeper functionality would require deeper stubs
     suite.test('when user is admin; no args - fails', async t => {
+        t.teardown(() => sinon.reset());
         t.plan(3);
 
         const messageStub = mockMessage();
@@ -77,10 +78,10 @@ test('commands - NOTIAM', suite => {
         t.strictEqual(messageStub.channel.send.callCount, 1, 'should call channel.send');
         const reply = messageStub.channel.send.getCall(0).args[0];
         t.match(reply, /You have permissions to use this command but not like that./, 'should return settings');
-
-        sinon.reset();
     });
+
     suite.test('when user is admin; clean, calls cleanHunters', async t => {
+        t.teardown(() => sinon.reset());
         t.plan(2);
 
         const messageStub = mockMessage();
@@ -93,10 +94,10 @@ test('commands - NOTIAM', suite => {
         const result = await NOTIAM.execute(messageStub, ['clean']);
         t.true(result.replied, 'should reply to admin');
         t.strictEqual(hunterStubs.cleanHunters.callCount, 1, 'should call cleanHunters');
-
-        sinon.reset();
     });
+
     suite.test('when user is mod; no args - fails', async t => {
+        t.teardown(() => sinon.reset());
         t.plan(3);
 
         const messageStub = mockMessage();
@@ -114,10 +115,10 @@ test('commands - NOTIAM', suite => {
         t.strictEqual(messageStub.channel.send.callCount, 1, 'should call channel.send');
         const reply = messageStub.channel.send.getCall(0).args[0];
         t.match(reply, /You have permissions to use this command but not like that./, 'should return settings');
-
-        sinon.reset();
     });
+
     suite.test('when user is mod; clean, does NOT call cleanHunters', async t => {
+        t.teardown(() => sinon.reset());
         t.plan(4);
 
         const memberStub = mockMember();
@@ -131,14 +132,12 @@ test('commands - NOTIAM', suite => {
         const reply = messageStub.channel.send.getCall(0).args[0];
         t.match(reply, /I'm afraid I can't do that/, 'should give usage error');
         t.match(logStubs.log.getCall(0).args[0], /Unauthorized use of "clean"/, 'should log attempt');
-
-        sinon.reset();
     });
 
-    suite.test('Restore Loggers - config', t => {
+    suite.teardown(() => {
+        suite.comment('Restore Stubs - notiam');
         restoreHunterRegistry(hunterStubs);
         restoreLogger(logStubs);
-        t.end();
         // CONFIG.save();
     });
 });

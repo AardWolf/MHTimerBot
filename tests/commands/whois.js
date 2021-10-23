@@ -25,16 +25,17 @@ test('commands - whois', suite => {
     });
 
     suite.test('when channel is text - when replying - signals caller', async t => {
+        t.teardown(() => sinon.reset());
         t.plan(2);
 
         const messageStub = mockMessage({ channelType: 'GUILD_TEXT' });
         const result = await WHOIS.execute(messageStub, []);
         t.true(result.replied, 'should reply');
         t.false(result.sentDm, 'should reply publically');
-
-        sinon.reset();
     });
+
     suite.test('when channel#send fails - logs error', async t => {
+        t.teardown(() => sinon.reset());
         t.plan(3);
 
         const messageStub = mockMessage({ sendStub: sinon.stub().rejects(Error('oops!')) });
@@ -43,19 +44,19 @@ test('commands - whois', suite => {
         const [description, err] = logStubs.error.getCall(0).args;
         t.match(description, /failed to send/, 'should indicate error source');
         t.match(err.message, /oops!/, 'should log error from Message.channel#send');
-
-        sinon.reset();
     });
+
     suite.test('when channel#send fails - flags bot error', async t => {
+        t.teardown(() => sinon.reset());
         t.plan(1);
 
         const messageStub = mockMessage({ sendStub: sinon.stub().rejects(Error('oops!')) });
         const result = await WHOIS.execute(messageStub, []);
         t.true(result.botError, 'should indicate bot error');
-
-        sinon.reset();
     });
+
     suite.test('when called with a number - calls getHuntersByProperty with type "hid"', async t => {
+        t.teardown(() => sinon.reset());
         t.plan(4);
 
         const messageStub = mockMessage();
@@ -67,10 +68,10 @@ test('commands - whois', suite => {
         t.deepEqual(tokens, sendToken[0], 'Called with first token argument');
         t.strictEqual(type, 'hid', 'Called out to do a hunter id lookup');
         t.strictEqual(limit, 1, 'Limited to one answer');
-
-        sinon.reset();
     });
+
     suite.test('when first token starts with "snu" - calls getHuntersByProperty with type "snuid"', async t => {
+        t.teardown(() => sinon.reset());
         t.plan(4);
 
         const messageStub = mockMessage();
@@ -82,10 +83,10 @@ test('commands - whois', suite => {
         t.deepEqual(tokens, 1, 'Called with second token argument');
         t.strictEqual(type, 'snuid', 'Called out to do a snuid lookup');
         t.strictEqual(limit, 1, 'Limited to one answer');
-
-        sinon.reset();
     });
+
     suite.test('when first token starts with "snu" - when alpha input - calls getHuntersByProperty with type "snuid"', async t => {
+        t.teardown(() => sinon.reset());
         t.plan(4);
 
         const messageStub = mockMessage();
@@ -97,10 +98,10 @@ test('commands - whois', suite => {
         t.deepEqual(tokens, 'a', 'Called with original alpha argument');
         t.strictEqual(type, 'snuid', 'Called out to do a snuid lookup');
         t.strictEqual(limit, 1, 'Limited to one answer');
-
-        sinon.reset();
     });
+
     suite.test('when first token starts with "snu" - when multiple args - calls getHuntersByProperty with type "snuid"', async t => {
+        t.teardown(() => sinon.reset());
         t.plan(4);
 
         const messageStub = mockMessage();
@@ -112,10 +113,10 @@ test('commands - whois', suite => {
         t.deepEqual(tokens, 1, 'Called with only the first token');
         t.strictEqual(type, 'snuid', 'Called out to do a snuid lookup');
         t.strictEqual(limit, 1, 'Limited to one answer');
-
-        sinon.reset();
     });
+
     suite.test('when first token is "in" - calls getHuntersByProperty with type "location" ', async t => {
+        t.teardown(() => sinon.reset());
         t.plan(3);
 
         const messageStub = mockMessage();
@@ -126,10 +127,10 @@ test('commands - whois', suite => {
         const [type, tokens] = hunterStubs.getHuntersByProperty.getCall(0).args;
         t.strictEqual(type, 'location', 'Called out to do a location lookup');
         t.strictEqual(tokens, 'trouble', 'Called with original alpha argument');
-        hunterStubs.getHuntersByProperty.reset();
-        sinon.reset();
     });
+
     suite.test('when first token is "a" - calls getHuntersByProperty with type "rank" ', async t => {
+        t.teardown(() => sinon.reset());
         t.plan(3);
 
         const messageStub = mockMessage();
@@ -140,13 +141,11 @@ test('commands - whois', suite => {
         const [type, tokens] = hunterStubs.getHuntersByProperty.getCall(0).args;
         t.strictEqual(type, 'rank', 'Called out to do a location lookup');
         t.strictEqual(tokens, 'nerd', 'Called with original alpha argument');
-        hunterStubs.getHuntersByProperty.reset();
-        sinon.reset();
     });
 
-    suite.test('Restore Loggers - whois', t => {
+    suite.teardown(() => {
+        suite.comment('Restore Stubs - whois');
         restoreHunterRegistry(hunterStubs);
         restoreLogger(logStubs);
-        t.end();
     });
 });

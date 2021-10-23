@@ -164,10 +164,12 @@ test('addMessageReaction', suite => {
         });
     });
     suite.test('when sending reaction - when error occurs - handles error', async t => {
+        const errorStub = sinon.stub(require('../../src/modules/logger'), 'error');
+        t.teardown(() => errorStub.restore());
         t.plan(6);
+
         const message = { channel : { type: 'text' }, react: sinon.stub().rejects(Error('oops!')) };
         const input = new CommandResult({ success: true, sentDm: false, message });
-        const errorStub = sinon.stub(require('../../src/modules/logger'), 'error');
         const result = await addMessageReaction(input);
         t.strictEqual(errorStub.callCount, 1, 'should log error from Message#react');
         const [description, err, givenResult] = errorStub.getCall(0).args;
@@ -176,9 +178,5 @@ test('addMessageReaction', suite => {
         t.same(givenResult, input, 'should log input command result');
         t.true(result.botError, 'should signal bot error to caller');
         t.false(result.success, 'should signal unsuccessful result to caller');
-    });
-    suite.test('Module Cleanup', t => {
-        sinon.restore();
-        t.end();
     });
 });

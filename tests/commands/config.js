@@ -41,6 +41,7 @@ test('commands - config', suite => {
     });
 
     suite.test('when user is not owner, admin, mod - fail', async t => {
+        t.teardown(() => sinon.reset());
         t.plan(3);
 
         const messageStub = mockMessage();
@@ -54,10 +55,10 @@ test('commands - config', suite => {
         t.strictEqual(messageStub.channel.send.callCount, 1, 'should call channel.send');
         const reply = messageStub.channel.send.getCall(0).args[0];
         t.match(reply, /Just who do you think you are?/, 'should fail');
-
-        sinon.reset();
     });
+
     suite.test('when user is mod - fail', async t => {
+        t.teardown(() => sinon.reset());
         t.plan(3);
 
         const messageStub = mockMessage();
@@ -73,11 +74,10 @@ test('commands - config', suite => {
         t.strictEqual(messageStub.channel.send.callCount, 1, 'should call channel.send');
         const reply = messageStub.channel.send.getCall(0).args[0];
         t.match(reply, /Just who do you think you are?/, 'should not work for mods');
-
-        sinon.reset();
     });
 
     suite.test('when user is owner; no args - view', async t => {
+        t.teardown(() => sinon.reset());
         t.plan(3);
         const messageStub = stubAsOwner();
 
@@ -87,10 +87,10 @@ test('commands - config', suite => {
         t.strictEqual(messageStub.channel.send.callCount, 1, 'should call channel.send');
         const reply = messageStub.channel.send.getCall(0).args[0];
         t.match(reply, /adminrole/, 'should return settings');
-
-        sinon.reset();
     });
+
     suite.test('when user is owner; prefix, 1 token shows current prefix', async t => {
+        t.teardown(() => sinon.reset());
         t.plan(3);
         const messageStub = stubAsOwner();
 
@@ -100,10 +100,10 @@ test('commands - config', suite => {
         t.strictEqual(messageStub.channel.send.callCount, 1, 'should call channel.send');
         const reply = messageStub.channel.send.getCall(0).args[0];
         t.match(reply, /Current prefix for this server/, 'should return settings');
-
-        sinon.reset();
     });
+
     suite.test('when user is owner; prefix, 2 tokens sets prefix', async t => {
+        t.teardown(() => sinon.reset());
         t.plan(3);
         const messageStub = stubAsOwner();
 
@@ -113,11 +113,10 @@ test('commands - config', suite => {
         t.strictEqual(messageStub.channel.send.callCount, 1, 'should call channel.send');
         const reply = messageStub.channel.send.getCall(0).args[0];
         t.match(reply, /New prefix for this server after the bot restarts/, 'should announce change to setting');
-
-        sinon.reset();
     });
 
     suite.test('when user is admin; no args - view', async t => {
+        t.teardown(() => sinon.reset());
         t.plan(3);
         const messageStub = stubAsAdmin();
 
@@ -127,10 +126,10 @@ test('commands - config', suite => {
         t.strictEqual(messageStub.channel.send.callCount, 1, 'should call channel.send');
         const reply = messageStub.channel.send.getCall(0).args[0];
         t.match(reply, /adminrole/, 'should return settings');
-
-        sinon.reset();
     });
+
     suite.test('when user is admin; prefix, 1 token shows current prefix', async t => {
+        t.teardown(() => sinon.reset());
         t.plan(3);
         const messageStub = stubAsAdmin();
 
@@ -140,10 +139,10 @@ test('commands - config', suite => {
         t.strictEqual(messageStub.channel.send.callCount, 1, 'should call channel.send');
         const reply = messageStub.channel.send.getCall(0).args[0];
         t.match(reply, /Current prefix for this server/, 'should return settings');
-
-        sinon.reset();
     });
+
     suite.test('when user is admin; prefix, 2 tokens sets prefix', async t => {
+        t.teardown(() => sinon.reset());
         t.plan(3);
         const messageStub = stubAsAdmin();
 
@@ -153,10 +152,10 @@ test('commands - config', suite => {
         t.strictEqual(messageStub.channel.send.callCount, 1, 'should call channel.send');
         const reply = messageStub.channel.send.getCall(0).args[0];
         t.match(reply, /New prefix for this server after the bot restarts/, 'should announce change to setting');
-
-        sinon.reset();
     });
+
     suite.test('when user is admin; timers; 1 token shows timers', async t => {
+        t.teardown(() => sinon.reset());
         t.plan(3);
         const messageStub = stubAsAdmin();
 
@@ -167,7 +166,9 @@ test('commands - config', suite => {
         const reply = messageStub.channel.send.getCall(0).args[0];
         t.match(reply, /Timer channels for this server:/, 'should list timers');
     });
+
     suite.test('when user is admin; timers; add w/o channel', async t => {
+        t.teardown(() => sinon.reset());
         t.plan(3);
         const messageStub = stubAsAdmin();
 
@@ -178,7 +179,9 @@ test('commands - config', suite => {
         const reply = messageStub.channel.send.getCall(0).args[0];
         t.match(reply, /I don't think you gave me a channel to add/, 'should request channel mention');
     });
+
     suite.test('when user is admin; timers; remove w/o channel', async t => {
+        t.teardown(() => sinon.reset());
         t.plan(3);
         const messageStub = stubAsAdmin();
 
@@ -190,8 +193,8 @@ test('commands - config', suite => {
         t.match(reply, /I don't think you gave me a channel to remove/, 'should request channel mention');
     });
 
-    suite.test('Restore Loggers - config', t => {
+    suite.teardown(() => {
+        suite.comment('Restore Loggers - config');
         restoreLogger(logStubs);
-        t.end();
     });
 });

@@ -25,26 +25,27 @@ test('commands - IAM', suite => {
     });
 
     suite.test('when channel is dm - when replying - signals caller', async t => {
+        t.teardown(() => sinon.reset());
         t.plan(2);
 
         const messageStub = mockMessage({ channelType: 'DM' });
         const result = await IAM.execute(messageStub, []);
         t.true(result.replied, 'should reply');
         t.true(result.sentDm, 'should indicate DM was sent');
-
-        sinon.reset();
     });
+
     suite.test('when channel is text - when replying - signals caller', async t => {
+        t.teardown(() => sinon.reset());
         t.plan(2);
 
         const messageStub = mockMessage({ channelType: 'GUILD_TEXT' });
         const result = await IAM.execute(messageStub, []);
         t.true(result.replied, 'should reply');
         t.false(result.sentDm, 'should reply publically');
-
-        sinon.reset();
     });
+
     suite.test('when channel#send fails - logs error', async t => {
+        t.teardown(() => sinon.reset());
         t.plan(3);
 
         const messageStub = mockMessage({ sendStub: sinon.stub().rejects(Error('oops!')) });
@@ -53,37 +54,37 @@ test('commands - IAM', suite => {
         const [description, err] = logStubs.error.getCall(0).args;
         t.match(description, /failed to send/, 'should indicate error source');
         t.match(err.message, /oops!/, 'should log error from Message.channel#send');
-
-        sinon.reset();
     });
+
     suite.test('when channel#send fails - flags bot error', async t => {
+        t.teardown(() => sinon.reset());
         t.plan(1);
 
         const messageStub = mockMessage({ sendStub: sinon.stub().rejects(Error('oops!')) });
         const result = await IAM.execute(messageStub, []);
         t.true(result.botError, 'should indicate bot error');
-
-        sinon.reset();
     });
+
     suite.test('when called with exactly "not" - calls unsetHunterID', async t => {
+        t.teardown(() => sinon.reset());
         t.plan(1);
 
         const messageStub = mockMessage();
         await IAM.execute(messageStub, ['not']);
         t.strictEqual(hunterStubs.unsetHunterID.callCount, 1, 'should call unsetHunterID');
-
-        sinon.reset();
     });
+
     suite.test('when first token is "not" - when multiple args - does nothing', async t => {
+        t.teardown(() => sinon.reset());
         t.plan(Object.values(hunterStubs).length);
 
         const messageStub = mockMessage();
         await IAM.execute(messageStub, ['not', 'cool']);
         Object.entries(hunterStubs).forEach(([name, stub]) => t.strictEqual(stub.callCount, 0, `should not call ${name}`));
-
-        sinon.reset();
     });
+
     suite.test('when called with exactly "auto" - calls setHunterProperty', async t => {
+        t.teardown(() => sinon.reset());
         t.plan(4);
 
         const messageStub = mockMessage();
@@ -93,22 +94,21 @@ test('commands - IAM', suite => {
         t.strictEqual(author, messageStub.author.id, 'Sets for the calling author');
         t.strictEqual(type, 'manual', 'Called to turn off manual mode');
         t.strictEqual(tokens, false, 'Called with false');
-
-        sinon.reset();
     });
+
     suite.test('when called with "auto" and more tokens - does not calls setHunterProperty', async t => {
+        t.teardown(() => sinon.reset());
         t.plan(1);
 
         const messageStub = mockMessage();
         await IAM.execute(messageStub, ['auto', 'anything', 'else']);
         t.strictEqual(hunterStubs.setHunterProperty.callCount, 0, 'should not call setHunterProperty');
-
-        sinon.reset();
     });
-    suite.test('Restore Loggers - iam', t => {
+
+    suite.teardown(() => {
+        suite.comment('Restore Stubs - iam');
         restoreHunterRegistry(hunterStubs);
         restoreLogger(logStubs);
-        t.end();
         IAM.save();
     });
 });
