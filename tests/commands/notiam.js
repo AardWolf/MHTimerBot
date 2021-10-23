@@ -138,6 +138,5 @@ test('commands - NOTIAM', suite => {
         suite.comment('Restore Stubs - notiam');
         restoreHunterRegistry(hunterStubs);
         restoreLogger(logStubs);
-        // CONFIG.save();
     });
 });

@@ -109,6 +109,5 @@ test('commands - IAM', suite => {
         suite.comment('Restore Stubs - iam');
         restoreHunterRegistry(hunterStubs);
         restoreLogger(logStubs);
-        IAM.save();
     });
 });
