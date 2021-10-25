@@ -1,12 +1,16 @@
-const Logger = require('../modules/logger');
-const { initialize, getFilter, getMice, formatMice, sendInteractiveSearchResult, 
-    listFilters, getLoot, formatLoot, save } = require('../modules/mhct-lookup');
+// eslint-disable-next-line no-unused-vars
+const { Message, Util } = require('discord.js');
+
 const CommandResult = require('../interfaces/command-result');
+const { isDMChannel } = require('../modules/channel-utils');
+const Logger = require('../modules/logger');
+const { initialize, getFilter, getMice, formatMice, sendInteractiveSearchResult,
+    listFilters, getLoot, formatLoot, save } = require('../modules/mhct-lookup');
 
 /**
  *
  * @param {Message} message The message that triggered the action
- * @param {Array} tokens The tokens of the command
+ * @param {string[]} tokens The tokens of the command
  * @returns {Promise<CommandResult>} Status of the execution
  */
 async function doFIND(message, tokens) {
@@ -21,14 +25,23 @@ async function doFIND(message, tokens) {
     if (!tokens)
         reply = 'I just cannot find what you\'re looking for (since you didn\'t tell me what it was).';
     else {
-        //Set the filter if it's requested
-        if (tokens[0] === '-e')
-            tokens.shift();
-        const filter = getFilter(tokens[0]);
-        if (filter && 'code_name' in filter && tokens.length > 1) {
-            opts.timefilter = filter.code_name;
-            tokens.shift();
+        // Set the filter if it's requested.
+        if (tokens.includes('-e')) {
+            const introducerIndex = tokens.findIndex((token) => token === '-e');
+            // The index of the filter term must immediately follow the introducer token.
+            const filterIndex = introducerIndex + 1;
+            let spliceCount = 1;
+            if (filterIndex < tokens.length) {
+                const filter = getFilter(tokens[filterIndex]);
+                if (filter && tokens.length > 2) {
+                    opts.timefilter = filter.code_name;
+                    ++spliceCount;
+                }
+            }
+            // Remove the processed tokens.
+            tokens.splice(introducerIndex, spliceCount);
         }
+
         // Figure out what they're searching for
         if (tokens[tokens.length - 1].toLowerCase() === 'mouse') {
             tokens.pop();
@@ -39,10 +52,10 @@ async function doFIND(message, tokens) {
             // We have multiple options, show the interactive menu
             urlInfo.qsParams = opts;
             sendInteractiveSearchResult(all_mice, message.channel, formatMice,
-                ['dm', 'group'].includes(message.channel.type), urlInfo, searchString);
+                isDMChannel(message.channel), urlInfo, searchString);
             theResult.replied = true;
             theResult.success = true;
-            theResult.sentDM = ['dm', 'group'].includes(message.channel.type);
+            theResult.sentDM = isDMChannel(message.channel);
         } else {
             const all_loot = getLoot(searchString, message.client.nicknames.get('loot'));
             if (all_loot && all_loot.length) {
@@ -51,10 +64,10 @@ async function doFIND(message, tokens) {
                 urlInfo.type = 'item';
                 urlInfo.uri = 'https://www.mhct.win/loot.php';
                 sendInteractiveSearchResult(all_loot, message.channel, formatLoot,
-                    ['dm', 'group'].includes(message.channel.type), urlInfo, searchString);
+                    isDMChannel(message.channel), urlInfo, searchString);
                 theResult.replied = true;
                 theResult.success = true;
-                theResult.sentDM = ['dm', 'group'].includes(message.channel.type);
+                theResult.sentDM = isDMChannel(message.channel);
             } else {
                 reply = `I don't know anything about "${searchString}"`;
             }
@@ -63,10 +76,12 @@ async function doFIND(message, tokens) {
     if (reply) {
         try {
             // Note that a lot of this is handled by sendInteractiveSearchResult
-            await message.channel.send(reply, { split: { prepend: '```\n', append: '\n```' } });
+            for (const msg of Util.splitMessage(reply, { prepend: '```\n', append: '\n```' })) {
+                await message.channel.send(msg);
+            }
             theResult.replied = true;
             theResult.success = true;
-            theResult.sentDM = ['dm', 'group'].includes(message.channel.type);
+            theResult.sentDM = isDMChannel(message.channel);
         } catch (err) {
             Logger.error('FIND: failed to send reply', err);
             theResult.botError = true;

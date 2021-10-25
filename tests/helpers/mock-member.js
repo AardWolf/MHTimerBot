@@ -24,6 +24,7 @@ const mockMember = ({
                 '987654321': {
                     adminRole: '',
                     modRole: '',
+                    timedAnnouncementChannels: new Set(),
                 },
             },
         },

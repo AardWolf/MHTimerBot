@@ -1,3 +1,6 @@
+// eslint-disable-next-line no-unused-vars
+const { Message, Util } = require('discord.js');
+
 const CommandResult = require('../interfaces/command-result');
 const { getHunterByDiscordID, getHuntersByProperty, initialize } = require('../modules/hunter-registry');
 const Logger = require('../modules/logger');
@@ -5,7 +8,7 @@ const Logger = require('../modules/logger');
 /**
  * The whois command
  * @param {Message} message Discord message that triggered the command
- * @param {Array} tokens "Words" that followed the command in an array
+ * @param {string[]} tokens "Words" that followed the command in an array
  * @returns {Promise<CommandResult>}
  */
 async function doWHOIS(message, tokens) {
@@ -81,7 +84,9 @@ async function doWHOIS(message, tokens) {
     }
     if (reply) {
         try {
-            await message.channel.send(reply, { split: true });
+            for (const msg of Util.splitMessage(reply)) {
+                await message.channel.send(msg);
+            }
             theResult.replied = true;
             theResult.success = true;
         } catch (err) {

@@ -1,6 +1,5 @@
 // Required test imports
 const test = require('tape');
-// const sinon = require('sinon');
 
 // Functionality to be tested.
 const {

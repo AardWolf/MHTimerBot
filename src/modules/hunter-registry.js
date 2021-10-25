@@ -1,6 +1,6 @@
 // Type-hinting imports
 // eslint-disable-next-line no-unused-vars
-const { Message } = require('discord.js');
+const { Message, Snowflake } = require('discord.js');
 const { Duration } = require('luxon');
 // These two added to auto-populate some values
 const fetch = require('node-fetch');
@@ -11,12 +11,11 @@ const Logger = require('./logger');
 const { loadDataFromJSON, saveDataAsJSON } = require('../modules/file-utils');
 const hunter_ids_filename = 'data/hunters.json';
 const hunters = {};
-//const hunters = require('../../data/hunters.json');
 const save_frequency = Duration.fromObject({ minutes: 5 });
 const refresh_frequency = Duration.fromObject({ minutes: 90 });
-let someone_initialized = 0;
-let hunterSaveInterval ;
-let hunterRefreshInterval ;
+let someone_initialized = false;
+let hunterSaveInterval = null;
+let hunterRefreshInterval = null;
 
 //If a user sets these they go into manual mode
 const manual_properties = ['rank', 'location'];
@@ -27,27 +26,28 @@ const manual_properties = ['rank', 'location'];
  * @returns {Promise<boolean>}
  */
 async function initialize() {
+    // Initialize only once.
     if (someone_initialized) {
-        //Initialize once only
         return true;
     }
     someone_initialized = true;
+
+    // Schedule timers.
+    Logger.log(`Hunters: Configuring save every ${save_frequency / (60 * 1000)} min.`);
+    hunterSaveInterval = setInterval(saveHunters, save_frequency);
+    hunterRefreshInterval = setInterval(refreshHunters, refresh_frequency);
+
+    // If we don't have any hunters yet, promptly fetch them.
     if (Object.keys(hunters).length > 0) {
-        Logger.log('Hunters already loaded');
+        Logger.warn('Hunters: Hunters already loaded when initialize called');
         return true;
     }
-    const hasHunters = loadHunterData()
-        .then(hunterData => {
-            Object.assign(hunters, hunterData);
-            Logger.log(`Hunters: imported ${Object.keys(hunterData).length} from file.`);
-            return Object.keys(hunters).length > 0;
-        });
-    hasHunters.then(() => migrateData())
-        .then(() => {
-            Logger.log(`Hunters: Configuring save every ${save_frequency / (60 * 1000)} min.`);
-            hunterSaveInterval = setInterval(saveHunters, save_frequency);
-            hunterRefreshInterval = setInterval(refreshHunters, refresh_frequency);
-        });
+
+    const hunterData = await loadHunterData();
+    Object.assign(hunters, hunterData);
+    Logger.log(`Hunters: imported ${Object.keys(hunterData).length} from file.`);
+    migrateData();
+    return Object.keys(hunters).length > 0;
 }
 
 /**
@@ -55,12 +55,13 @@ async function initialize() {
   */
 async function save() {
     let saved = false;
+    if (hunterSaveInterval !== null) clearInterval(hunterSaveInterval);
+    if (hunterRefreshInterval !== null) clearInterval(hunterRefreshInterval);
     if (someone_initialized) {
-        someone_initialized = 0;
         saved = await saveHunters();
-        clearInterval(hunterSaveInterval);
-        clearInterval(hunterRefreshInterval);
+        someone_initialized = false;
     }
+
     return saved;
 }
 
@@ -71,10 +72,10 @@ async function save() {
  */
 function migrateData() {
     if (Object.keys(hunters).length === 0) {
-        return false;
+        return;
     }
     if (!hunters.version) {
-        //First version of the object is version 1.
+        // First version of the object is version 1.
         hunters.version = 1.00;
     }
     if (hunters.version < 1.01) {
@@ -125,13 +126,11 @@ async function saveHunters(path = hunter_ids_filename) {
  * @param {Snowflake} hunter A Discord ID snowflake
  */
 function unsetHunterID(hunter) {
-    let response = '';
-    if (hunters[hunter]) {
+    if (hunter in hunters) {
         delete hunters[hunter];
-        response = '*POOF*, all gone!';
-    } else
-        response = 'I didn\'t do anything but that\'s because you didn\'t do anything either.';
-    return response;
+        return '*POOF*, all gone!';
+    }
+    return 'I didn\'t do anything but that\'s because you didn\'t do anything either.';
 }
 
 /**
@@ -145,20 +144,24 @@ async function setHunterID(discordId, hid) {
 
     // Initialize the data for any new registrants.
     if (!hunters[discordId]) {
-        hunters[discordId] = {};
         Logger.log(`Hunters: OMG! A new hunter id '${discordId}'`);
-        hunters[discordId]['hid'] = hid;
-        hunters[discordId]['manual'] = false;
-        hunters[discordId]['failureCount'] = 0;
-        hunters[discordId]['guilds'] = [];
-        await populateHunter(discordId); // This is asynchronous and that is ok
-        message_str += `If people look you up they'll see \`${hid}\` and find you for rank \`${hunters[discordId]['rank']}\` in \`${hunters[discordId]['location']}\`.`;
-    } else if (hunters[discordId]['hid']) {
-        message_str = `You used to be known as \`${hunters[discordId]['hid']}\`.`;
-        Logger.log(`Hunters: Updating hid ${hunters[discordId]['hid']} to ${hid}`);
+        hunters[discordId] = {
+            hid,
+            manual: false,
+            failureCount: 0,
+            guilds: [],
+        };
+        message_str += `If people look up you they'll see \`${hid}\``;
+        message_str += (await populateHunter(discordId))
+            ? `and find you for rank \`${hunters[discordId].rank}\` in \`${hunters[discordId].location}\`.`
+            : '. (I couldn\'t find your rank or location just yet.)';
+    } else if (hunters[discordId].hid) {
+        message_str = `You used to be known as \`${hunters[discordId].hid}\`.`;
+        Logger.log(`Hunters: Updating hid ${hunters[discordId].hid} to ${hid}`);
+        hunters[discordId].hid = hid;
     }
-    if (!hunters[discordId]['manual']) {
-        message_str += ' I am automatically updating your rank and location, set them manually and I will stop.';
+    if (!hunters[discordId].manual) {
+        message_str += ' I am automatically updating your `rank` and `location`; set them manually and I will stop.';
     }
     return message_str;
 }
@@ -190,7 +193,7 @@ function setHunterProperty(discordId, property, value) {
 /**
  * Returns a stringified version of the hunter's object
  *
- * @param {bigint} hunter the discordId for the user to look up
+ * @param {Snowflake} hunter the discordId for the user to look up
  * @returns {string} The property string for that ID
  */
 function getHunterProperties(hunter) {
@@ -230,24 +233,26 @@ function getHuntersByProperty(property, criterion, limit = 5) {
  * Find the self-registered account for the user identified by the given Discord ID.
  * Returns undefined if the user has not self-registered.
  *
- * @param {message} message a Discord message object
- * @param {string} discordId the Discord ID of a registered hunter.
+ * @param {Snowflake} discordId the Discord ID of a registered hunter.
  * @returns {string?} the hunter ID of the registered hunter having that Discord ID.
  */
 function getHunterByDiscordID(discordId) {
-    if (hunters[discordId] && !('block' in hunters[discordId]))
+    if (discordId in hunters && !('block' in hunters[discordId]))
         return hunters[discordId]['hid'];
 }
 
 /**
  * Populates some values based on the discordId
- * @param hunterId
+ * @param {Snowflake} hunterId
+ * @returns {Promise<boolean>}
  */
 async function populateHunter(discordId) {
-    if (!hunters[discordId] || !hunters[discordId]['hid'])
+    const hunter = hunters[discordId];
+    const hid = hunter?.hid;
+    if (!hid)
         return false;
 
-    const url = `https://www.mousehuntgame.com/p.php?id=${hunters[discordId]['hid']}`;
+    const url = `https://www.mousehuntgame.com/p.php?id=${hid}`;
     try {
         const response = await fetch(url);
         const body = await response.text();
@@ -258,33 +263,34 @@ async function populateHunter(discordId) {
         hunters[discordId]['rank'] = / an* (.*?) in MouseHunt./.exec(lines[0])[1].toLowerCase() || 'unknown';
         hunters[discordId]['location'] = /Location: (.*?)$/.exec(lines[5])[1].toLowerCase() || 'unknown';
         hunters[discordId]['failureCount'] = 0;
+        return true;
     } catch (error) {
         hunters[discordId].failureCount += 1;
         Logger.error(`Hunter: Populating for ${discordId} failed: ${error.message}`);
         if (hunters[discordId].failureCount >= 5) {
             delete hunters[discordId];
-            Logger.log(`5 strikes, ${discordId} is forgotten`);
+            Logger.warn(`Hunters: 5 strikes, ${discordId} is forgotten`);
         }
     }
-
+    return false;
 }
 
 /**
  * Clean up hunters who are no longer in the server
  * TODO: This needs to work with multiple servers -- might be handled in unsetHunterID
- * @param message message that triggered the action
+ * @param {Message} message message that triggered the action
  */
 function cleanHunters(message) {
-    const author = message.author;
-    Logger.log(`Hunter: cleaning cycle triggered by ${author.id} for guild ${message.guild.id}`);
-    Object.keys(hunters)
-        .filter(key => hunters[key].hid)
-        .forEach((discordID) => {
-            if(!message.guild.members.cache.get(discordID)) {
-                Logger.log(`Cleaning up ${discordID} from ${message.guild.id}`);
-                unsetHunterID(discordID);
-            }
-        });
+    Logger.log(`Hunter: cleaning cycle triggered by "${message.author.id}" for guild "${message.guild.id}"`);
+    const guildMembers = message.guild.members.cache;
+    const removed = Object.keys(hunters)
+        .filter(discordID => hunters[discordID].hid && !guildMembers.get(discordID))
+        .map((discordID) => ((unsetHunterID(discordID) === '*POOF*, all gone!') ? discordID : null))
+        .filter((id) => Boolean(id));
+
+    if (removed.length) {
+        Logger.log(`Hunters: Cleaned up ${removed.length} hunters that left: "${removed.join('", "')}"`);
+    }
     return 'Clean cycle complete';
 }
 
@@ -295,9 +301,7 @@ function refreshHunters() {
     Logger.log('Refreshing non-manual hunters');
     Object.keys(hunters)
         .filter(key => hunters[key]['manual'] === false)
-        .forEach((discordId) => {
-            populateHunter(discordId);
-        });
+        .forEach((discordId) => populateHunter(discordId));
 }
 
 exports.getHuntersByProperty = getHuntersByProperty;

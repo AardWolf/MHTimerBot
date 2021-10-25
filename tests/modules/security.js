@@ -20,11 +20,9 @@ test('checkPerms', suite => {
             false,
             `should return false for random stuff - ${typeof input}`,
         ));
-        sinon.reset();
-
     });
-    suite.test('given member input (non-owner, non-admin) - returns false', t => {
 
+    suite.test('given member input (non-owner, non-admin) - returns false', t => {
         t.plan(1);
         const mockMemberStub = mockMember({
             hasPermissionStub: sinon.stub().withArgs(Permissions.FLAGS.ADMINISTRATOR).returns(false),
@@ -34,10 +32,9 @@ test('checkPerms', suite => {
             false,
             'should return false non-owner, non ADMIN',
         );
-        sinon.reset();
     });
-    suite.test('given member input (owner) - returns true', t => {
 
+    suite.test('given member input (owner) - returns true', t => {
         t.plan(2);
         const mockMemberStub = mockMember();
         mockMemberStub.client.settings.owner = mockMemberStub.id;
@@ -47,10 +44,9 @@ test('checkPerms', suite => {
             `should return true for the owner ${mockMemberStub.client.settings.owner}, ${mockMemberStub.id} even when not server admin`,
         );
         t.strictEqual(mockMemberStub.permissions.has.callCount, 0, 'should not check perms of owner');
-        sinon.reset();
     });
-    suite.test('given member input (non-owner, admin) - returns true', t => {
 
+    suite.test('given member input (non-owner, admin) - returns true', t => {
         t.plan(1);
         const mockMemberStub = mockMember({
             hasPermissionStub: sinon.stub().withArgs(Permissions.FLAGS.ADMINISTRATOR).returns(true),
@@ -61,10 +57,9 @@ test('checkPerms', suite => {
             true,
             'should return true for the owner when server admin',
         );
-        sinon.reset();
     });
-    suite.test('given member input (non-owner, mod) - returns false for admin', t => {
 
+    suite.test('given member input (non-owner, mod) - returns false for admin', t => {
         t.plan(1);
         const mockMemberStub = mockMember();
         mockMemberStub.permissions.has.withArgs(Permissions.FLAGS.ADMINISTRATOR).returns(false);
@@ -74,10 +69,9 @@ test('checkPerms', suite => {
             false,
             'should return false for non-owner, non-admin',
         );
-        sinon.reset();
     });
-    suite.test('given member input (non-owner, mod) - returns true for mod', t => {
 
+    suite.test('given member input (non-owner, mod) - returns true for mod', t => {
         t.plan(1);
         const mockMemberStub = mockMember();
         mockMemberStub.permissions.has.withArgs(Permissions.FLAGS.ADMINISTRATOR).returns(false);
@@ -87,10 +81,9 @@ test('checkPerms', suite => {
             true,
             'should return true for non-owner, mod',
         );
-        sinon.reset();
     });
-    suite.test('given member input (non-owner, admin) - returns true for mod', t => {
 
+    suite.test('given member input (non-owner, admin) - returns true for mod', t => {
         t.plan(1);
         const mockMemberStub = mockMember();
         mockMemberStub.permissions.has.withArgs(Permissions.FLAGS.ADMINISTRATOR).returns(true);
@@ -100,10 +93,9 @@ test('checkPerms', suite => {
             true,
             'should return true for non-owner, admin',
         );
-        sinon.reset();
     });
-    suite.test('given member input (non-owner, non-admin, non-mod) - returns false for mod', t => {
 
+    suite.test('given member input (non-owner, non-admin, non-mod) - returns false for mod', t => {
         t.plan(1);
         const mockMemberStub = mockMember({
             hasPermissionStub: () => false,
@@ -111,13 +103,8 @@ test('checkPerms', suite => {
         t.deepEqual(
             checkPerms(mockMemberStub, 'mod'),
             false,
-            'should return false for non-owner, nonadmin, nonmod',
+            'should return false for non-owner, non-admin, non-mod',
         );
-        sinon.reset();
-    });
-
-    suite.test('Module Cleanup', t => {
-        sinon.restore();
-        t.end();
     });
 });
+

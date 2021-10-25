@@ -2,7 +2,7 @@ const test = require('tape');
 const sinon = require('sinon');
 
 const searchHelper = require('../../src/modules/search-helpers');
-const getSearchedEntityStub = sinon.stub(searchHelper, 'getSearchedEntity').returns([]);
+const getSearchedEntityStub = sinon.stub(searchHelper, 'getSearchedEntity');
 const mhct_lookup = require('../../src/modules/mhct-lookup');
 
 //const getMHCTList = mhct_lookup.getMHCTList;
@@ -16,23 +16,21 @@ const getConvertibles = mhct_lookup.getConvertibles;
 
 test('getFilter', suite => {
     suite.test('given non-string input - returns undefined', t => {
+        t.teardown(() => sinon.reset());
         const inputs = [
-            '',
             true,
             undefined,
             () => {},
         ];
-        t.plan(inputs.length);
-        getSearchedEntityStub.returns([]);
-        inputs.forEach(input => t.deepEqual(
-            getFilter(input),
-            undefined,
-            `should return undefined for random and empty stuff - ${typeof input}`,
-        ));
-        sinon.reset();
-
+        t.plan(inputs.length * 2);
+        inputs.forEach(input => {
+            t.equal(getFilter(input), undefined, `should return undefined for non-string ${typeof input}`);
+            t.false(getSearchedEntityStub.called, 'should not call "getSearchedEntity"');
+        });
     });
-    suite.test('given string input - returns known shortcuts', t => {
+
+    suite.test('given shorthand string - returns known shortcuts', t => {
+        t.teardown(() => sinon.reset());
         const inputs = [
             { input: '3_d', expected: '3_days' },
             { input: '3days', expected: '3_days' },
@@ -42,18 +40,18 @@ test('getFilter', suite => {
             { input: 'allowance', expected: 'alltime' },
             { input: 'current', expected: '1_month' }, //NOTE this can only be asserted because we don't load the filter list
         ];
-        t.plan(inputs.length*2);
-        getSearchedEntityStub.resetHistory();
+        t.plan(inputs.length * 2);
         getSearchedEntityStub.returns([]);
         inputs.forEach(input => {
-            const result = getFilter(input.input);
-            t.true(getSearchedEntityStub.calledOnce, 'should call search entity');
-            t.deepEqual(getSearchedEntityStub.args[0][0], input.expected, `should search for known shortcut ${input.input} = ${input.expected}`);
-            console.log(`Recived ${result}`);
+            getFilter(input.input);
+            t.strictEqual(getSearchedEntityStub.callCount, 1, 'should call search entity');
+            t.deepEqual(getSearchedEntityStub.args[0][0], input.expected, `should convert shorthand ${input.input} correctly`);
             getSearchedEntityStub.resetHistory();
         });
-        sinon.reset();
-    });    suite.test('given input that can\'t be turned into a truthy string - returns undefined', t => {
+    });
+
+    suite.test('given input that can\'t be turned into a truthy string - returns undefined', t => {
+        t.teardown(() => sinon.reset());
         const inputs = [
             '',
             undefined,
@@ -64,10 +62,10 @@ test('getFilter', suite => {
             undefined,
             `should return undefined for random and empty stuff - ${typeof input}`,
         ));
-        sinon.reset();
-
     });
+
     suite.test('given input that can\'t be turned into a truthy string - returns undefined', t => {
+        t.teardown(() => sinon.reset());
         const inputs = [
             '',
             undefined,
@@ -78,18 +76,12 @@ test('getFilter', suite => {
             undefined,
             `should return undefined for random and empty stuff - ${typeof input}`,
         ));
-        sinon.reset();
-
-    });
-    suite.test('Module Cleanup', t => {
-        sinon.restore();
-        t.end();
     });
 });
 
 test('getConvertibles', suite => {
-    
     suite.test('given input that can\'t be turned into a truthy string - returns undefined', t => {
+        t.teardown(() => sinon.reset());
         const inputs = [
             '',
             undefined,
@@ -100,22 +92,29 @@ test('getConvertibles', suite => {
             undefined,
             `should return undefined for random and empty stuff - ${typeof input}`,
         ));
-        sinon.reset();
-
     });
 
-    suite.test('given input matches the return value of getSearchedEntity - returns input', t => {
+    suite.test('given valid input - calls getSearchedEntity correctly', t => {
+        t.teardown(() => sinon.reset());
         const inputs = [
             '10th',
             'birthday',
         ];
-        t.plan(inputs.length);
-        getSearchedEntityStub.returns('10th Birthday');
-        inputs.forEach(input => t.match(
+        t.plan(inputs.length * 4);
+        inputs.forEach(input => {
             getConvertibles(input),
-            /10th Birthday/,
-            'should return known string when given correct input',
-        ));
-        sinon.reset();
+            t.strictEqual(getSearchedEntityStub.callCount, 1, 'should call "getSearchedEntity"');
+            const callArgs = getSearchedEntityStub.getCall(0).args;
+            t.strictEqual(callArgs.length, 2, 'should pass correct number of arguments');
+            t.strictEqual(callArgs[0], input, 'should pass input to search method');
+            // TODO: mock initialize `convertibles` to assert the right array is used. Requires stubbing `getMHCTList` or `fetch`
+            t.true(Array.isArray(callArgs[1]), 'should pass convertible "db" as second arg');
+            getSearchedEntityStub.resetHistory();
+        });
     });
+});
+
+test('Module Cleanup - mhct-lookup', t => {
+    getSearchedEntityStub.restore();
+    t.end();
 });

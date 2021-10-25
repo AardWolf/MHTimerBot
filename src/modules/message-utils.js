@@ -21,7 +21,7 @@ const botErrorSequence = async (msg) => {
  * Based on the given result of a previous command, react (or don't) accordingly on the source message.
  * @param {Promise<CommandResult>|CommandResult} executedCommand A previous bot command's result output.
  */
-const addMessageReaction = async function addMessageReaction(executedCommand) {
+async function addMessageReaction(executedCommand) {
     if (!executedCommand) throw new TypeError('Missing required input parameter');
 
     const inputResult = await executedCommand;
@@ -35,8 +35,8 @@ const addMessageReaction = async function addMessageReaction(executedCommand) {
 
     if (!inputResult.message) {
         ourResult.botError = true;
-    } else if (inputResult.message.channel.type === 'dm') {
-        // The requesting message was a DM, so we likely replied via DM.
+    } else if (inputResult.message.channel.type === 'DM') {
+        // The requesting message was a private DM, so we likely replied via DM.
         shouldAddReaction = !inputResult.sentDm;
     } else if (inputResult.sentDm) {
         // We sent a DM, but the request came from a non-DM channel (e.g. group DM or regular TextChannel)
@@ -69,6 +69,6 @@ const addMessageReaction = async function addMessageReaction(executedCommand) {
     ourResult.success = !ourResult.botError;
 
     return ourResult;
-};
+}
 
 exports.addMessageReaction = addMessageReaction;
