@@ -8,9 +8,10 @@ const fs = require('fs');
 
 // Extract type-hinting definitions for Discord classes.
 // eslint-disable-next-line no-unused-vars
-const { Client, Collection, Guild, GuildMember, Intents, Message, MessageReaction, MessageEmbed, TextChannel, User } = Discord;
+const { Client, Collection, Constants, Guild, GuildMember, Intents, Message, MessageReaction, MessageEmbed, TextChannel, User } = Discord;
 
 // Import our own local classes and functions.
+const { isDMChannel } = require('./modules/channel-utils.js');
 const Timer = require('./modules/timers.js');
 const CommandResult = require('./interfaces/command-result');
 const {
@@ -26,6 +27,7 @@ const {
     addMessageReaction,
 } = require('./modules/message-utils');
 const security = require('./modules/security.js');
+const EnumKeys = require('./utils/discord-enum-keys');
 
 // Access external URIs, like @devjacksmith 's tools.
 const fetch = require('node-fetch');
@@ -33,15 +35,17 @@ const fetch = require('node-fetch');
 const csv_parse = require('csv-parse');
 
 // Globals
-const client = new Client({ disabledEvents: ['TYPING_START'], 
-    intents: [Intents.FLAGS.GUILD_MESSAGES,
-        Intents.FLAGS.GUILD_MESSAGE_REACTIONS,
+const client = new Client({
+    intents: [
         Intents.FLAGS.GUILDS,
+        Intents.FLAGS.GUILD_MESSAGES,
+        Intents.FLAGS.GUILD_MESSAGE_REACTIONS,
         Intents.FLAGS.GUILD_EMOJIS_AND_STICKERS,
         Intents.FLAGS.DIRECT_MESSAGES,
-        Intents.FLAGS.DIRECT_MESSAGE_REACTIONS],
-    partials: ['MESSAGE', 'CHANNEL', 'REACTION'] });
-const textChannelTypes = new Set(['GUILD_TEXT', 'DM', 'GROUP_DM', 'GUILD_NEWS', 'GUILD_NEWS_THREAD', 'GUILD_PUBLIC_THREAD', 'GUILD_PRIVATE_THREAD']);
+        Intents.FLAGS.DIRECT_MESSAGE_REACTIONS,
+    ],
+    partials: ['MESSAGE', 'CHANNEL', 'REACTION'],
+});
 const main_settings_filename = 'data/settings.json',
     timer_settings_filename = 'data/timer_settings.json',
     reminder_filename = 'data/reminders.json',
@@ -190,53 +194,75 @@ function Main() {
             // Configure the bot behavior.
             client.once('ready', () => {
                 Logger.log('I am alive!');
-                //Migrate settings at this point since connection required for some pieces
+                // Migrate settings at this point since connection required for some pieces
                 migrateSettings(client.settings);
 
                 // Find all text channels on which to send announcements.
                 const announcables = client.guilds.cache.reduce((channels, guild) => {
+                    const requested = client.settings.guilds[guild.id].timedAnnouncementChannels;
                     const candidates = guild.channels.cache
-                        .filter(c => client.settings.guilds[guild.id].timedAnnouncementChannels.has(c.name) && textChannelTypes.has(c.type))
-                        .map(tc => tc);
-                    if (candidates.length)
-                        Array.prototype.push.apply(channels, candidates);
-                    else
+                        .filter(c => requested.has(c.name) && EnumKeys(Constants.TextBasedChannelTypes).has(c.type));
+                    if (candidates.size)
+                        Array.prototype.push.apply(channels, Array.from(candidates.values()));
+                    else if (requested.size) {
                         Logger.warn(`Timers: No valid channels in ${guild.name} for announcements.`);
+                    }
                     return channels;
                 }, []);
 
                 // Use one timeout per timer to manage default reminders and announcements.
                 client.timers_list.forEach(timer => scheduleTimer(timer, announcables));
-                Logger.log(`Timers: Initialized ${timer_config.size} timers on channels ${announcables}.`);
+                Logger.log(`Timers: Initialized ${timer_config.size} timers on channels ${oxfordStringifyValues(announcables.map(c => `${c.guild.name}#${c.name}`))}.`);
 
                 // If we disconnect and then reconnect, do not bother rescheduling the already-scheduled timers.
                 client.on('ready', () => Logger.log('I am inVINCEeble!'));
             });
 
-            // Message handling.
-            const re = {};
-            for (const guild in client.settings.guilds) {
-                if (client.settings.guilds[guild].botPrefix)
-                    re[guild] = new RegExp('^' + client.settings.guilds[guild].botPrefix.trim() + '\\s');
-            }
-            client.on('messageCreate', message => {
+            // Discord will trim leading & trailing spaces from messages automatically, so our prefix
+            // regexps do not need to handle that. If a space follows the prefix, we are guaranteed at
+            // least one additional token to process.
+            const re = Object.freeze(Object.entries(client.settings.guilds).reduce((res, [guildId, guild]) => {
+                if (guild.botPrefix) {
+                    res[guildId] = new RegExp(`^${guild.botPrefix.trim()} `);
+                }
+                return res;
+            }, { hgReward: /(http[s]?:\/\/htgb\.co\/)/ }));
+            client.on('messageCreate', async message => {
+                if (message.partial) {
+                    try {
+                        message = await message.fetch();
+                        Logger.log('MessageCreate: Handled partial Message');
+                    } catch (err) {
+                        Logger.error('MessageCreate: failed to resolve partial Message', err);
+                        return;
+                    }
+                }
+
+                // Ignore the bot's own messages (we do allow some bot-to-bot interactions).
                 if (message.author.id === client.user.id)
                     return;
 
-                if (message.webhookId === settings.relic_hunter_webhook)
+                // A DM can only be a user message.
+                if (isDMChannel(message.channel)) {
+                    parseUserMessage(message);
+                    return;
+                } else if (!message.channel.isText()) {
+                    return;
+                }
+
+                const guildId = message.guild.id;
+                const guildSettings = client.settings.guilds[guildId];
+                if (message.webhookId && [
+                    guildSettings.relic_hunter_webhook,
+                    settings.relic_hunter_webhook,
+                ].includes(message.webhookId)) {
                     handleRHWebhook(message);
-                
-                switch (message.channel.name) {
-                    case settings.linkConversionChannel:
-                        if (/(http[s]?:\/\/htgb\.co\/)/g.test(message.content.toLowerCase()))
-                            convertRewardLink(message);
-                        break;
-                    default:
-                        if (message.channel.type === 'DM' || message.channel.type === 'GROUP_DM')
-                            parseUserMessage(message);
-                        else if (re[message.guild.id].test(message.content))
-                            parseUserMessage(message);
-                        break;
+                } else if (message.channel.name === guildSettings.linkConversionChannel && re.hgReward.test(message.content.toLowerCase())) {
+                    convertRewardLink(message);
+                } else if (message.author.bot) {
+                    // The only supported bot-to-bot interaction is reward link conversion.
+                } else if (re[guildId].test(message.content) || message.content === guildSettings.botPrefix) {
+                    parseUserMessage(message);
                 }
             });
 
@@ -268,8 +294,9 @@ function Main() {
         .then(() => client.login(settings.token))
         .catch(err => {
             Logger.error('Unhandled startup error, shutting down:', err);
-            client.destroy()
-                .then(() => process.exitCode = 1);
+            client.destroy();
+            process.exitCode = 1;
+            return quit();
         });
 }
 try {
@@ -283,7 +310,10 @@ function quit() {
     return doSaveAll()
         .then(
             () => Logger.log('Shutdown: data saves completed'),
-            (err) => Logger.error('Shutdown: error while saving:\n', err),
+            (err) => {
+                Logger.error('Shutdown: error while saving:\n', err);
+                process.exitCode = 1;
+            },
         )
         .then(() => { Logger.log('Shutdown: destroying client'); return client.destroy(); })
         .then(() => {
@@ -299,48 +329,57 @@ function quit() {
                 clearTimeout(relic_hunter.timeout);
             }
         })
-        .then(() => process.exitCode = 1)
+        .then(() => process.exit())
         .catch(err => {
             Logger.error('Shutdown: unhandled error:\n', err, '\nImmediately exiting.');
-            process.exit();
+            process.exit(1);
         });
 }
 
 /**
  * Any object which stores user-entered data should be periodically saved, or at minimum saved before
  * the bot shuts down, to minimize data loss.
- * @returns {boolean} Whether volatile data was serialized, or perhaps not serialized.
+ * @returns {Promise<boolean>} Whether volatile data was serialized, or perhaps not serialized.
  */
-function doSaveAll() {
-    client.commands.filter(command => command.save).every((command => {
-        Logger.log(`Saving ${command.name}`);
-        Promise.resolve(command.save());
+async function doSaveAll() {
+    const saveableCommands = client.commands.filter(command => typeof command.save === 'function');
+    const settingsSaved = await saveSettings();
+    const remindersSaved = await saveReminders();
+    const commandsSaved = await Promise.all(saveableCommands.map(c => {
+        Logger.log(`Saving data for command "${c.name}"`);
+        return c.save();
     }));
-    return (saveSettings().then(saveReminders()));
+    return settingsSaved && remindersSaved && commandsSaved.every(saved => saved);
 }
 
 /**
  * Takes a settings object and performs whatever migration tasks are needed to get them to current version
- * @param {Object} original_settings The settings read from disk
+ * @param {object} original_settings The settings read from disk
  *
  * Doesn't return anything; throws on errors
  */
 function migrateSettings(original_settings) {
     if (!('version' in original_settings)) {
-        //OG Settings file detected
-        Logger.log('SETTINGS: Migrating from version 0');
+        Logger.log('Settings: Migrating from version 0');
         const guild_settings = {
-            timedAnnouncementChannels: Array.from(original_settings.timedAnnouncementChannels),
+            timedAnnouncementChannels: new Set(Array.from(original_settings.timedAnnouncementChannels)),
             linkConversionChannel: original_settings.linkConversionChannel,
             botPrefix: original_settings.botPrefix.trim(),
         };
-        //Logger.log(`SETTINGS: ${typeof(client.guilds.cache)} - ${JSON.stringify(client.guilds.cache)}`);
-        const guilds = client.guilds.cache;
-        original_settings.guilds = {};
-        guilds.forEach((guild) => {
-            original_settings.guilds[guild.id] = guild_settings;
-        });
+        original_settings.guilds = client.guilds.cache.reduce((acc, guild) => {
+            acc[guild.id] = guild_settings;
+            return acc;
+        }, {});
         original_settings.version = '1.00';
+        delete original_settings.timedAnnouncementChannels;
+        delete original_settings.linkConversionChannel;
+    }
+    // Perform additional updates based on the source version.
+    switch (original_settings.version) {
+        case '1.00':
+            break;
+        default:
+            Logger.warn(`Unknown settings version "${original_settings.version}"`);
     }
 }
 
@@ -351,51 +390,65 @@ function migrateSettings(original_settings) {
  * @param {string} [path] The path to a JSON file to read data from. Default is the 'main_settings_filename'.
  * @returns {Promise <boolean>} Whether the read was successful.
  */
-function loadSettings(path = main_settings_filename) {
-    return loadDataFromJSON(path).then(data => {
-        // (Re)initialize any keys to the value specified in the file.
-        Object.assign(settings, data);
-        // Pre version 1.00 logic
-        if (!('version' in settings)) {
-            // Set defaults if they were not specified.
-            if (!settings.linkConversionChannel)
-                settings.linkConversionChannel = 'larrys-freebies';
-
-            if (!settings.timedAnnouncementChannels)
-                settings.timedAnnouncementChannels = ['timers'];
-            Logger.log(`TAC: ${JSON.stringify(settings.timedAnnouncementChannels)}`);
-            if (!Array.isArray(settings.timedAnnouncementChannels)) {
-                settings.timedAnnouncementChannels = settings.timedAnnouncementChannels.split(',').map(s => s.trim());
-                Logger.log('Not an array so we turned it into one, sort of');
-            }
-            settings.timedAnnouncementChannels = new Set(settings.timedAnnouncementChannels);
-
-            settings.relic_hunter_webhook = settings.relic_hunter_webhook || '283571156236107777';
-
-            settings.botPrefix = settings.botPrefix ? settings.botPrefix.trim() : '-mh';
-
-            settings.owner = settings.owner || '0'; // So things don't fail if it's unset
-        } else {
-            for (const guild in settings.guilds) {
-                settings.guilds[guild].timedAnnouncementChannels = new Set(settings.guilds[guild].timedAnnouncementChannels);
-                if (settings.guilds[guild].newBotPrefix) {
-                    Logger.log(`Migrating bot prefix to ${settings.guilds[guild].newBotPrefix} for ${guild}`);
-                    settings.guilds[guild].botPrefix = settings.guilds[guild].newBotPrefix;
-                    delete settings.guilds[guild].newBotPrefix;
-                }
-            }
-        }
-        if (settings.DBGames && !isValidURL(settings.DBGames)) {
-            settings.DBGames = false;
-            Logger.log('Settings: invalid value for DBGames, set to false');
-        }
-        client.settings = settings;
-
-        return true;
-    }).catch(err => {
+async function loadSettings(path = main_settings_filename) {
+    let data;
+    try {
+        data = await loadDataFromJSON(path);
+    } catch (err) {
         Logger.error(`Settings: error while reading settings from '${path}':\n`, err);
         return false;
-    });
+    }
+    // (Re)initialize any keys to the value specified in the file.
+    Object.assign(settings, data);
+    // Set version-agnostic defaults, in case they have not been set.
+    settings.relic_hunter_webhook ??= '283571156236107777';
+    settings.owner ??= '0';
+    if (settings.DBGames && !isValidURL(settings.DBGames)) {
+        settings.DBGames = false;
+        Logger.warn('Settings: invalid value for DBGames, set to false');
+    }
+
+    // Load based on the current specified settings version.
+    if (!('version' in settings)) {
+        // Pre version 1.00 logic
+        try {
+            // Set defaults if they were not specified.
+            settings.linkConversionChannel ??= 'larrys-freebies';
+
+            settings.timedAnnouncementChannels ??= ['timers'];
+            if (!Array.isArray(settings.timedAnnouncementChannels)) {
+                Logger.warn('Settings: attempting to parse unexpected "timed announcement channel" format');
+                if (typeof settings.timedAnnouncementChannels === 'string') {
+                    settings.timedAnnouncementChannels = settings.timedAnnouncementChannels.split(',').map(s => s.trim());
+                } else if (typeof settings.timedAnnouncementChannels === 'object') {
+                    settings.timedAnnouncementChannels = Object.keys(settings.timedAnnouncementChannels);
+                }
+            }
+            settings.timedAnnouncementChannels = new Set(settings.timedAnnouncementChannels);
+            settings.botPrefix = settings.botPrefix ? settings.botPrefix.trim() : '-mh';
+        } catch (err) {
+            Logger.error('Settings: error while parsing unversioned settings file', err);
+            return false;
+        }
+    } else {
+        try {
+            for (const guild of Object.values(settings.guilds)) {
+                guild.timedAnnouncementChannels = new Set(guild.timedAnnouncementChannels);
+                if (guild.newBotPrefix) {
+                    Logger.log(`Settings: Migrating bot prefix to ${guild.newBotPrefix} for ${guild}`);
+                    guild.botPrefix = guild.newBotPrefix;
+                    delete guild.newBotPrefix;
+                }
+            }
+        } catch (err) {
+            Logger.error(`Settings: error while parsing settings file with version "${settings.version}"`, err);
+            return false;
+        }
+    }
+
+    // Stash the settings on the client, so they are available to dynamic commands.
+    client.settings = settings;
+    return true;
 }
 
 /**
@@ -405,10 +458,13 @@ function loadSettings(path = main_settings_filename) {
  * @returns {Promise<boolean>}
  */
 function saveSettings(path = main_settings_filename) {
-    const outobj = {};
-    Object.assign(outobj, client.settings);
-    for (const guild in outobj.guilds) {
-        outobj.guilds[guild].timedAnnouncementChannels = Array.from(outobj.guilds[guild].timedAnnouncementChannels);
+    // If we couldn't read settings in, don't overwrite the existing settings.
+    if (!client.settings || !Object.keys(client.settings).length) {
+        return Promise.resolve(false);
+    }
+    const outobj = Object.assign({}, client.settings);
+    for (const guild of Object.values(outobj.guilds)) {
+        guild.timedAnnouncementChannels = Array.from(guild.timedAnnouncementChannels);
     }
     return saveDataAsJSON(path, outobj);
 }
@@ -420,11 +476,13 @@ function saveSettings(path = main_settings_filename) {
  * @param {string} [path] The path to a JSON file to read data from. Default is the 'dbgames_filename'
  * @returns {Promise <Object>} keys of short names with values of long/pretty names
  */
-function loadDBGamesLocations(path = dbgames_filename) {
-    return loadDataFromJSON(path).catch(err => {
+async function loadDBGamesLocations(path = dbgames_filename) {
+    try {
+        return await loadDataFromJSON(path);
+    } catch (err) {
         Logger.error(`DBGamesLocation: Error loading data from '${path}':\n`, err);
         return {};
-    });
+    }
 }
 
 /**
@@ -435,13 +493,14 @@ function loadDBGamesLocations(path = dbgames_filename) {
  * @param {string} [path] The path to a JSON file to read data from. Default is the 'timer_settings_filename'
  * @returns {Promise <TimerSeed[]>} All local information for creating timers
  */
-function loadTimers(path = timer_settings_filename) {
-    return loadDataFromJSON(path).then(data => {
+async function loadTimers(path = timer_settings_filename) {
+    try {
+        const data = await loadDataFromJSON(path);
         return Array.isArray(data) ? data : Array.from(data);
-    }).catch(err => {
+    } catch (err) {
         Logger.error(`Timers: error during load from '${path}'. None loaded.\n`, err);
         return [];
-    });
+    }
 }
 
 /**
@@ -458,7 +517,7 @@ function createTimersFromList(timerData) {
         try {
             timer = new Timer(seed);
         } catch (err) {
-            Logger.error(`Timers: error occured while constructing timer: '${err}'. Received object:\n`, seed);
+            Logger.error(`Timers: error occurred while constructing timer: '${err}'. Received object:\n`, seed);
             continue;
         }
         client.timers_list.push(timer);
@@ -476,6 +535,8 @@ function createTimersFromList(timerData) {
 function scheduleTimer(timer, channels) {
     if (timer.isSilent())
         return;
+    if (!channels.length)
+        return;
     const msUntilActivation = timer.getNext().diffNow().minus(timer.getAdvanceNotice()).as('milliseconds');
     timer.storeTimeout('scheduling',
         setTimeout(t => {
@@ -490,7 +551,7 @@ function scheduleTimer(timer, channels) {
             doAnnounce(t);
         }, msUntilActivation, timer),
     );
-    timer_config.set(timer.id, { active: true, channels: channels, inactiveChannels: [] });
+    timer_config.set(timer.id, { active: true, channels, inactiveChannels: [] });
 }
 
 /**
@@ -500,33 +561,33 @@ function scheduleTimer(timer, channels) {
  * @param {Message} message a Discord message to parse
  */
 function parseUserMessage(message) {
-    const tokens = splitString(message.content);
-    if (!tokens.length) {
-        message.channel.send('What is happening???');
-        return;
-    }
-
+    const tokens = splitString(message.content).map((s) => s.toLocaleLowerCase());
     // Messages that come in from public chat channels will be prefixed with the bot's command prefix.
-    const prefix = message.guild ? message.client.settings.guilds[message.guild.id].botPrefix.trim() :
-        message.client.settings.botPrefix.trim();
-    if (tokens[0] === prefix)
-        tokens.shift();
-
-    let command = tokens.shift(); // changed from const for RH case. TODO: Change back to const
-    if (!command) {
-        message.channel.send('I didn\'t understand, but you can ask me for help.');
-        return;
-    }
-    // Today's hack brought to you by laziness - haven't migrated notifications/timers yet
-    if (command.toLowerCase() === 'find' && tokens.length && 
-            ((tokens[0].toLowerCase() === 'rh' || tokens[0].toLowerCase() === 'relic_hunter') ||
-            (tokens.length >= 2 && tokens[0].toLowerCase() === 'relic' && tokens[1].toLowerCase() == 'hunter')))
-        command = 'findrh';
-
-    const dynCommand = client.commands.get(command.toLowerCase())
-        || client.commands.find(cmd => cmd.aliases && cmd.aliases.includes(command));
     const botPrefix = message.guild ? message.client.settings.guilds[message.guild.id].botPrefix.trim() :
         message.client.settings.botPrefix.trim();
+    if (tokens[0] === botPrefix)
+        tokens.shift();
+
+    /**
+     * Detect the command based on the first few tokens, allowing some shortcuts and also phone autocapitalization.
+     * @param  {string} [cmd]
+     * @param  {string} [first]
+     * @param  {string} [second]
+     */
+    const getCommand = (cmd, first, second) => {
+        if (!cmd) return 'help';
+        if (cmd !== 'find' || !first) return cmd;
+        // Special case for finding the Relic Hunter, since it isn't a normal mouse.
+        if (first === 'rh' || first === 'relic_hunter' || (first === 'relic' && second === 'hunter')) return 'findrh';
+        // Received "find <some non-RH mouse>"
+        return cmd;
+    };
+    const command = getCommand(...tokens);
+    // Don't pass the command to the command's argument handler:
+    tokens.shift();
+
+    const dynCommand = client.commands.get(command)
+        ?? client.commands.find(cmd => cmd.aliases && cmd.aliases.includes(command));
     if (dynCommand) {
         if (dynCommand.requiresArgs && !tokens.length) {
             const reply = 'You didn\'t provide arguments.\n' +
@@ -534,8 +595,8 @@ function parseUserMessage(message) {
                 `\t${dynCommand.usage.replace('\n', '\t\n')}\n\`\`\``;
             message.reply({ content: reply });
         }
-        else if (!dynCommand.canDM && message.channel.type === 'DM') {
-            const reply = `\`${command.toLowerCase()}\` is not allowed in DMs`;
+        else if (!dynCommand.canDM && isDMChannel(message.channel)) {
+            const reply = `\`${command}\` is not allowed in DMs`;
             message.reply({ content: reply });
         }
         else {
@@ -555,8 +616,8 @@ function parseUserMessage(message) {
                     // that occur during their execution) and instead just return the appropriate command result.
                     // In case they leak an exception, catch it here.
                     .catch((commandErr) => {
-                        Logger.error(`Error executing dynamic command ${command.toLowerCase()}`, commandErr);
-                        return message.reply({ content: `Sorry, I couldn't do ${command.toLowerCase()} for ... reasons.` })
+                        Logger.error(`Error executing dynamic command ${command}`, commandErr);
+                        return message.reply({ content: `Sorry, I couldn't do ${command} for ... reasons.` })
                             .then(() => new CommandResult({
                                 replied: true,
                                 botError: true,
@@ -574,14 +635,14 @@ function parseUserMessage(message) {
                     // we can process further.
                     .then((cmdResult) => addMessageReaction(cmdResult));
             } else {
-                const reply = `You do not have permission to use \`${command.toLowerCase()}\``;
+                const reply = `You do not have permission to use \`${command}\``;
                 message.reply({ content: reply });
             }
         }
     }
     else
     {
-        switch (command.toLowerCase()) {
+        switch (command) {
 
             case 'findrh': {
                 findRH(message.channel, { split: true });
@@ -589,15 +650,16 @@ function parseUserMessage(message) {
             }
             case 'shutdown': {
                 if (message.author.id === settings.owner) {
-                    message.channel.send('Good-bye');
-                    quit().then(didSave => didSave ? process.exit() : message.channel.send('Uhhh, save failed'));
+                    message.channel.send('So long, and thank\'s for all the fish.')
+                        .then(() => quit()); // Quit will _always_ terminate.
                 }
                 break;
             }
             case 'save': {
                 if (message.author.id === settings.owner) {
-                    message.channel.send('Asynchronous save started');
-                    doSaveAll().then(didSaveAll => message.channel.send(`Save complete: ${didSaveAll ? 'success': 'failure'}`));
+                    message.channel.send('Asynchronous save started')
+                        .then(() => doSaveAll())
+                        .then(didSaveAll => message.channel.send(`Save complete: ${didSaveAll ? 'success': 'failure'}`));
                 }
                 break;
             }
@@ -652,7 +714,7 @@ async function convertRewardLink(message) {
         } else {
             return '';
         }
-    }))).filter(nl => !!nl);
+    }))).filter(nl => Boolean(nl));
     if (!newLinks.length)
         return;
 
@@ -709,8 +771,8 @@ async function convertRewardLink(message) {
 }
 
 /**
- * @typedef {Object} TimerReminder
- * @property {User} user The Discord user who requested the reminder.
+ * @typedef {object} TimerReminder
+ * @property {string} user A Snowflake representing the user who requested the reminder.
  * @property {number} count The number of remaining times this reminder will activate.
  * @property {string} area The area to which this reminder applies, e.g. "fg"
  * @property {string} [sub_area] A logical "location" within the area, e.g. "close" or "open" for Forbidden Grove.
@@ -725,13 +787,14 @@ async function convertRewardLink(message) {
  * @param {string} [path] The path to a JSON file to read data from. Default is the 'reminder_filename'.
  * @returns {Promise <ReminderSeed[]>} Local data that can be used to create reminders.
  */
-function loadReminders(path = reminder_filename) {
-    return loadDataFromJSON(path).then(data => {
+async function loadReminders(path = reminder_filename) {
+    try {
+        const data = await loadDataFromJSON(path);
         return Array.isArray(data) ? data : Array.from(data);
-    }).catch(err => {
+    } catch (err) {
         Logger.error(`Reminders: error during loading from '${path}':\n`, err);
         return [];
-    });
+    }
 }
 
 /**
@@ -856,7 +919,7 @@ function doRemind(timer) {
             if (a.count === b.count)
                 // The two reminder quotas are equal: coerce the sub-areas from string -> bool -> int
                 // and then return a descending sort (since true -> 1 and true means it was specific).
-                return (!!b.sub_area) * 1 - (!!a.sub_area) * 1;
+                return Boolean(b.sub_area) * 1 - Boolean(a.sub_area) * 1;
 
             // For dissimilar quotas, we know only one can be perpetual. If one is perpetual, sort descending.
             // Else, sort ascending.
@@ -995,7 +1058,7 @@ function getHelpMessage(message, tokens) {
         else
             return `I know how to ${command} but I don't know how to tell you how to ${command}`;
     }
-    else 
+    else
         return `I don't know that one, but I do know ${keywords}.`;
 }
 
@@ -1008,11 +1071,13 @@ function getHelpMessage(message, tokens) {
  * @param {string} [path] The path to a JSON file to read data from. Default is the 'nickname_urls_filename'.
  * @returns {Promise <{}>} Data from the given file, as an object to be consumed by the caller.
  */
-function loadNicknameURLs(path = nickname_urls_filename) {
-    return loadDataFromJSON(path).catch(err => {
+async function loadNicknameURLs(path = nickname_urls_filename) {
+    try {
+        return await loadDataFromJSON(path);
+    } catch (err) {
         Logger.error(`Nicknames: Error loading data from '${path}':\n`, err);
         return {};
-    });
+    }
 }
 
 /**
@@ -1043,8 +1108,7 @@ function getNicknames(type) {
     const parser = csv_parse({ delimiter: ',' })
         .on('readable', () => {
             let record;
-            // eslint-disable-next-line no-cond-assign
-            while (record = parser.read())
+            while ((record = parser.read()))
                 newData[record[0]] = record[1];
         })
         .on('error', err => Logger.error(err.message));
@@ -1176,7 +1240,7 @@ function DBGamesRHLookup() {
  * @returns {Promise<{ location: string, source: 'MHCT' }>}
  */
 function MHCTRHLookup() {
-    return fetch('https://www.agiletravels.com/tracker.json')
+    return fetch('https://www.mhct.win/tracker.json')
         .then(async (response) => {
             if (!response.ok) throw `HTTP ${response.status}`;
             const { rh } = await response.json();

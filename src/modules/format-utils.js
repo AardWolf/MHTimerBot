@@ -29,7 +29,7 @@ function oxfordStringifyValues(container, final = 'and') {
 }
 
 /**
- * @typedef {Object} ColumnFormatOptions
+ * @typedef {object} ColumnFormatOptions
  * @property {number} [columnWidth] The total width of the largest value in the column
  * @property {boolean} [isFixedWidth] If true, the input width will not be dynamically computed based on the values in the given column
  * @property {string} [prefix] a string or character which should appear in the column before the column's value. e.g. $
@@ -37,7 +37,7 @@ function oxfordStringifyValues(container, final = 'and') {
  * @property {boolean} [alignRight] Whether the column should be right-aligned (default: left-aligned)
  * @property {boolean} [convertToPercent] Whether the value is a raw float that should be converted to a percentage value by multiplying by 100. (Does not add a % to the end)
  * @property {number} [numDecimals] For right-aligned values that are converted to percent, the number of decimals kept.
- * @property {boolean} [commify] Whether to run it through integerComma 
+ * @property {boolean} [commify] Whether to run it through integerComma
  */
 
 /**
@@ -188,7 +188,7 @@ function splitString(input) {
  * time remaining before the given input.
  * Ex "in 35 days, 14 hours, and 1 minute"
  *
- * @param {DateTime} in_date The impending time that humans must be warned about.
+ * @param {luxon.DateTime} in_date The impending time that humans must be warned about.
  * @returns {string} A timestring that indicates the amount of time left before the given Date.
  */
 function timeLeft(in_date) {
@@ -211,8 +211,8 @@ function timeLeft(in_date) {
 
 /**
  * If it's given an object it returns a string. Rethrows errors in that process
- * @param {String} str Accepts "any" object, tries to turn it into a string
- * @returns {String}
+ * @param {string} str Accepts "any" object, tries to turn it into a string
+ * @returns {string}
  */
 function forceToString(str) {
     if (typeof str === 'object') {
@@ -230,8 +230,8 @@ function forceToString(str) {
 
 /**
  * Unescapes HTML entities (&#\d+;) only
- * @param {String} str String containing HTML numeric entities
- * @returns {String} An unescaped string
+ * @param {string} str String containing HTML numeric entities
+ * @returns {string} An unescaped string
  */
 function unescapeEntities(str) {
     str = forceToString(str);
@@ -246,8 +246,8 @@ function unescapeEntities(str) {
 
 /**
  * Checks if a string is a valid URL
- * @param {String} str String to be tested
- * @returns {Boolean} Whether it's valid
+ * @param {string} str String to be tested
+ * @returns {boolean} Whether it's valid
  */
 function isValidURL(str) {
     str = forceToString(str);
@@ -266,10 +266,10 @@ function isValidURL(str) {
 
 /**
  * Consistently format a rate
- * @param denominator The bottom number - the thing we're dividing by
- * @param numerator The top number - the thing we're dividing
- * @param precision Optional - precision, if you know you want X decimal places
- * @returns a string representation of the rate
+ * @param {number} denominator The bottom number - the thing we're dividing by
+ * @param {number} numerator The top number - the thing we're dividing
+ * @param {number} [precision] Optional - precision, if you know you want X decimal places
+ * @returns {number}
  */
 function calculateRate(denominator, numerator, precision) {
     if ((typeof denominator === 'undefined') ||
@@ -305,7 +305,7 @@ function integerComma(number) {
 
 /**
  * Turns an integer into a human-readable string, up to billions
- * @param {Number} number
+ * @param {number} number
  * @returns {string} Formatted number
  */
 function intToHuman(number) {

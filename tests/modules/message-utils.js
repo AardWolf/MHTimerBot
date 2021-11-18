@@ -56,7 +56,7 @@ test('addMessageReaction', suite => {
         t.plan(inputs.length);
         inputs.forEach(async (success) => {
             const message = {
-                channel: { type: 'dm' },
+                channel: { type: 'DM' },
                 react: sinon.spy(),
             };
             const input = new CommandResult({ success, sentDm: true, message });
@@ -72,7 +72,7 @@ test('addMessageReaction', suite => {
         t.plan(inputs.length * 2);
         inputs.forEach(async ({ success, emoji }) => {
             const message = {
-                channel: { type: 'dm' },
+                channel: { type: 'DM' },
                 react: sinon.spy(),
             };
             const input = new CommandResult({ success, sentDm: false, message });
@@ -84,7 +84,7 @@ test('addMessageReaction', suite => {
     suite.test('when origin was DM - when replied via DM - when command errored - does not react', async t => {
         t.plan(1);
         const message = {
-            channel: { type: 'dm' },
+            channel: { type: 'DM' },
             react: sinon.spy(),
         };
         const input = new CommandResult({ sentDm: true, botError: true, message });
@@ -96,7 +96,7 @@ test('addMessageReaction', suite => {
         t.plan(inputs.length * 2);
         inputs.forEach(async (success) => {
             const message = {
-                channel: { type: 'dm' },
+                channel: { type: 'DM' },
                 react: sinon.spy(),
             };
             const input = new CommandResult({ success, sentDm: false, botError: true, message });
@@ -164,10 +164,12 @@ test('addMessageReaction', suite => {
         });
     });
     suite.test('when sending reaction - when error occurs - handles error', async t => {
+        const errorStub = sinon.stub(require('../../src/modules/logger'), 'error');
+        t.teardown(() => errorStub.restore());
         t.plan(6);
+
         const message = { channel : { type: 'text' }, react: sinon.stub().rejects(Error('oops!')) };
         const input = new CommandResult({ success: true, sentDm: false, message });
-        const errorStub = sinon.stub(require('../../src/modules/logger'), 'error');
         const result = await addMessageReaction(input);
         t.strictEqual(errorStub.callCount, 1, 'should log error from Message#react');
         const [description, err, givenResult] = errorStub.getCall(0).args;
@@ -176,9 +178,5 @@ test('addMessageReaction', suite => {
         t.same(givenResult, input, 'should log input command result');
         t.true(result.botError, 'should signal bot error to caller');
         t.false(result.success, 'should signal unsuccessful result to caller');
-    });
-    suite.test('Module Cleanup', t => {
-        sinon.restore();
-        t.end();
     });
 });

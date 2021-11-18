@@ -1,10 +1,12 @@
 // Type-hinting imports
 // eslint-disable-next-line no-unused-vars
-const { Message } = require('discord.js');
+const { Message, Util } = require('discord.js');
 
 const CommandResult = require('../interfaces/command-result');
+const { isDMChannel } = require('../modules/channel-utils');
 const Logger = require('../modules/logger');
 const { unsetHunterID, setHunterID, setHunterProperty, initialize, save, getHunterProperties } = require('../modules/hunter-registry');
+
 const usage = [
     '#### - provide a number to set your hunter ID (**Must be done first**)',
     'rank <rank> - identify your rank',
@@ -54,9 +56,11 @@ async function doIAM(message, tokens) {
     }
     if (reply) {
         try {
-            await message.channel.send(reply, { split: true });
+            for (const msg of Util.splitMessage(reply)) {
+                await message.channel.send(msg);
+            }
             theResult.replied = true;
-            if (message.channel.type === 'dm') theResult.sentDm = true;
+            theResult.sentDm = isDMChannel(message.channel);
             theResult.success = true;
         } catch (err) {
             Logger.error('IAM: failed to send reply', err);

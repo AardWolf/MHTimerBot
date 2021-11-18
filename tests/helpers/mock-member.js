@@ -4,10 +4,9 @@ const sinon = require('sinon');
  * A Fake guild member for use in tests
  * @param memberId
  * @param guildId
- * @param hasPermissionStub
+ * @param hasPermissionStub stub function for the `permissions.has` method
  * @param someStub
  * @param clientStub
- * @returns {{guild: {id}, hasPermission: *, roles: {cache: {some: *}}, client: any, id}}
  */
 const mockMember = ({
     memberId = '123456789',
@@ -25,6 +24,7 @@ const mockMember = ({
                 '987654321': {
                     adminRole: '',
                     modRole: '',
+                    timedAnnouncementChannels: new Set(),
                 },
             },
         },
@@ -36,7 +36,9 @@ const mockMember = ({
         client: clientWithSettings,
         id: memberId,
         guild: { id: guildId },
-        hasPermission: hasPermissionStub,
+        permissions: {
+            has: hasPermissionStub,
+        },
         roles: {
             cache: {
                 some: someStub,
