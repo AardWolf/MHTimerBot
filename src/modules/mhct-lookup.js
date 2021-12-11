@@ -379,22 +379,51 @@ function getFilter(tester) {
     // Process filter-y nicknames
     if (!tester || typeof tester !== 'string')
         return;
-    if (tester.startsWith('3_d') || tester.startsWith('3d'))
-        tester = '3_days';
-    else if (tester.startsWith('3_m') || tester.startsWith('3m'))
-        tester = '3_months';
-    else if (tester.startsWith('all'))
-        tester = 'alltime';
-    else if (tester === 'current') {
-        tester = '1_month';
-        // If there is an ongoing event, use that instead of the 1-month filter.
-        for (const filter of filters) {
-            if (filter.start_time && !filter.end_time && filter.code_name !== tester) {
-                return filter;
-            }
-        }
+    const asFilterSearchTerm = (token) => {
+        if (/^3_?d/i.test(token)) return '3_days';
+        if (/^3_?m/i.test(token)) return '3_months';
+        if (/^all/i.test(token)) return 'alltime';
+        if (token === 'current') return '1_month';
+        return token;
+    };
+    // If there is an ongoing event, we will use that instead of the 1-month filter.
+    if (tester === 'current') {
+        const currentEvent = filters.find((f) => f.code_name !== '1_month' && f.start_time && !f.end_time);
+        if (currentEvent) return currentEvent;
     }
-    return getSearchedEntity(tester, filters)[0];
+    const searchTerm = asFilterSearchTerm(tester);
+    return getSearchedEntity(searchTerm, filters)[0];
+}
+
+/**
+ * Processes the given tokens, extracting the event filter if possible.
+ * @param {string[]} tokens user-specified command arguments, one of which may be a filter identifier
+ * @returns {{ tokens: string[], filter: DatabaseFilter|null }} Unused tokens and the filter, if any
+ */
+function extractEventFilter(tokens) {
+    // The filter term must immediately follow the introducer token or be the first token.
+    const introducerIndex = tokens.findIndex((token) => token === '-e');
+    const filterIndex = introducerIndex + 1;
+    let filter = null;
+    if (filterIndex < tokens.length) {
+        filter = getFilter(tokens[filterIndex]);
+    }
+
+    // Construct the remaining (unused) tokens from all input tokens except the one that produced the filter
+    // and the event specifier token.
+    const remaining = [];
+    if (filter || introducerIndex !== -1) {
+        const firstSkippedIndex = Math.max(0, introducerIndex);
+        if (firstSkippedIndex) {
+            remaining.push(...tokens.slice(0, firstSkippedIndex));
+        }
+        // Add all tokens following the one used to obtain the filter.
+        remaining.push(...tokens.slice(filterIndex + 1));
+    } else {
+        remaining.push(...tokens);
+    }
+
+    return { tokens: remaining, filter };
 }
 
 /**
@@ -726,6 +755,7 @@ async function save() {
 module.exports.getMHCTList = getMHCTList;
 module.exports.initialize = initialize;
 module.exports.findThing = findThing;
+module.exports.extractEventFilter = extractEventFilter;
 module.exports.getFilter = getFilter;
 module.exports.getLoot = getLoot;
 module.exports.getMice = getMice;

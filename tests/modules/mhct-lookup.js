@@ -195,10 +195,19 @@ test('extractEventFilter', suite => {
             t.teardown(() => sinon.resetHistory());
             t.plan(2);
             const input = ['noTouchy', '-e', followingToken, 'alsoNoTouchy'];
-            const result = extractEventFilter(input);
+            extractEventFilter(input);
             t.true(getSearchedEntityStub.called, 'should call "getFilter" and thus "getSearchedEntity"');
             t.strictEqual(getSearchedEntityStub.getCall(0).args[0], followingToken, 'should use token after "-e" as filter search term');
         });
+    });
+
+    suite.test('given tokens with "-e" - when no following token - no search performed', t => {
+        t.teardown(() => sinon.resetHistory());
+        t.plan(2);
+        const input = ['noTouchy', 'seriouslyNoTouchy', '-e'];
+        const result = extractEventFilter(input);
+        t.false(getSearchedEntityStub.called, 'should not perform filter lookup');
+        t.deepEqual(result.tokens, ['noTouchy', 'seriouslyNoTouchy'], 'should always remove "-e" token');
     });
 });
 
