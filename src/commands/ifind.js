@@ -4,16 +4,16 @@ const { Message, Util } = require('discord.js');
 const CommandResult = require('../interfaces/command-result');
 const { isDMChannel } = require('../modules/channel-utils');
 const Logger = require('../modules/logger');
-const { getFilter, getLoot, formatLoot,
+const { extractEventFilter, getLoot, formatLoot,
     sendInteractiveSearchResult, listFilters, getMice, formatMice } = require('../modules/mhct-lookup');
 
 /**
  *
  * @param {Message} message The message that triggered the action
- * @param {string[]} tokens The tokens of the command
+ * @param {string[]} userArgs The tokens of the command
  * @returns {Promise<CommandResult>} Status of the execution
  */
-async function doIFIND(message, tokens) {
+async function doIFIND(message, userArgs) {
     const theResult = new CommandResult({ message, success: false, sentDM: false });
     let reply = '';
     const opts = {};
@@ -22,24 +22,13 @@ async function doIFIND(message, tokens) {
         uri: 'https://www.mhct.win/loot.php',
         type: 'item',
     };
-    if (!tokens)
+    if (!userArgs)
         reply = 'I just cannot find what you\'re looking for (since you didn\'t tell me what it was).';
     else {
+        const { tokens, filter } = extractEventFilter(userArgs);
         // Set the filter if it's requested.
-        if (tokens.includes('-e')) {
-            const introducerIndex = tokens.findIndex((token) => token === '-e');
-            // The index of the filter term must immediately follow the introducer token.
-            const filterIndex = introducerIndex + 1;
-            let spliceCount = 1;
-            if (filterIndex < tokens.length) {
-                const filter = getFilter(tokens[filterIndex]);
-                if (filter && tokens.length > 2) {
-                    opts.timefilter = filter.code_name;
-                    ++spliceCount;
-                }
-            }
-            // Remove the processed tokens.
-            tokens.splice(introducerIndex, spliceCount);
+        if (filter) {
+            opts.timefilter = filter.code_name;
         }
 
         // Figure out what they're searching for (remove mouse at the end in case of fallthrough)
