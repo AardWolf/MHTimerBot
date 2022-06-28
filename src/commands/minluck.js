@@ -1,5 +1,6 @@
 // eslint-disable-next-line no-unused-vars
 const { Message } = require('discord.js');
+const { SlashCommandBuilder } = require('@discordjs/builders');
 
 const CommandResult = require('../interfaces/command-result');
 const { isDMChannel } = require('../modules/channel-utils');
@@ -34,6 +35,20 @@ const typeMap = {
     't': 'Tactical',
     'r': 'Rift',
 };
+
+// Options for slash commands
+const options = {
+    'mouse': {
+        'description': 'The mouse to look up',
+        'required': true
+    },
+    'powerType': {
+        'description': 'Which power type to look up (default: All)',
+        'required': false,
+        'type': 'String',
+        'choices': typeMap
+    }
+}
 
 /**
  * Get the minluck of a mouse
@@ -105,6 +120,31 @@ async function doMINLUCK(message, tokens) {
 
 }
 
+// Build the slashCommand registration JSON
+const slashCommand = new SlashCommandBuilder()
+    .setName('minluck')
+    .setDescription('Get the minluck values for a mouse')
+    .addStringOption(option => 
+        option.setName('mouse')
+            .setDescription('The mouse to look up')
+            .setRequired(true))
+    .addStringOption(option => 
+        option.setName('powertype')
+            .setDescription('The specific power type to look up (Default: all)')
+            .setRequired(false)
+            .addChoices(
+                { name: 'Arcane', value: 'a' },
+                { name: 'Draconic', value: 'd' },
+                { name: 'Forgotten', value: 'f' },
+                { name: 'Hydro', value: 'h' },
+                { name: 'Law', value: 'l' },
+                { name: 'Physical', value: 'p' },
+                { name: 'Shadow', value: 's' },
+                { name: 'Tactical', value: 't' },
+                { name: 'Rift', value: 'r' },
+            ));
+
+
 module.exports = {
     name: 'minluck',
     args: true,
@@ -112,6 +152,7 @@ module.exports = {
     description: 'Get the minluck values of mice - this is the lowest luck stat that "guarantees" a catch of that mouse with that power type.',
     canDM: true,
     aliases: [ 'luck', 'lucks', 'mluck', 'mlucks', 'minlucks' ],
+    slashCommand: slashCommand,
     execute: doMINLUCK,
     initialize: initialize,
     save: save,
