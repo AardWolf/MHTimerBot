@@ -1,5 +1,5 @@
 // eslint-disable-next-line no-unused-vars
-const { Message } = require('discord.js');
+const { Message, CommandInteraction } = require('discord.js');
 const { SlashCommandBuilder } = require('@discordjs/builders');
 
 const CommandResult = require('../interfaces/command-result');
@@ -36,20 +36,6 @@ const typeMap = {
     'r': 'Rift',
 };
 
-// Options for slash commands
-const options = {
-    'mouse': {
-        'description': 'The mouse to look up',
-        'required': true
-    },
-    'powerType': {
-        'description': 'Which power type to look up (default: All)',
-        'required': false,
-        'type': 'String',
-        'choices': typeMap
-    }
-}
-
 /**
  * Get the minluck of a mouse
  * @param {Message} message The message that triggered the action
@@ -85,25 +71,7 @@ async function doMINLUCK(message, tokens) {
             tokens.pop();
         }
         const searchString = tokens.filter(word => word.charAt(0) !== '-').join(' ');
-        const all_mice = getMice(searchString, message.client.nicknames.get('mice'));
-        if (all_mice && all_mice.length) {
-            if (all_mice.length > 1)
-                reply = 'I found multiple matches, here is the first.';
-            // all_mice.splice(1);
-            // all_mice.id is the mhct id, all_mice.value is the text name of the mouse
-            const types = flags.map(f => {
-                if (f in typeMap)
-                    return typeMap[f];
-            });
-            if ('guildId' in message 
-                && message['guildId']
-                && message['guildId'] in message.client.settings.guilds
-                && 'emoji' in message.client.settings.guilds[message.guildId]) {
-                reply = getMinluckString(all_mice[0].value, types, false, message.client.settings.guilds[message.guild.id].emoji);
-            } else {
-                reply = getMinluckString(all_mice[0].value, types, false);
-            }
-        }
+        reply = getMinLuck(message, searchString, flags);
     }
     if (reply) {
         try {
@@ -120,10 +88,60 @@ async function doMINLUCK(message, tokens) {
 
 }
 
+/**
+ * Get the string for minluck for a mouse
+ * @param {Message|CommandInteraction} message -- Hook back to the bot client
+ * @param {String} mouse -- Search string
+ * @param {String|Array} flags -- Power type flags
+ * 
+ * @returns {String} -- Minluck result as a string
+ */
+function getMinLuck(message, mouse, flags) {
+    if (!flags || flags === '*' || flags === ['*']) {
+        flags = Object.keys(typeMap);
+    }
+    if (!Array.isArray(flags)) {
+        flags = [flags];
+    }
+    var reply = `I did not find ${mouse}`;
+    const all_mice = getMice(mouse, message.client.nicknames.get('mice'));
+    if (all_mice && all_mice.length) {
+        if (all_mice.length > 1)
+            reply = 'I found multiple matches, here is the first.';
+        // all_mice.splice(1);
+        // all_mice.id is the mhct id, all_mice.value is the text name of the mouse
+        const types = flags.map(f => {
+            if (f in typeMap)
+                return typeMap[f];
+        });
+        if ('guildId' in message 
+            && message['guildId']
+            && message['guildId'] in message.client.settings.guilds
+            && 'emoji' in message.client.settings.guilds[message.guildId]) {
+            reply = getMinluckString(all_mice[0].value, types, false, message.client.settings.guilds[message.guild.id].emoji);
+        } else {
+            reply = getMinluckString(all_mice[0].value, types, false);
+        }
+    }
+    return reply;
+
+}
+
+/**
+ * Reply to an interaction
+ * @param {CommandInteraction} interaction -- the thing to respond to
+ */
+async function interact(interaction) {
+    await interaction.reply(getMinLuck(interaction, 
+        interaction.options.getString('mouse'), 
+        interaction.options.getString('powertype')));
+}
+
 // Build the slashCommand registration JSON
 const slashCommand = new SlashCommandBuilder()
     .setName('minluck')
     .setDescription('Get the minluck values for a mouse')
+    .setDMPermission(true)
     .addStringOption(option => 
         option.setName('mouse')
             .setDescription('The mouse to look up')
@@ -142,6 +160,7 @@ const slashCommand = new SlashCommandBuilder()
                 { name: 'Shadow', value: 's' },
                 { name: 'Tactical', value: 't' },
                 { name: 'Rift', value: 'r' },
+                { name: 'All', value: '*' },
             ));
 
 
@@ -153,6 +172,7 @@ module.exports = {
     canDM: true,
     aliases: [ 'luck', 'lucks', 'mluck', 'mlucks', 'minlucks' ],
     slashCommand: slashCommand,
+    interactionHandler: interact,
     execute: doMINLUCK,
     initialize: initialize,
     save: save,

@@ -293,6 +293,22 @@ function Main() {
                 }
             });
 
+            // Handle slashCommands
+            client.on('interactionCreate', async interaction => {
+                if (!interaction.isCommand()) return;
+                const dynCommand = client.commands.get(interaction.commandName);
+                if (dynCommand && dynCommand.interactionHandler) {
+                    Promise.resolve(dynCommand.interactionHandler(interaction))
+                        .catch((commandErr) => {
+                            Logger.error(`Error executing dynamic slash command ${interaction.commandName}`);
+                            interaction.reply(`Sorry, ${dynCommand.name} seems broken`)
+                                .catch((replyErr) => {
+                                    Logger.error('There was an error saying there was an error!');
+                                });
+                        });
+                }
+            });
+
             // WebSocket connection error for the bot client.
             client.on('error', error => {
                 Logger.error(`Discord Client Error Received: "${error.message}"\n`, error.error);
