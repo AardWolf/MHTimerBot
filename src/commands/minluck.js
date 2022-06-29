@@ -107,7 +107,7 @@ function getMinLuck(message, mouse, flags) {
     const all_mice = getMice(mouse, message.client.nicknames.get('mice'));
     if (all_mice && all_mice.length) {
         if (all_mice.length > 1)
-            reply = 'I found multiple matches, here is the first.';
+            reply = 'I found multiple matches, here is the first.\n';
         // all_mice.splice(1);
         // all_mice.id is the mhct id, all_mice.value is the text name of the mouse
         const types = flags.map(f => {
@@ -118,9 +118,9 @@ function getMinLuck(message, mouse, flags) {
             && message['guildId']
             && message['guildId'] in message.client.settings.guilds
             && 'emoji' in message.client.settings.guilds[message.guildId]) {
-            reply = getMinluckString(all_mice[0].value, types, false, message.client.settings.guilds[message.guild.id].emoji);
+            reply += getMinluckString(all_mice[0].value, types, false, message.client.settings.guilds[message.guild.id].emoji);
         } else {
-            reply = getMinluckString(all_mice[0].value, types, false);
+            reply += getMinluckString(all_mice[0].value, types, false);
         }
     }
     return reply;
