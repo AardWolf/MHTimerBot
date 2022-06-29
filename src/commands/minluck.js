@@ -106,7 +106,7 @@ function getMinLuck(message, mouse, flags) {
     if (!Array.isArray(flags)) {
         flags = [flags];
     }
-    let reply;
+    let reply = '';
     const all_mice = getMice(mouse, message.client.nicknames.get('mice'));
     if (all_mice && all_mice.length) {
         if (all_mice.length > 1)
