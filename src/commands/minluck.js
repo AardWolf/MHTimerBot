@@ -106,7 +106,7 @@ function getMinLuck(message, mouse, flags) {
     if (!Array.isArray(flags)) {
         flags = [flags];
     }
-    var reply = `I did not find ${mouse}`;
+    var reply;
     const all_mice = getMice(mouse, message.client.nicknames.get('mice'));
     if (all_mice && all_mice.length) {
         if (all_mice.length > 1)
@@ -125,6 +125,8 @@ function getMinLuck(message, mouse, flags) {
         } else {
             reply += getMinluckString(all_mice[0].value, types, false);
         }
+    } else {
+        reply = `I did not find ${mouse}`;
     }
     return reply;
 
@@ -135,9 +137,28 @@ function getMinLuck(message, mouse, flags) {
  * @param {CommandInteraction} interaction -- the thing to respond to
  */
 async function interact(interaction) {
-    await interaction.reply(getMinLuck(interaction, 
-        interaction.options.getString('mouse'), 
-        interaction.options.getString('powertype')));
+    if (interaction.isCommand()) {
+        await interaction.reply({   content: getMinLuck(interaction, 
+            interaction.options.getString('mouse'), 
+            interaction.options.getString('powertype')),
+        ephemeral: !interaction.options.getBoolean('share') });
+    } else {
+        Logger.error('Somehow minluck command interaction was called without a command');
+    }
+}
+
+/**
+ * Reply to an autotype request
+ * @param {CommandInteraction} interaction Must be an autocomplete interaction
+ */
+async function automice(interaction) {
+    if (interaction.isAutocomplete()) {
+        const focus = interaction.options.getFocused();
+        const all_mice = getMice(focus, interaction.client.nicknames.get('mice'));
+        await interaction.respond(
+            all_mice.map(mouse => ({ name: mouse.value, value: mouse.value })),
+        );
+    }
 }
 
 // Build the slashCommand registration JSON
@@ -148,7 +169,8 @@ const slashCommand = new SlashCommandBuilder()
     .addStringOption(option => 
         option.setName('mouse')
             .setDescription('The mouse to look up')
-            .setRequired(true))
+            .setRequired(true)
+            .setAutocomplete(true))
     .addStringOption(option => 
         option.setName('powertype')
             .setDescription('The specific power type to look up (Default: all)')
@@ -164,7 +186,10 @@ const slashCommand = new SlashCommandBuilder()
                 { name: 'Tactical', value: 't' },
                 { name: 'Rift', value: 'r' },
                 { name: 'All', value: '*' },
-            ));
+            ))
+    .addBooleanOption(option => 
+        option.setName('share')
+            .setDescription('Let others see the result?'));
 
 
 module.exports = {
@@ -175,6 +200,7 @@ module.exports = {
     canDM: true,
     aliases: [ 'luck', 'lucks', 'mluck', 'mlucks', 'minlucks' ],
     slashCommand: slashCommand,
+    autocompleteHandler: automice,
     interactionHandler: interact,
     execute: doMINLUCK,
     initialize: initialize,

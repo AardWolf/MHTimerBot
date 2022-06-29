@@ -293,20 +293,7 @@ function Main() {
             });
 
             // Handle slashCommands TODO: This becomes a function so different interactions get handled
-            client.on('interactionCreate', async interaction => {
-                if (!interaction.isCommand()) return;
-                const dynCommand = client.commands.get(interaction.commandName);
-                if (dynCommand && dynCommand.interactionHandler) {
-                    Promise.resolve(dynCommand.interactionHandler(interaction))
-                        .catch((commandErr) => {
-                            Logger.error(`Error executing dynamic slash command ${interaction.commandName}: ${commandErr}`);
-                            interaction.reply(`Sorry, ${dynCommand.name} seems broken`)
-                                .catch((replyErr) => {
-                                    Logger.error('There was an error saying there was an error!', replyErr);
-                                });
-                        });
-                }
-            });
+            client.on('interactionCreate', async interaction => handleInteraction(interaction));
 
             // WebSocket connection error for the bot client.
             client.on('error', error => {
@@ -594,6 +581,40 @@ function scheduleTimer(timer, channels) {
         }, msUntilActivation, timer),
     );
     timer_config.set(timer.id, { active: true, channels, inactiveChannels: [] });
+}
+
+/**
+ * Respond to slash commands, menus, and other interactions if the dynamic command allows it
+ * 
+ * @param {CommandInteraction} interaction a Discord interaction
+ */
+function handleInteraction(interaction) {
+    if (interaction.isCommand()) {
+        const dynCommand = interaction.client.commands.get(interaction.commandName);
+        if (dynCommand && dynCommand.interactionHandler) {
+            Promise.resolve(dynCommand.interactionHandler(interaction))
+                .catch((commandErr) => {
+                    Logger.error(`Error executing dynamic slash command ${interaction.commandName}: ${commandErr}`);
+                    interaction.reply(`Sorry, ${dynCommand.name} seems broken`)
+                        .catch((replyErr) => {
+                            Logger.error('There was an error saying there was an error!', replyErr);
+                        });
+                });
+        }
+    } // end command Interaction
+    else if (interaction.isAutocomplete()) {
+        const dynCommand = interaction.client.commands.get(interaction.commandName);
+        if (dynCommand && dynCommand.interactionHandler && dynCommand.autocompleteHandler) {
+            Promise.resolve(dynCommand.autocompleteHandler(interaction))
+                .catch((commandErr) => {
+                    Logger.error(`Error autocompleting dynamic slash command ${interaction.commandName}: ${commandErr}`);
+                    interaction.reply(`Sorry, ${dynCommand.name} seems broken`)
+                        .catch((replyErr) => {
+                            Logger.error('There was an error saying there was an error!', replyErr);
+                        });
+                });
+        }
+    }
 }
 
 /**
