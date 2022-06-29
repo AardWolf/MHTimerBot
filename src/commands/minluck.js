@@ -1,5 +1,6 @@
 // eslint-disable-next-line no-unused-vars
-const { Message } = require('discord.js');
+const { Message, CommandInteraction } = require('discord.js');
+const { SlashCommandBuilder } = require('@discordjs/builders');
 
 const CommandResult = require('../interfaces/command-result');
 const { isDMChannel } = require('../modules/channel-utils');
@@ -66,29 +67,11 @@ async function doMINLUCK(message, tokens) {
             flags = allFlags;
         flags = flags.flat().filter((value, index, self) => self.indexOf(value) === index);
         // Figure out what they're searching for
-        if (tokens[tokens.length - 1].toLowerCase() === 'mouse') {
+        if (tokens.length > 0 && tokens[tokens.length - 1].toLowerCase() === 'mouse') { // Issue #244
             tokens.pop();
         }
         const searchString = tokens.filter(word => word.charAt(0) !== '-').join(' ');
-        const all_mice = getMice(searchString, message.client.nicknames.get('mice'));
-        if (all_mice && all_mice.length) {
-            if (all_mice.length > 1)
-                reply = 'I found multiple matches, here is the first.';
-            // all_mice.splice(1);
-            // all_mice.id is the mhct id, all_mice.value is the text name of the mouse
-            const types = flags.map(f => {
-                if (f in typeMap)
-                    return typeMap[f];
-            });
-            if ('guildId' in message 
-                && message['guildId']
-                && message['guildId'] in message.client.settings.guilds
-                && 'emoji' in message.client.settings.guilds[message.guildId]) {
-                reply = getMinluckString(all_mice[0].value, types, false, message.client.settings.guilds[message.guild.id].emoji);
-            } else {
-                reply = getMinluckString(all_mice[0].value, types, false);
-            }
-        }
+        reply = getMinLuck(message, searchString, flags);
     }
     if (reply) {
         try {
@@ -105,6 +88,110 @@ async function doMINLUCK(message, tokens) {
 
 }
 
+/**
+ * Get the string for minluck for a mouse
+ * @param {Message|CommandInteraction} message -- Hook back to the bot client
+ * @param {String} mouse -- Search string
+ * @param {String|Array} flags -- Power type flags
+ * 
+ * @returns {String} -- Minluck result as a string
+ */
+function getMinLuck(message, mouse, flags) {
+    if (!mouse || mouse === '') {
+        return 'Looks like you forgot what you were searching for';
+    }
+    if (!flags || flags === '*' || flags === ['*']) {
+        flags = Object.keys(typeMap);
+    }
+    if (!Array.isArray(flags)) {
+        flags = [flags];
+    }
+    let reply;
+    const all_mice = getMice(mouse, message.client.nicknames.get('mice'));
+    if (all_mice && all_mice.length) {
+        if (all_mice.length > 1)
+            reply = 'I found multiple matches, here is the first.\n';
+        // all_mice.splice(1);
+        // all_mice.id is the mhct id, all_mice.value is the text name of the mouse
+        const types = flags.map(f => {
+            if (f in typeMap)
+                return typeMap[f];
+        });
+        if ('guildId' in message 
+            && message['guildId']
+            && message['guildId'] in message.client.settings.guilds
+            && 'emoji' in message.client.settings.guilds[message.guildId]) {
+            reply += getMinluckString(all_mice[0].value, types, false, message.client.settings.guilds[message.guild.id].emoji);
+        } else {
+            reply += getMinluckString(all_mice[0].value, types, false);
+        }
+    } else {
+        reply = `I did not find ${mouse}`;
+    }
+    return reply;
+
+}
+
+/**
+ * Reply to an interaction
+ * @param {CommandInteraction} interaction -- the thing to respond to
+ */
+async function interact(interaction) {
+    if (interaction.isCommand()) {
+        await interaction.reply({   content: getMinLuck(interaction, 
+            interaction.options.getString('mouse'), 
+            interaction.options.getString('powertype')),
+        ephemeral: !interaction.options.getBoolean('share') });
+    } else {
+        Logger.error('Somehow minluck command interaction was called without a command');
+    }
+}
+
+/**
+ * Reply to an autotype request
+ * @param {CommandInteraction} interaction Must be an autocomplete interaction
+ */
+async function automice(interaction) {
+    if (interaction.isAutocomplete()) {
+        const focus = interaction.options.getFocused();
+        const all_mice = getMice(focus, interaction.client.nicknames.get('mice'));
+        await interaction.respond(
+            all_mice.map(mouse => ({ name: mouse.value, value: mouse.value })),
+        );
+    }
+}
+
+// Build the slashCommand registration JSON
+const slashCommand = new SlashCommandBuilder()
+    .setName('minluck')
+    .setDescription('Get the minluck values for a mouse')
+    .setDMPermission(true)
+    .addStringOption(option => 
+        option.setName('mouse')
+            .setDescription('The mouse to look up')
+            .setRequired(true)
+            .setAutocomplete(true))
+    .addStringOption(option => 
+        option.setName('powertype')
+            .setDescription('The specific power type to look up (Default: all)')
+            .setRequired(false)
+            .addChoices(
+                { name: 'Arcane', value: 'a' },
+                { name: 'Draconic', value: 'd' },
+                { name: 'Forgotten', value: 'f' },
+                { name: 'Hydro', value: 'h' },
+                { name: 'Law', value: 'l' },
+                { name: 'Physical', value: 'p' },
+                { name: 'Shadow', value: 's' },
+                { name: 'Tactical', value: 't' },
+                { name: 'Rift', value: 'r' },
+                { name: 'All', value: '*' },
+            ))
+    .addBooleanOption(option => 
+        option.setName('share')
+            .setDescription('Let others see the result?'));
+
+
 module.exports = {
     name: 'minluck',
     args: true,
@@ -112,6 +199,9 @@ module.exports = {
     description: 'Get the minluck values of mice - this is the lowest luck stat that "guarantees" a catch of that mouse with that power type.',
     canDM: true,
     aliases: [ 'luck', 'lucks', 'mluck', 'mlucks', 'minlucks' ],
+    slashCommand: slashCommand,
+    autocompleteHandler: automice,
+    interactionHandler: interact,
     execute: doMINLUCK,
     initialize: initialize,
     save: save,

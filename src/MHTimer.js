@@ -33,6 +33,8 @@ const EnumKeys = require('./utils/discord-enum-keys');
 const fetch = require('node-fetch');
 // We need more robust CSV handling
 const csv_parse = require('csv-parse');
+const { REST } = require('@discordjs/rest');
+const { Routes } = require('discord-api-types/v9');
 
 // Globals
 const client = new Client({
@@ -81,6 +83,7 @@ const timer_config = new Map();
 
 // A collection to hold all the commands in the commands directory
 client.commands = new Collection();
+const slashCommands = [];
 const commandFiles = fs.readdirSync('src/commands').filter(file => file.endsWith('.js'));
 for (const file of commandFiles) {
     try {
@@ -97,6 +100,9 @@ for (const file of commandFiles) {
                 });
             }
             client.commands.set(command.name, command);
+            if (command.slashCommand) {
+                slashCommands.push(command.slashCommand.toJSON());
+            }
         } else {
             Logger.error(`Error in ${file}: Command name property is missing`);
         }
@@ -196,6 +202,26 @@ function Main() {
                 Logger.log('I am alive!');
                 // Migrate settings at this point since connection required for some pieces
                 migrateSettings(client.settings);
+                // Register slash commands
+                const discordRest = new REST({ version: '9' }).setToken(client.settings.token);
+
+                // We might be able to move this to after the bot is connected and run it once
+                if (client.application.id) {
+                    (async () => {
+                        try {
+                            Logger.log(`Re-registering ${slashCommands.length} slash commands.`);
+
+                            await discordRest.put(
+                                Routes.applicationCommands(client.application.id),
+                                { body: slashCommands },
+                            );
+
+                            Logger.log('Slash commands registered.');
+                        } catch (error) {
+                            Logger.error(error);
+                        }
+                    })();
+                }
 
                 // Find all text channels on which to send announcements.
                 const announcables = client.guilds.cache.reduce((channels, guild) => {
@@ -265,6 +291,9 @@ function Main() {
                     parseUserMessage(message);
                 }
             });
+
+            // Handle slashCommands TODO: This becomes a function so different interactions get handled
+            client.on('interactionCreate', async interaction => handleInteraction(interaction));
 
             // WebSocket connection error for the bot client.
             client.on('error', error => {
@@ -552,6 +581,40 @@ function scheduleTimer(timer, channels) {
         }, msUntilActivation, timer),
     );
     timer_config.set(timer.id, { active: true, channels, inactiveChannels: [] });
+}
+
+/**
+ * Respond to slash commands, menus, and other interactions if the dynamic command allows it
+ * 
+ * @param {CommandInteraction} interaction a Discord interaction
+ */
+function handleInteraction(interaction) {
+    if (interaction.isCommand()) {
+        const dynCommand = interaction.client.commands.get(interaction.commandName);
+        if (dynCommand && dynCommand.interactionHandler) {
+            Promise.resolve(dynCommand.interactionHandler(interaction))
+                .catch((commandErr) => {
+                    Logger.error(`Error executing dynamic slash command ${interaction.commandName}: ${commandErr}`);
+                    interaction.reply(`Sorry, ${dynCommand.name} seems broken`)
+                        .catch((replyErr) => {
+                            Logger.error('There was an error saying there was an error!', replyErr);
+                        });
+                });
+        }
+    } // end command Interaction
+    else if (interaction.isAutocomplete()) {
+        const dynCommand = interaction.client.commands.get(interaction.commandName);
+        if (dynCommand && dynCommand.interactionHandler && dynCommand.autocompleteHandler) {
+            Promise.resolve(dynCommand.autocompleteHandler(interaction))
+                .catch((commandErr) => {
+                    Logger.error(`Error autocompleting dynamic slash command ${interaction.commandName}: ${commandErr}`);
+                    interaction.reply(`Sorry, ${dynCommand.name} seems broken`)
+                        .catch((replyErr) => {
+                            Logger.error('There was an error saying there was an error!', replyErr);
+                        });
+                });
+        }
+    }
 }
 
 /**
