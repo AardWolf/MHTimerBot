@@ -67,7 +67,7 @@ async function doMINLUCK(message, tokens) {
             flags = allFlags;
         flags = flags.flat().filter((value, index, self) => self.indexOf(value) === index);
         // Figure out what they're searching for
-        if (tokens[tokens.length - 1].toLowerCase() === 'mouse') {
+        if (tokens.length > 0 && tokens[tokens.length - 1].toLowerCase() === 'mouse') { // Issue #244
             tokens.pop();
         }
         const searchString = tokens.filter(word => word.charAt(0) !== '-').join(' ');
@@ -97,6 +97,9 @@ async function doMINLUCK(message, tokens) {
  * @returns {String} -- Minluck result as a string
  */
 function getMinLuck(message, mouse, flags) {
+    if (!mouse || mouse === '') {
+        return 'Looks like you forgot what you were searching for';
+    }
     if (!flags || flags === '*' || flags === ['*']) {
         flags = Object.keys(typeMap);
     }

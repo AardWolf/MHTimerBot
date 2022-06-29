@@ -34,7 +34,6 @@ const fetch = require('node-fetch');
 // We need more robust CSV handling
 const csv_parse = require('csv-parse');
 const { REST } = require('@discordjs/rest');
-const { restore } = require('mock-fs');
 const { Routes } = require('discord-api-types/v9');
 
 // Globals
@@ -293,17 +292,17 @@ function Main() {
                 }
             });
 
-            // Handle slashCommands
+            // Handle slashCommands TODO: This becomes a function so different interactions get handled
             client.on('interactionCreate', async interaction => {
                 if (!interaction.isCommand()) return;
                 const dynCommand = client.commands.get(interaction.commandName);
                 if (dynCommand && dynCommand.interactionHandler) {
                     Promise.resolve(dynCommand.interactionHandler(interaction))
                         .catch((commandErr) => {
-                            Logger.error(`Error executing dynamic slash command ${interaction.commandName}`);
+                            Logger.error(`Error executing dynamic slash command ${interaction.commandName}: ${commandErr}`);
                             interaction.reply(`Sorry, ${dynCommand.name} seems broken`)
                                 .catch((replyErr) => {
-                                    Logger.error('There was an error saying there was an error!');
+                                    Logger.error('There was an error saying there was an error!', replyErr);
                                 });
                         });
                 }
