@@ -1,5 +1,5 @@
 // eslint-disable-next-line no-unused-vars
-const { Message, CommandInteraction } = require('discord.js');
+const { Message, CommandInteraction, MessageActionRow, MessageButton } = require('discord.js');
 const { SlashCommandBuilder } = require('@discordjs/builders');
 
 const CommandResult = require('../interfaces/command-result');
@@ -138,26 +138,48 @@ function getMinLuck(message, mouse, flags) {
  */
 async function interact(interaction) {
     if (interaction.isCommand()) {
-        await interaction.reply({   content: getMinLuck(interaction, 
-            interaction.options.getString('mouse'), 
-            interaction.options.getString('powertype')),
-        ephemeral: !interaction.options.getBoolean('share') });
+        const filter = f => f.customId === interaction.id && f.user.id === interaction.user.id;
+        const shareButton = new MessageActionRow()
+            .addComponents(
+                new MessageButton()
+                    .setCustomId(interaction.id)
+                    .setLabel('Share')
+                    .setStyle('PRIMARY'),
+            );
+        const results = getMinLuck(interaction, interaction.options.getString('mouse'), interaction.options.getString('powertype'));
+        const collector = interaction.channel.createMessageComponentCollector({ filter, time: 5 * 60 * 1000 });
+        collector.on('collect', async c => {
+            const sharer = interaction.guild ? interaction.member.displayName : interaction.user.username;
+            //await c.update({ content: 'Shared', components: [] });
+            // await c.deferUpdate(); // can't defer+update
+            await c.message.channel.send( { content: `${sharer} shares:\n${results}`});
+            await c.update({ content: 'Shared', ephemeral: false, components: [] });
+            // await c.deleteReply();
+            
+            // await c.reply({ content: `${sharer} sent:\n${results}`, fetchReply: false }); // this one works but I don't like it
+        });
+        collector.on('end', async c => {
+            await c.reply({ components: [] });
+        });
+        await interaction.reply({ content: results, ephemeral: true, components: [shareButton] });
     } else {
         Logger.error('Somehow minluck command interaction was called without a command');
     }
 }
 
 /**
- * Reply to an autotype request
+ * Reply to an autotype request. Technically this could be folded into the interact?
  * @param {CommandInteraction} interaction Must be an autocomplete interaction
  */
 async function automice(interaction) {
     if (interaction.isAutocomplete()) {
         const focus = interaction.options.getFocused();
         const all_mice = getMice(focus, interaction.client.nicknames.get('mice'));
-        await interaction.respond(
-            all_mice.map(mouse => ({ name: mouse.value, value: mouse.value })),
-        );
+        if (all_mice) {
+            await interaction.respond(
+                all_mice.map(mouse => ({ name: mouse.value, value: mouse.value })),
+            );
+        }
     }
 }
 
@@ -186,10 +208,7 @@ const slashCommand = new SlashCommandBuilder()
                 { name: 'Shadow', value: 's' },
                 { name: 'Tactical', value: 't' },
                 { name: 'Rift', value: 'r' },
-            ))
-    .addBooleanOption(option => 
-        option.setName('share')
-            .setDescription('Let others see the result?'));
+            ));
 
 
 module.exports = {

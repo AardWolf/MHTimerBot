@@ -589,6 +589,7 @@ function scheduleTimer(timer, channels) {
  * @param {CommandInteraction} interaction a Discord interaction
  */
 function handleInteraction(interaction) {
+    // TODO: Do the various interactions need to be separated here or let the command do it/not respond to an interaction it doesn't support?
     if (interaction.isCommand()) {
         const dynCommand = interaction.client.commands.get(interaction.commandName);
         if (dynCommand && dynCommand.interactionHandler) {
@@ -608,10 +609,6 @@ function handleInteraction(interaction) {
             Promise.resolve(dynCommand.autocompleteHandler(interaction))
                 .catch((commandErr) => {
                     Logger.error(`Error autocompleting dynamic slash command ${interaction.commandName}: ${commandErr}`);
-                    interaction.reply(`Sorry, ${dynCommand.name} seems broken`)
-                        .catch((replyErr) => {
-                            Logger.error('There was an error saying there was an error!', replyErr);
-                        });
                 });
         }
     }
