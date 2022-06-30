@@ -116,7 +116,7 @@ function getMinLuck(message, mouse, flags) {
         const types = flags.map(f => {
             if (f in typeMap)
                 return typeMap[f];
-        });
+        }).filter(type => !!type );
         if ('guildId' in message 
             && message['guildId']
             && message['guildId'] in message.client.settings.guilds
