@@ -15,6 +15,7 @@ const DM_CHANNELS = Object.freeze(new Set([
     ChannelTypes[API_TYPE_VALUES.DM],
     ChannelTypes[API_TYPE_VALUES.GROUP_DM],
 ]));
+
 // If the above mapping fails, for whatever reason, ensure the bot does not start up:
 for (const type of DM_CHANNELS.values())
     if (typeof type !== 'string')

@@ -47,7 +47,6 @@ async function addMessageReaction(executedCommand) {
         shouldAddReaction = true;
     }
 
-
     // Now that we know whether we should react to the original message, do so.
     if (shouldAddReaction) {
         try {

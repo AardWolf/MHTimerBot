@@ -46,5 +46,4 @@ module.exports = class TimeStampedLogger {
         if (!args.length) return;
         console.error.apply(console, addTimestamp(...args));
     }
-
 };

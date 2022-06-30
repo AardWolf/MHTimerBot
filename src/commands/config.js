@@ -1,4 +1,3 @@
-
 // eslint-disable-next-line no-unused-vars
 const { Message, Util } = require('discord.js');
 
@@ -34,7 +33,7 @@ async function doSet(message, tokens) {
         reply = 'Just who do you think you are?';
     }
     else if (action === 'view' && guild) {
-        // Show current settings
+        // Show current settings.
         reply = `\`adminrole\` - ${guildSettings.adminrole}\n`;
         reply += `\`modrole\` - ${guildSettings.modrole}`;
         if ('emoji' in guildSettings) {
@@ -42,7 +41,7 @@ async function doSet(message, tokens) {
         }
     }
     else if (guild && action === 'emoji') {
-        //Allow setting for any string, really. But we especially want power types
+        // Allow setting for any string, really. But we especially want power types.
         reply = 'I don\'t know what to set here...';
         let guild_emojis = {};
         let action = 'add';
@@ -55,7 +54,7 @@ async function doSet(message, tokens) {
         if ('emoji' in guildSettings)
             guild_emojis = guildSettings['emoji'];
         if (tokens.length === 0) {
-            //Show off what we have right now
+            // Show off what we have right now.
             const howMany = Object.keys(guild_emojis).length;
             reply = `Currently configured emoji (${howMany}):\n`;
             reply += Object.keys(guild_emojis).map(e => {
@@ -84,7 +83,7 @@ async function doSet(message, tokens) {
         }
     }
     else if (action === 'modrole' || action === 'adminrole') {
-        // Set the moderator role on this server
+        // Set the moderator role on this server.
         const newRole = tokens.shift();
         reply = `'${newRole}' not found in this guild.`;
         if (guild.available) {

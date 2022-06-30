@@ -19,7 +19,6 @@ const usage = [
     'See Also: next; for when a timer occurs next. remind; for setting a reminder for a specific timer.',
 ].join('\n\t');
 
-
 /**
  * @param {Message} message
  * @param {string[]} tokens
@@ -29,6 +28,7 @@ async function doSCHED(message, tokens) {
     const theResult = new CommandResult({ message, success: false, sentDM: false });
     let reply = '';
     const timerRequest = timerAliases(message.client.timers_list, tokens);
+
     // Default the searched time period to 24 hours if it was not specified.
     timerRequest.count = timerRequest.count || 24;
 
@@ -82,7 +82,7 @@ async function doSCHED(message, tokens) {
 
     if (reply) {
         try {
-            // Note that a lot of this is handled by sendInteractiveSearchResult
+            // Note that a lot of this is handled by sendInteractiveSearchResult.
             if (typeof reply === 'string') {
                 for (const msg of Util.splitMessage(reply)) {
                     await message.channel.send(msg);

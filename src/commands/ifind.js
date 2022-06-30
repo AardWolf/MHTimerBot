@@ -78,9 +78,7 @@ async function doIFIND(message, userArgs) {
         }
     }
     return theResult;
-
 }
-
 
 function helpFind() {
     let reply = '-mh find [filter] loot:\nFind the drop rates for loot (nicknames allowed, filters optional).\n';
@@ -88,7 +86,7 @@ function helpFind() {
     return reply;
 }
 
-// initialize and save are in find.js
+// Initialize and save are in find.js.
 module.exports = {
     name: 'ifind',
     args: true,
@@ -98,4 +96,3 @@ module.exports = {
     helpFunction: helpFind,
     execute: doIFIND,
 };
-
