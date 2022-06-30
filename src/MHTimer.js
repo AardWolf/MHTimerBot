@@ -585,7 +585,7 @@ function scheduleTimer(timer, channels) {
 
 /**
  * Respond to slash commands, menus, and other interactions if the dynamic command allows it
- * 
+ *
  * @param {CommandInteraction} interaction a Discord interaction
  */
 function handleInteraction(interaction) {
@@ -1049,7 +1049,6 @@ function sendRemind(user, remind, timer) {
     alter_str += `\nUse \`${settings.botPrefix} help remind\` for additional info.`;
     output.addField('To Update:', alter_str, false);
 
-
     if (remind.fail) {
         output.setDescription(`(There were ${remind.fail} failures before this got through.)`);
         if (remind.fail > 10)
@@ -1066,8 +1065,6 @@ function sendRemind(user, remind, timer) {
         () => remind.fail = (remind.fail || 0) + 1,
     );
 }
-
-
 
 /**
  * Get the help text.
@@ -1121,8 +1118,6 @@ function getHelpMessage(message, tokens) {
     else
         return `I don't know that one, but I do know ${keywords}.`;
 }
-
-
 
 /**
  * Load nickname data from the input path, defaulting to the value of 'nickname_urls_filename'.

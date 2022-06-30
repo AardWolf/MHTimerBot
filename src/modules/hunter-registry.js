@@ -17,7 +17,7 @@ let someone_initialized = false;
 let hunterSaveInterval = null;
 let hunterRefreshInterval = null;
 
-//If a user sets these they go into manual mode
+// If a user sets these they go into manual mode.
 const manual_properties = ['rank', 'location'];
 
 /**
@@ -117,7 +117,6 @@ async function saveHunters(path = hunter_ids_filename) {
     Logger.log(`Hunters: ${didSave ? 'Saved' : 'Failed to save'} ${Object.keys(hunters).length} to '${path}'.`);
     return didSave;
 }
-
 
 /**
  * Unset the hunter's id (and all other friend-related settings), and messages the user back.

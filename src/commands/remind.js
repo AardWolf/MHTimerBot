@@ -34,7 +34,7 @@ async function doREMIND(message, tokens) {
         if (message.guild && message.client.settings.guilds[message.guild.id].botPrefix) {
             botPrefix = message.client.settings.guilds[message.guild.id].botPrefix;
         }
-        // This reminders array could be pre-filtered
+        // This reminders array could be pre-filtered.
         return sendDM(message.author, theResult, listRemind(message.author.id, message.client.reminders, botPrefix));
     }
 
@@ -49,8 +49,8 @@ async function doREMIND(message, tokens) {
     const requestName = `${area}${subArea ? `: ${subArea}` : ''}`;
 
     // Delete the reminder, if that is being requested.
-    // (Rather than try to modify the positions and number of elements in
-    // reminders e.g. thread race saveReminders, simply set the count to 0.)
+    // Rather than try to modify the positions and number of elements in
+    // reminders e.g. thread race saveReminders, simply set the count to 0.
     if (!count) {
         const responses = [];
         for (const reminder of message.client.reminders) {
@@ -104,6 +104,7 @@ async function doREMIND(message, tokens) {
     // No updates were made - free to add a new reminder.
     /** @type {TimerReminder} */
     const newReminder = { count, area, user: message.author.id };
+
     // If the matched timer has a sub-area, we need to care about the sub-area specified
     // in the request. It will either be the same as that of this timer, or it will be
     // null / undefined (i.e. a request for reminders from all timers in the area).

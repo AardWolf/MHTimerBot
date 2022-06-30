@@ -49,7 +49,7 @@ async function doNEXT(message, tokens) {
     }
     if (reply) {
         try {
-            // Note that a lot of this is handled by sendInteractiveSearchResult
+            // Note that a lot of this is handled by sendInteractiveSearchResult.
             if (typeof reply === 'string') {
                 await message.channel.send(reply);
             } else {
@@ -66,7 +66,6 @@ async function doNEXT(message, tokens) {
 
     return theResult;
 }
-
 
 module.exports = {
     name: 'next',
