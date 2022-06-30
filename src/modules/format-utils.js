@@ -227,7 +227,6 @@ function forceToString(str) {
     return str;
 }
 
-
 /**
  * Unescapes HTML entities (&#\d+;) only
  * @param {string} str String containing HTML numeric entities
@@ -242,7 +241,6 @@ function unescapeEntities(str) {
         return String.fromCharCode(num);
     });
 }
-
 
 /**
  * Checks if a string is a valid URL
@@ -261,7 +259,6 @@ function isValidURL(str) {
     }
 
     return url.protocol === 'http:' || url.protocol === 'https:';
-
 }
 
 /**

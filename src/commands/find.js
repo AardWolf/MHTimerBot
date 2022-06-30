@@ -31,14 +31,14 @@ async function doFIND(message, userArgs) {
             opts.timefilter = filter.code_name;
         }
 
-        // Figure out what they're searching for
+        // Figure out what they're searching for.
         if (tokens[tokens.length - 1].toLowerCase() === 'mouse') {
             tokens.pop();
         }
         const searchString = tokens.join(' ').toLowerCase();
         const all_mice = getMice(searchString, message.client.nicknames.get('mice'));
         if (all_mice && all_mice.length) {
-            // We have multiple options, show the interactive menu
+            // We have multiple options, show the interactive menu.
             urlInfo.qsParams = opts;
             sendInteractiveSearchResult(all_mice, message.channel, formatMice,
                 isDMChannel(message.channel), urlInfo, searchString);
@@ -48,7 +48,7 @@ async function doFIND(message, userArgs) {
         } else {
             const all_loot = getLoot(searchString, message.client.nicknames.get('loot'));
             if (all_loot && all_loot.length) {
-                // We have multiple options, show the interactive menu
+                // We have multiple options, show the interactive menu.
                 urlInfo.qsParams = opts;
                 urlInfo.type = 'item';
                 urlInfo.uri = 'https://www.mhct.win/loot.php';
@@ -64,7 +64,7 @@ async function doFIND(message, userArgs) {
     }
     if (reply) {
         try {
-            // Note that a lot of this is handled by sendInteractiveSearchResult
+            // Note that a lot of this is handled by sendInteractiveSearchResult.
             for (const msg of Util.splitMessage(reply, { prepend: '```\n', append: '\n```' })) {
                 await message.channel.send(msg);
             }
@@ -77,7 +77,6 @@ async function doFIND(message, userArgs) {
         }
     }
     return theResult;
-
 }
 
 function helpFind() {
@@ -98,7 +97,3 @@ module.exports = {
     initialize: initialize,
     save: save,
 };
-
-// Testing area
-//findThing('loot', 65, {})
-//    .then(result => Logger.log(`Now is: ${JSON.stringify(result)}`));

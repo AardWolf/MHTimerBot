@@ -58,7 +58,6 @@ const powerEmoji = {
     'rift': 'Rift',
 };
 
-
 /**
  * Construct and dispatch a reaction-enabled message for interactive "search result" display.
  *
@@ -218,7 +217,6 @@ async function formatLoot(isDM, loot, opts) {
     return reply;
 }
 
-
 /**
  * Formats mice into a nice table
  * @param {boolean} isDM Whether the command came as a DM
@@ -249,7 +247,7 @@ async function formatMice(isDM, mouse, opts) {
     const order = ['location', 'stage', 'cheese', 'ar', 'total_hunts'];
     const labels = { location: 'Location', stage: 'Stage', total_hunts: 'Hunts',
         ar: '/Hunt', cheese: 'Cheese' };
-    //Sort the results
+    // Sort the results.
     attracts.sort((a, b) => parseFloat(b.ar) - parseFloat(a.ar));
     attracts.splice(isDM ? 100 : 10);
     if (attracts.every(row => row.stage === no_stage))
@@ -376,7 +374,7 @@ async function formatConvertibles(isDM, convertible, opts) {
  * @returns {DatabaseFilter|undefined} The closest matching filter, if any.
  */
 function getFilter(tester) {
-    // Process filter-y nicknames
+    // Process filter-y nicknames.
     if (!tester || typeof tester !== 'string')
         return;
     const asFilterSearchTerm = (token) => {

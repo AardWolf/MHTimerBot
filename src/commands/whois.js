@@ -41,7 +41,7 @@ async function doWHOIS(message, tokens) {
                 foundHunters = getHunterByDiscordID(member.id);
             }
         } else {
-            // Rank or location lookup. tokens[] contains the terms to search
+            // Rank or location lookup. tokens[] contains the terms to search.
             let search = tokens.join(' ').toLowerCase();
             if (searchType === 'in') {
                 if (message.client.nicknames.get('locations')[search]) {
@@ -105,7 +105,6 @@ async function doWHOIS(message, tokens) {
  * -mh whois in <words>             -> area lookup
  * -mh whois [rank|title|a] <words> -> random query lookup
  */
-
 module.exports = {
     name: 'whois',
     args: true,

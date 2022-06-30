@@ -19,7 +19,6 @@ const {
     // getMHCTList,
 } = mhct_lookup;
 
-
 test('getFilter', suite => {
     suite.test('given non-string input - returns undefined', t => {
         t.teardown(() => sinon.reset());

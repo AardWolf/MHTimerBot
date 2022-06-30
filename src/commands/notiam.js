@@ -33,7 +33,7 @@ async function doNOT_IAM(message, tokens) {
     }
     else {
         const subCommand = tokens.shift().toLowerCase();
-        // Find the discordID to act on
+        // Find the discordID to act on.
         let hunter;
         if (message.mentions && message.mentions.members.first()) {
             hunter = message.mentions.members.first().id;
