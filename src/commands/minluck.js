@@ -176,6 +176,7 @@ const slashCommand = new SlashCommandBuilder()
             .setDescription('The specific power type to look up (Default: all)')
             .setRequired(false)
             .addChoices(
+                { name: 'All', value: '*' },
                 { name: 'Arcane', value: 'a' },
                 { name: 'Draconic', value: 'd' },
                 { name: 'Forgotten', value: 'f' },
@@ -185,7 +186,6 @@ const slashCommand = new SlashCommandBuilder()
                 { name: 'Shadow', value: 's' },
                 { name: 'Tactical', value: 't' },
                 { name: 'Rift', value: 'r' },
-                { name: 'All', value: '*' },
             ))
     .addBooleanOption(option => 
         option.setName('share')
