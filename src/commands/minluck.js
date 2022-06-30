@@ -166,16 +166,20 @@ const slashCommand = new SlashCommandBuilder()
     .setName('minluck')
     .setDescription('Get the minluck values for a mouse')
     .setDMPermission(true)
-    .addStringOption(option => 
+    .addStringOption(option =>
         option.setName('mouse')
             .setDescription('The mouse to look up')
             .setRequired(true)
             .setAutocomplete(true))
-    .addStringOption(option => 
+    .addBooleanOption(option =>
+        option.setName('share')
+            .setDescription('Let others see the result?'))
+    .addStringOption(option =>
         option.setName('powertype')
             .setDescription('The specific power type to look up (Default: all)')
             .setRequired(false)
             .addChoices(
+                { name: 'All', value: '*' },
                 { name: 'Arcane', value: 'a' },
                 { name: 'Draconic', value: 'd' },
                 { name: 'Forgotten', value: 'f' },
@@ -185,11 +189,7 @@ const slashCommand = new SlashCommandBuilder()
                 { name: 'Shadow', value: 's' },
                 { name: 'Tactical', value: 't' },
                 { name: 'Rift', value: 'r' },
-                { name: 'All', value: '*' },
-            ))
-    .addBooleanOption(option => 
-        option.setName('share')
-            .setDescription('Let others see the result?'));
+            ));
 
 
 module.exports = {
