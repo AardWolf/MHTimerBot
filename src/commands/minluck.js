@@ -106,7 +106,7 @@ function getMinLuck(message, mouse, flags) {
     if (!Array.isArray(flags)) {
         flags = [flags];
     }
-    let reply;
+    let reply = '';
     const all_mice = getMice(mouse, message.client.nicknames.get('mice'));
     if (all_mice && all_mice.length) {
         if (all_mice.length > 1)
@@ -115,8 +115,8 @@ function getMinLuck(message, mouse, flags) {
         const types = flags.map(f => {
             if (f in typeMap)
                 return typeMap[f];
-        });
-        if ('guildId' in message
+        }).filter(type => !!type );
+        if ('guildId' in message 
             && message['guildId']
             && message['guildId'] in message.client.settings.guilds
             && 'emoji' in message.client.settings.guilds[message.guildId]) {
