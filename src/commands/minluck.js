@@ -150,7 +150,7 @@ async function interact(interaction) {
             const sharer = interaction.guild ? interaction.member.displayName : interaction.user.username;
             //await c.update({ content: 'Shared', components: [] });
             // await c.deferUpdate(); // can't defer+update
-            await c.message.channel.send( { content: `${sharer} shares:\n${results}`});
+            await c.message.channel.send( { content: `${sharer} shares:\n${results}` });
             await c.update({ content: 'Shared', ephemeral: false, components: [] });
             // await c.deleteReply();
             
