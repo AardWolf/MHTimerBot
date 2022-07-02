@@ -55,11 +55,7 @@ async function doREMIND(message, tokens) {
         const responses = [];
         for (const reminder of message.client.reminders) {
             if (reminder.user === message.author.id && reminder.area === area) {
-                if (subArea && subArea === reminder.sub_area) {
-                    reminder.count = 0;
-                    responses.push(`Reminder for '${requestName}' turned off.`);
-                }
-                else if (!subArea && !reminder.sub_area) {
+                if ((subArea && subArea === reminder.sub_area) || (!subArea && !reminder.sub_area)) {
                     reminder.count = 0;
                     responses.push(`Reminder for '${requestName}' turned off.`);
                 }
