@@ -1,5 +1,5 @@
 // eslint-disable-next-line no-unused-vars
-const { Message, CommandInteraction, MessageActionRow, MessageButton } = require('discord.js');
+const { Message, CommandInteraction, MessageActionRow, MessageButton, Constants } = require('discord.js');
 const { SlashCommandBuilder } = require('@discordjs/builders');
 
 const CommandResult = require('../interfaces/command-result');
@@ -147,10 +147,10 @@ async function interact(interaction) {
         const results = getMinLuck(interaction, interaction.options.getString('mouse'), interaction.options.getString('powertype'));
         const collector = interaction.channel.createMessageComponentCollector({ filter, time: 5 * 60 * 1000 });
         collector.on('collect', async c => {
-            const sharer = interaction.guild ? interaction.member.displayName : interaction.user.username;
+            const sharer = interaction.user;
             //await c.update({ content: 'Shared', components: [] });
             // await c.deferUpdate(); // can't defer+update
-            await c.message.channel.send( { content: `${sharer} shares:\n${results}` });
+            await c.message.channel.send( { content: `<@${sharer.id}> used \`/minluck ${interaction.options.getString('mouse')}\`:\n${results}` });
             await c.update({ content: 'Shared', ephemeral: false, components: [] });
             // await c.deleteReply();
             

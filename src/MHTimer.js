@@ -943,9 +943,7 @@ function doAnnounce(timer) {
             tc.send(message).catch(err => {
                 Logger.error(`(${timer.name}): Error during announcement on channel "${tc.name}" in "${tc.guild.name}".\nClient status: ${client.status}\n`, err);
                 // Deactivate this channel only if we are connected to Discord. (Status === 'READY')
-                // TODO: actually use the enum instead of a value for the enum (in case it changes):
-                // https://github.com/discordjs/discord.js/blob/de0cacdf3209c4cc33b537ca54cd0969d57da3ab/src/util/Constants.js#L258
-                if (client.status === 0) {
+                if (client.status === Constants.Status.READY) {
                     const index = config.channels.indexOf(tc);
                     Array.prototype.push.apply(config.inactiveChannels, config.channels.splice(index, 1));
                     Logger.warn(`(${timer.name}): deactivated announcement on channel ${tc.name} in ${tc.guild.name} due to send error during send.`);
