@@ -141,7 +141,7 @@ async function interact(interaction) {
             .addComponents(
                 new MessageButton()
                     .setCustomId(interaction.id)
-                    .setLabel('Share')
+                    .setLabel('Send to Channel')
                     .setStyle('PRIMARY'),
             );
         const results = getMinLuck(interaction, interaction.options.getString('mouse'), interaction.options.getString('powertype'));
