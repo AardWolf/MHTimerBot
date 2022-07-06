@@ -102,7 +102,6 @@ function timerAliases(timers_list, tokens) {
     return newReminder;
 }
 
-
 /**
  * Attempt to match the input string to known Timer sub-areas. If successful, updates the given reminder.
  * Overwrites any previously-specified area.
@@ -217,7 +216,6 @@ function parseTokenForSubArea(token, newReminder) {
     return true;
 }
 
-
 /**
  * Attempt to match the input string to a positive integer. If successful, updates the given reminder.
  * Overwrites any previously-specified count.
@@ -274,7 +272,6 @@ function parseTokenForCount(token, newReminder) {
     }
     return true;
 }
-
 
 /**
  * Attempt to match the input string to known Timer areas. If successful, updates the given reminder.
@@ -337,7 +334,6 @@ function parseTokenForArea(token, newReminder) {
     }
     return true;
 }
-
 
 /**
  * Returns the next occurrence of the desired class of timers as a MessageEmbed.
@@ -405,7 +401,6 @@ function listRemind(user, reminders, botPrefix) {
     });
     return userReminders.length ? timer_str : 'I found no reminders for you, sorry.';
 }
-
 
 module.exports.getKnownTimersDetails = getKnownTimersDetails;
 module.exports.timerAliases = timerAliases;

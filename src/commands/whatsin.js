@@ -34,7 +34,7 @@ async function doWHATSIN(message, tokens) {
         const searchString = tokens.join(' ').toLowerCase();
         const all_convertibles = getConvertibles(searchString);
         if (all_convertibles && all_convertibles.length) {
-            // We have multiple options, show the interactive menu
+            // We have multiple options, show the interactive menu.
             urlInfo.qsParams = opts;
             sendInteractiveSearchResult(all_convertibles, message.channel, formatConvertibles,
                 isDMChannel(message.channel), urlInfo, searchString);
@@ -60,7 +60,6 @@ async function doWHATSIN(message, tokens) {
         }
     }
     return theResult;
-
 }
 
 module.exports = {

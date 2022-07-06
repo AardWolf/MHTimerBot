@@ -585,10 +585,11 @@ function scheduleTimer(timer, channels) {
 
 /**
  * Respond to slash commands, menus, and other interactions if the dynamic command allows it
- * 
+ *
  * @param {CommandInteraction} interaction a Discord interaction
  */
 function handleInteraction(interaction) {
+    // TODO: Do the various interactions need to be separated here or let the command do it/not respond to an interaction it doesn't support?
     if (interaction.isCommand()) {
         const dynCommand = interaction.client.commands.get(interaction.commandName);
         if (dynCommand && dynCommand.interactionHandler) {
@@ -608,10 +609,6 @@ function handleInteraction(interaction) {
             Promise.resolve(dynCommand.autocompleteHandler(interaction))
                 .catch((commandErr) => {
                     Logger.error(`Error autocompleting dynamic slash command ${interaction.commandName}: ${commandErr}`);
-                    interaction.reply(`Sorry, ${dynCommand.name} seems broken`)
-                        .catch((replyErr) => {
-                            Logger.error('There was an error saying there was an error!', replyErr);
-                        });
                 });
         }
     }
@@ -946,9 +943,7 @@ function doAnnounce(timer) {
             tc.send(message).catch(err => {
                 Logger.error(`(${timer.name}): Error during announcement on channel "${tc.name}" in "${tc.guild.name}".\nClient status: ${client.status}\n`, err);
                 // Deactivate this channel only if we are connected to Discord. (Status === 'READY')
-                // TODO: actually use the enum instead of a value for the enum (in case it changes):
-                // https://github.com/discordjs/discord.js/blob/de0cacdf3209c4cc33b537ca54cd0969d57da3ab/src/util/Constants.js#L258
-                if (client.status === 0) {
+                if (client.status === Constants.Status.READY) {
                     const index = config.channels.indexOf(tc);
                     Array.prototype.push.apply(config.inactiveChannels, config.channels.splice(index, 1));
                     Logger.warn(`(${timer.name}): deactivated announcement on channel ${tc.name} in ${tc.guild.name} due to send error during send.`);
@@ -1052,7 +1047,6 @@ function sendRemind(user, remind, timer) {
     alter_str += `\nUse \`${settings.botPrefix} help remind\` for additional info.`;
     output.addField('To Update:', alter_str, false);
 
-
     if (remind.fail) {
         output.setDescription(`(There were ${remind.fail} failures before this got through.)`);
         if (remind.fail > 10)
@@ -1069,8 +1063,6 @@ function sendRemind(user, remind, timer) {
         () => remind.fail = (remind.fail || 0) + 1,
     );
 }
-
-
 
 /**
  * Get the help text.
@@ -1124,8 +1116,6 @@ function getHelpMessage(message, tokens) {
     else
         return `I don't know that one, but I do know ${keywords}.`;
 }
-
-
 
 /**
  * Load nickname data from the input path, defaulting to the value of 'nickname_urls_filename'.

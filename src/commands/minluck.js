@@ -1,5 +1,5 @@
 // eslint-disable-next-line no-unused-vars
-const { Message, CommandInteraction } = require('discord.js');
+const { Message, CommandInteraction, MessageActionRow, MessageButton, Constants } = require('discord.js');
 const { SlashCommandBuilder } = require('@discordjs/builders');
 
 const CommandResult = require('../interfaces/command-result');
@@ -93,7 +93,7 @@ async function doMINLUCK(message, tokens) {
  * @param {Message|CommandInteraction} message -- Hook back to the bot client
  * @param {String} mouse -- Search string
  * @param {String|Array} flags -- Power type flags
- * 
+ *
  * @returns {String} -- Minluck result as a string
  */
 function getMinLuck(message, mouse, flags) {
@@ -106,17 +106,16 @@ function getMinLuck(message, mouse, flags) {
     if (!Array.isArray(flags)) {
         flags = [flags];
     }
-    let reply;
+    let reply = '';
     const all_mice = getMice(mouse, message.client.nicknames.get('mice'));
     if (all_mice && all_mice.length) {
         if (all_mice.length > 1)
             reply = 'I found multiple matches, here is the first.\n';
-        // all_mice.splice(1);
-        // all_mice.id is the mhct id, all_mice.value is the text name of the mouse
+        // all_mice.id is the mhct id, all_mice.value is the text name of the mouse.
         const types = flags.map(f => {
             if (f in typeMap)
                 return typeMap[f];
-        });
+        }).filter(type => !!type );
         if ('guildId' in message 
             && message['guildId']
             && message['guildId'] in message.client.settings.guilds
@@ -129,7 +128,6 @@ function getMinLuck(message, mouse, flags) {
         reply = `I did not find ${mouse}`;
     }
     return reply;
-
 }
 
 /**
@@ -138,44 +136,67 @@ function getMinLuck(message, mouse, flags) {
  */
 async function interact(interaction) {
     if (interaction.isCommand()) {
-        await interaction.reply({   content: getMinLuck(interaction, 
-            interaction.options.getString('mouse'), 
-            interaction.options.getString('powertype')),
-        ephemeral: !interaction.options.getBoolean('share') });
+        const filter = f => f.customId === interaction.id && f.user.id === interaction.user.id;
+        const shareButton = new MessageActionRow()
+            .addComponents(
+                new MessageButton()
+                    .setCustomId(interaction.id)
+                    .setLabel('Send to Channel')
+                    .setStyle('PRIMARY'),
+            );
+        const results = getMinLuck(interaction, interaction.options.getString('mouse'), interaction.options.getString('powertype'));
+        const collector = interaction.channel.createMessageComponentCollector({ filter, time: 5 * 60 * 1000 });
+        collector.on('collect', async c => {
+            const sharer = interaction.user;
+            //await c.update({ content: 'Shared', components: [] });
+            // await c.deferUpdate(); // can't defer+update
+            await c.message.channel.send( { content: `<@${sharer.id}> used \`/minluck ${interaction.options.getString('mouse')}\`:\n${results}` });
+            await c.update({ content: 'Shared', ephemeral: false, components: [] });
+            // await c.deleteReply();
+            
+            // await c.reply({ content: `${sharer} sent:\n${results}`, fetchReply: false }); // this one works but I don't like it
+        });
+        collector.on('end', async c => {
+            await c.reply({ components: [] });
+        });
+        await interaction.reply({ content: results, ephemeral: true, components: [shareButton] });
     } else {
         Logger.error('Somehow minluck command interaction was called without a command');
     }
 }
 
 /**
- * Reply to an autotype request
+ * Reply to an autotype request. Technically this could be folded into the interact?
  * @param {CommandInteraction} interaction Must be an autocomplete interaction
  */
 async function automice(interaction) {
     if (interaction.isAutocomplete()) {
         const focus = interaction.options.getFocused();
         const all_mice = getMice(focus, interaction.client.nicknames.get('mice'));
-        await interaction.respond(
-            all_mice.map(mouse => ({ name: mouse.value, value: mouse.value })),
-        );
+        if (all_mice) {
+            await interaction.respond(
+                all_mice.map(mouse => ({ name: mouse.value, value: mouse.value })),
+            );
+        }
     }
 }
 
-// Build the slashCommand registration JSON
+// Build the slashCommand registration JSON.
 const slashCommand = new SlashCommandBuilder()
     .setName('minluck')
     .setDescription('Get the minluck values for a mouse')
     .setDMPermission(true)
-    .addStringOption(option => 
+    .addStringOption(option =>
         option.setName('mouse')
             .setDescription('The mouse to look up')
             .setRequired(true)
             .setAutocomplete(true))
-    .addStringOption(option => 
+    .addStringOption(option =>
         option.setName('powertype')
             .setDescription('The specific power type to look up (Default: all)')
             .setRequired(false)
             .addChoices(
+                { name: 'All', value: '*' },
                 { name: 'Arcane', value: 'a' },
                 { name: 'Draconic', value: 'd' },
                 { name: 'Forgotten', value: 'f' },
@@ -185,12 +206,7 @@ const slashCommand = new SlashCommandBuilder()
                 { name: 'Shadow', value: 's' },
                 { name: 'Tactical', value: 't' },
                 { name: 'Rift', value: 'r' },
-                { name: 'All', value: '*' },
-            ))
-    .addBooleanOption(option => 
-        option.setName('share')
-            .setDescription('Let others see the result?'));
-
+            ));
 
 module.exports = {
     name: 'minluck',
@@ -206,4 +222,3 @@ module.exports = {
     initialize: initialize,
     save: save,
 };
-

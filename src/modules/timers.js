@@ -338,8 +338,10 @@ function* nextId() {
     while (true)
         yield (id++).toString();
 }
+
 /** Reference to an instantiated generator */
 const id = nextId();
+
 /**
  * Method to simplify timer identifier assignment
  *
@@ -348,6 +350,7 @@ const id = nextId();
 function getId() {
     return id.next().value;
 }
+
 /**
  * Convert the given input into a Duration object
  * @param {{} | number} value a value from a user/file to be cast to a duration.
@@ -364,6 +367,7 @@ function getAsDuration(value, normalize = false) {
     }
     return (normalize ? dur.shiftTo('days', 'hours', 'minutes', 'seconds', 'milliseconds') : dur);
 }
+
 function _isLuxonObject(value) {
     // It's probably milliseconds, but if not, it needs to be an object.
     if (!value || !isNaN(parseInt(value, 10)) || value !== Object(value))
