@@ -145,19 +145,17 @@ async function interact(interaction) {
                     .setStyle('PRIMARY'),
             );
         const results = getMinLuck(interaction, interaction.options.getString('mouse'), interaction.options.getString('powertype'));
-        const collector = interaction.channel.createMessageComponentCollector({ filter, time: 5 * 60 * 1000 });
+        const collector = interaction.channel.createMessageComponentCollector({ filter, time: 1 * 60 * 1000 });
         collector.on('collect', async c => {
             const sharer = interaction.user;
-            //await c.update({ content: 'Shared', components: [] });
-            // await c.deferUpdate(); // can't defer+update
             await c.message.channel.send( { content: `<@${sharer.id}> used \`/minluck ${interaction.options.getString('mouse')}\`:\n${results}` });
             await c.update({ content: 'Shared', ephemeral: false, components: [] });
-            // await c.deleteReply();
-            
-            // await c.reply({ content: `${sharer} sent:\n${results}`, fetchReply: false }); // this one works but I don't like it
+
+            // await interaction.editReply({ content: results, ephemeral: false, components: [] });
         });
         collector.on('end', async c => {
-            await c.reply({ components: [] });
+            await interaction.editReply({ content: results, components: [] });
+            // await c.reply({ components: [] });
         });
         await interaction.reply({ content: results, ephemeral: true, components: [shareButton] });
     } else {
