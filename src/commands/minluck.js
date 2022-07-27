@@ -151,11 +151,10 @@ async function interact(interaction) {
             await c.message.channel.send( { content: `<@${sharer.id}> used \`/minluck ${interaction.options.getString('mouse')}\`:\n${results}` });
             await c.update({ content: 'Shared', ephemeral: false, components: [] });
 
-            // await interaction.editReply({ content: results, ephemeral: false, components: [] });
+            // await interaction.editReply({ content: results, ephemeral: false, components: [] }); // Does not stop it from being ephemeral
         });
-        collector.on('end', async c => {
+        collector.on('end', async () => {
             await interaction.editReply({ content: results, components: [] });
-            // await c.reply({ components: [] });
         });
         await interaction.reply({ content: results, ephemeral: true, components: [shareButton] });
     } else {
