@@ -19,16 +19,14 @@ Next big push is make things into slash commands.
   -ifind tooth
 * whatsin \<convertible\> - Displays things that MHCT has seen in other things
   -whatsin arduous
-* iam \<hunter id\> - Enters you into the hunter registry
-* whois [in|a] [\<location|title\>] - Looks for potential new friends in the hunter's registry
-  -whois in lagoon
 * minluck \<mouse\> - Displays a mouse's minluck values
   -minluck Ful'mina OR -minluck ful
+* config - Bot and server owner, mostly. Allows for some server-level configurations such as who can run that command
 
 
 ## TO-DO
 
-* Slash commands
+* Slash commands -- doing!
 
 ## To Use In Your Own Server
 
@@ -40,6 +38,6 @@ Make a bot account. Google that if you don't know how. In the `data/settings.jso
 * timedAnnouncementsChannel - (optional) the name of the channel to announce timers in (default: timers)
 * botPrefix - (optional) the prefix for the bot's commands (default: -mh)
 
-Current requirement is for discord.js v13 and node.js v16.6
+Current requirement is for node.js v16.15
 
 Fork this repo to your hosting server, edit the config files to put in your values (including your ID as owner), and run `node src/MHTimer.js`.
