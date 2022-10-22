@@ -168,7 +168,7 @@ async function interactionDisplayPage(interaction, pages, current_page) {
                     await c.update({ content: 'Shared', ephemeral: false, components: [] })
                         .catch((error) => Logger.error(error));
                 } else {
-                    await c.followUp( { content: 'Sorry, share is turned off right now', ephemeral: true } );
+                    await c.reply( { content: 'Sorry, share is turned off right now', ephemeral: true } );
                 }
             }
             else if (c.customId === `fmmore_${interaction.id}_${current_page}`) {
