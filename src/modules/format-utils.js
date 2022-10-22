@@ -351,7 +351,7 @@ function splitMessageRegex(text, {
 } = {}) {
     if (text.length <= maxLength) return [text];
     const parts = [];
-    let curPart = prepend;
+    let curPart = ''; // was prepend but chunk 0 should not be prepended for us
     let chunkStartIndex = 0;
 
     let prevDelim = '';
@@ -386,8 +386,8 @@ function splitMessageRegex(text, {
     for (const match of text.matchAll(regex)) {
         addChunk(match.index, match[0]);
     }
-    addChunk(text.length - 1, '');
-    parts.push(curPart + append);
+    addChunk(text.length, ''); // not sure why this was using text.length - 1
+    parts.push(curPart); // we do not blindly add the append to the last chunk
     return parts;
 }
 

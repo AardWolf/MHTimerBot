@@ -120,20 +120,6 @@ async function autotype(interaction) {
  */
 async function interact(interaction) {
     if (interaction.isCommand()) {
-        const filter = f => (f.customId === `fmshare_${interaction.id}` || f.customId === `fmmore_${interaction.id}`) && f.user.id === interaction.user.id;
-        const moreButton = new MessageButton()
-            .setCustomId(`fmmore_${interaction.id}`)
-            .setLabel('More Results')
-            .setStyle('PRIMARY');
-
-        const actions = new MessageActionRow()
-            .addComponents(
-                new MessageButton()
-                    .setCustomId(`fmshare_${interaction.id}`)
-                    .setLabel('Send to Channel')
-                    .setStyle('PRIMARY'),
-            );
-        let more_actions = '';
         // const isDM = isDMChannel(interaction.channel);
         let mouse = {};
         const all_mice = getMice(interaction.options.get('mouse').value);
@@ -143,45 +129,72 @@ async function interact(interaction) {
             results = await formatMice(true, mouse, { timefilter: interaction.options.getString('filter') || 'all_time' });
         }
         // Here we need to split the results into chunks. The button goes on the last chunk?
-        const result_pages = splitMessageRegex(results, { maxLength: 2000 - 8, prepend: '```', append: '```' });
-        let result_page = 0;
-        if (result_pages.length > result_page + 1) {
-            more_actions = actions.addComponents(moreButton);
-            Logger.log(`FIND: Page ${result_page} of ${result_pages.length}`);
-        } else {
-            more_actions = actions;
-        }
-        Logger.log(`Find-mouse: We have ${result_pages.length} pages of results`);
-        await interaction.reply({ content: result_pages[result_page], ephemeral: true, components: [more_actions] });
-        const collector = interaction.channel.createMessageComponentCollector({ filter, time: 1 * 60 * 1000 });
-        collector.on('collect', async c => {
-            if (c.customId === `fmshare_${interaction.id}`) {
-                const sharer = interaction.user;
-                // Here we use only the first chunk of results for sharing if it's not a DM
-                await c.message.channel.send( { content: `<@${sharer.id}> used \`/find-mouse ${interaction.options.getString('mouse')}\`:\n${result_pages[result_page]}` });
-                await c.update({ content: 'Shared', ephemeral: false, components: [] })
-                    .catch((error) => Logger.error(error));
-            }
-            else if (c.customId === `fmmore_${interaction.id}`) {
-                // Here we use only the first chunk of results for sharing if it's not a DM
-                result_page++;
-                Logger.log(`Find-mouse: Sending next page of results, ${result_page}`);
-                if (result_pages.length <= result_page) {
-                    more_actions = actions;
-                }
-                // We might need a new collector?
-                await c.message.channel.send({ content: result_pages[result_page], ephemeral: true, components: [more_actions] });
-            }
-
-            // await interaction.editReply({ content: results, ephemeral: false, components: [] }); // Does not stop it from being ephemeral
-        });
-        collector.on('end', async () => {
-            await interaction.editReply({ content: results, components: [] });
-        });
+        const result_pages = splitMessageRegex(results, { maxLength: 1800, prepend: '```', append: '```' });
+        await interactionDisplayPage(interaction, result_pages, 0);
     } else {
         Logger.error('Somehow find-mouse command interaction was called without a mouse');
     }
 }
+
+async function interactionDisplayPage(interaction, pages, current_page) {
+    if (interaction.id && interaction.isCommand() && pages.length) {
+        current_page = current_page || 0;
+        // Build buttons
+        let buttons = new MessageActionRow();
+        if (pages.length > current_page + 1) {
+            buttons = buttons.addComponents(new MessageButton()
+                .setCustomId(`fmmore_${interaction.id}_${current_page}`)
+                .setLabel('More Results')
+                .setStyle('PRIMARY'));
+            // Logger.log(`FIND: Page ${current_page} of ${pages.length}`);
+        }
+        const share_button = new MessageButton()
+            .setCustomId(`fmshare_${interaction.id}_${current_page}`)
+            .setLabel('Send to Channel')
+            .setStyle('PRIMARY');
+        buttons = buttons.addComponents(share_button);
+        // Set filter
+        const filter = f => (f.customId === `fmshare_${interaction.id}_${current_page}` || f.customId === `fmmore_${interaction.id}_${current_page}`) 
+                            && f.user.id === interaction.user.id;
+        // Set collector
+        const collector = interaction.channel.createMessageComponentCollector({ filter, time: 1 * 60 * 1000 });
+        collector.on('collect', async c => {
+            if (c.customId === `fmshare_${interaction.id}_${current_page}`) {
+                const sharer = interaction.user;
+                // Here we use only the first chunk of results for sharing if it's not a DM
+                const allow_share = false;
+                if (allow_share) {
+                    await c.message.channel.send({ content: `<@${sharer.id}> used \`/find-mouse ${interaction.options.getString('mouse')}\`:\n${pages[current_page]}` });
+                    await c.update({ content: 'Shared', ephemeral: false, components: [] })
+                        .catch((error) => Logger.error(error));
+                } else {
+                    await c.followUp( { content: 'Sorry, share is turned off right now', ephemeral: true } );
+                }
+            }
+            else if (c.customId === `fmmore_${interaction.id}_${current_page}`) {
+                // Here we use only the first chunk of results for sharing if it's not a DM
+                // Logger.log(`Find-mouse: Sending next page of results, ${current_page}`);
+                await interactionDisplayPage(interaction, pages, current_page+1);
+                await c.update({ content: pages[current_page], components: [ new MessageActionRow().addComponents(share_button) ] })
+                    .catch((error) => Logger.error(error));
+            }
+        });
+        collector.on('end', async () => {
+            await interaction.editReply({ content: pages[current_page], components: [] })
+                .catch(e => {
+                    Logger.error(`FIND-MOUSE: ${e}`);
+                });
+        });
+        // Send message
+        if (current_page === 0) {
+            await interaction.reply({ content: pages[current_page], ephemeral: true, components: [buttons] });
+        } else {
+            await interaction.followUp({ content: pages[current_page], ephemeral: true, components: [buttons] });
+        }
+    }
+}
+
+// Build the slashcommand usage and things
 const slashCommand = new SlashCommandBuilder()
     .setName('find-mouse')
     .setDescription('Get the attraction rates for a mouse')
@@ -204,7 +217,7 @@ module.exports = {
     helpFunction: helpFind,
     description: 'Find mice sorted by their attraction rates',
     canDM: true,
-    aliases: [ 'mfind', 'find' ],
+    aliases: ['mfind', 'find'],
     slashCommand: slashCommand,
     autocompleteHandler: autotype,
     interactionHandler: interact,
