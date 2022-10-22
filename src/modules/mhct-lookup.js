@@ -108,6 +108,7 @@ async function sendInteractiveSearchResult(searchResults, channel, dataCallback,
     const sendResponse = async (ctx, text, errMsg) => {
         try {
             for (const content of Util.splitMessage(text, { prepend: '```', append: '```' })) {
+                // splitMessage going away: https://github.com/discordjs/discord.js/issues/7674#issuecomment-1073273262
                 await ctx.send({ content });
             }
         } catch (sendError) {
