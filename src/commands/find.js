@@ -122,15 +122,20 @@ async function interact(interaction) {
     if (interaction.isCommand()) {
         // const isDM = isDMChannel(interaction.channel);
         let mouse = {};
-        const all_mice = getMice(interaction.options.get('mouse').value);
-        let results = 'Somehow you did not search for a mouse';
+        await interaction.deferReply();
+        const search_string = interaction.options.get('mouse').value;
+        const all_mice = getMice(search_string);
+        let results = 'Somehow you did not search for a mouse'; // also happens when no matching mouse
         if (all_mice && all_mice.length) {
             mouse = all_mice[0];
             results = await formatMice(true, mouse, { timefilter: interaction.options.getString('filter') || 'all_time' });
+            // Here we need to split the results into chunks. The button goes on the last chunk?
+            const result_pages = splitMessageRegex(results, { maxLength: 1800, prepend: '```', append: '```' });
+            await interactionDisplayPage(interaction, result_pages, 0);
+        } else {
+            // TODO: Figure out how to see what was provided when it didn't match a mouse...
+            await interaction.editReply({ content: `Your search for '${search_string}' was not a success...`, ephemeral: true });
         }
-        // Here we need to split the results into chunks. The button goes on the last chunk?
-        const result_pages = splitMessageRegex(results, { maxLength: 1800, prepend: '```', append: '```' });
-        await interactionDisplayPage(interaction, result_pages, 0);
     } else {
         Logger.error('Somehow find-mouse command interaction was called without a mouse');
     }
@@ -187,7 +192,7 @@ async function interactionDisplayPage(interaction, pages, current_page) {
         });
         // Send message
         if (current_page === 0) {
-            await interaction.reply({ content: pages[current_page], ephemeral: true, components: [buttons] });
+            await interaction.editReply({ content: pages[current_page], ephemeral: true, components: [buttons] });
         } else {
             await interaction.followUp({ content: pages[current_page], ephemeral: true, components: [buttons] });
         }
