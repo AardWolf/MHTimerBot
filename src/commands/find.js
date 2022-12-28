@@ -167,10 +167,11 @@ async function interactionDisplayPage(interaction, pages, current_page) {
             if (c.customId === `fmshare_${interaction.id}_${current_page}`) {
                 const sharer = interaction.user;
                 // Here we use only the first chunk of results for sharing if it's not a DM
-                const allow_share = false;
+                const allow_share = true;
                 if (allow_share) {
-                    await c.message.channel.send({ content: `<@${sharer.id}> used \`/find-mouse ${interaction.options.getString('mouse')}\`:\n${pages[current_page]}` });
-                    await c.update({ content: 'Shared', ephemeral: false, components: [] })
+                    // TODO: Probably better to calculate X lines of attractions for sharing
+                    await c.message.channel.send({ content: `<@${sharer.id}> used \`/find-mouse ${interaction.options.getString('mouse')}\`:\n${pages[0]}` });
+                    await c.update({ content: 'Shared', ephemeral: true, components: [] })
                         .catch((error) => Logger.error(error));
                 } else {
                     await c.reply( { content: 'Sorry, share is turned off right now', ephemeral: true } );
