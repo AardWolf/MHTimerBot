@@ -166,11 +166,10 @@ async function interactionDisplayPage(interaction, pages, current_page) {
         collector.on('collect', async c => {
             if (c.customId === `fmshare_${interaction.id}_${current_page}`) {
                 const sharer = interaction.user;
-                // Here we use only the first chunk of results for sharing if it's not a DM
                 const allow_share = true;
                 if (allow_share) {
                     // TODO: Probably better to calculate X lines of attractions for sharing
-                    await c.message.channel.send({ content: `<@${sharer.id}> used \`/find-mouse ${interaction.options.getString('mouse')}\`:\n${pages[0]}` });
+                    await c.message.channel.send({ content: `<@${sharer.id}> used \`/find-mouse ${interaction.options.getString('mouse')}\`:\n${pages[current_page]}` });
                     await c.update({ content: 'Shared', ephemeral: true, components: [] })
                         .catch((error) => Logger.error(error));
                 } else {
@@ -181,7 +180,7 @@ async function interactionDisplayPage(interaction, pages, current_page) {
                 // Here we use only the first chunk of results for sharing if it's not a DM
                 // Logger.log(`Find-mouse: Sending next page of results, ${current_page}`);
                 await interactionDisplayPage(interaction, pages, current_page+1);
-                await c.update({ content: pages[current_page], components: [ new MessageActionRow().addComponents(share_button) ] })
+                await c.update({ content: pages[current_page], components: [] })
                     .catch((error) => Logger.error(error));
             }
         });
