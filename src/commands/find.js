@@ -122,7 +122,7 @@ async function interact(interaction) {
     if (interaction.isCommand()) {
         // const isDM = isDMChannel(interaction.channel);
         let mouse = {};
-        await interaction.deferReply();
+        await interaction.deferReply({ ephemeral: true });
         const search_string = interaction.options.get('mouse').value;
         const all_mice = getMice(search_string);
         let results = 'Somehow you did not search for a mouse'; // also happens when no matching mouse
