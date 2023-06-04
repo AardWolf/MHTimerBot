@@ -303,23 +303,22 @@ async function formatConvertibles(isDM, convertible, opts) {
     };
 
     const results = await findThing('convertible', convertible.id, opts);
-    for (convertible of results) {
-        convertible.average_qty = calculateRate(convertible.total, convertible.total_items);
+    for (const item of results) {
+        item.average_qty = calculateRate(item.total, item.total_items);
     }
 
     const converter = results
-        .map(convertible => {
+        .map(item => {
             return {
-                item: convertible.item.substring(0, 30),
-                average_qty: convertible.average_qty,
-                min_max: minMaxFormat(convertible.min_item_quantity, convertible.max_item_quantity),
-                average_when: calculateRate(convertible.times_with_any, 
-                    convertible.total_quantity_when_any),
-                chance: pctFormat(convertible.single_opens, convertible.times_with_any),
-                total: convertible.total,
-                single_opens: convertible.single_opens,
-                gold_value: convertible.item_gold_value 
-                    ? Math.round(convertible.item_gold_value * convertible.average_qty) : 'N/A',
+                item: item.item.substring(0, 30),
+                average_qty: item.average_qty,
+                min_max: minMaxFormat(item.min_item_quantity, item.max_item_quantity),
+                average_when: calculateRate(item.times_with_any, item.total_quantity_when_any),
+                chance: pctFormat(item.single_opens, item.times_with_any),
+                total: item.total,
+                single_opens: item.single_opens,
+                gold_value: item.item_gold_value 
+                    ? intToHuman(item.item_gold_value * item.average_qty) : 'N/A',
             };
         });
     const order = ['item', 'average_qty', 'chance', 'min_max', 'average_when', 'gold_value'];
@@ -378,11 +377,11 @@ async function formatConvertibles(isDM, convertible, opts) {
     const total_seen = converter[0].total;
     const single_seen = converter[0].single_opens;
     const target_url = `<https://www.mhct.win/converter.php?item=${convertible.id}>`;
-    const total_gold_value = results.reduce((a, convertible) => {
-        return a + (convertible.item_gold_value ?? 0) * convertible.average_qty;
+    const total_gold_value = results.reduce((a, item) => {
+        return a + (item.item_gold_value ?? 0) * item.average_qty;
     }, 0);
-    const total_sb_value = results.reduce((a, convertible) => {
-        return a + (convertible.item_sb_value ?? 0) * convertible.average_qty;
+    const total_sb_value = results.reduce((a, item) => {
+        return a + (item.item_sb_value ?? 0) * item.average_qty;
     }, 0);
 
     let reply = `${convertible.value} (convertible) has the following possible contents:\n\`\`\``;
