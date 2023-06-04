@@ -290,49 +290,55 @@ async function formatMice(isDM, mouse, opts) {
  * @returns {Promise<string>} Formatted mouse AR table
  */
 async function formatConvertibles(isDM, convertible, opts) {
-    const results = await findThing('convertible', convertible.id, opts);
-    const target_url = `<https://www.mhct.win/converter.php?item=${convertible.id}>`;
-    const minMax = (a, b) => {
-        if (a && b && !isNaN(a) && !isNaN(b) && a === b)
+    const minMaxFormat = (a, b) => {
+        if (!a || !b || !Number(a) || !Number(b))
+            return 'N/A';
+        else if(a === b)
             return integerComma(a);
-        return (a || 'N/A').concat('-').concat(b || 'N/A');
+        else
+            return `${a}-${b}`;
     };
-    const pctDisplay = (opens, total_items) => {
+    const pctFormat = (opens, total_items) => {
         return Number(calculateRate(opens, total_items*100)).toFixed(2);
     };
+
+    const results = await findThing('convertible', convertible.id, opts);
+    for (convertible of results) {
+        convertible.average_qty = calculateRate(convertible.total, convertible.total_items);
+    }
+
     const converter = results
         .map(convertible => {
             return {
                 item: convertible.item.substring(0, 30),
-                average_qty: calculateRate(convertible.total, convertible.total_items),
-                min_max: minMax(convertible.min_item_quantity, convertible.max_item_quantity),
-                average_when: calculateRate(convertible.times_with_any,
+                average_qty: convertible.average_qty,
+                min_max: minMaxFormat(convertible.min_item_quantity, convertible.max_item_quantity),
+                average_when: calculateRate(convertible.times_with_any, 
                     convertible.total_quantity_when_any),
-                chance: pctDisplay(convertible.single_opens, convertible.times_with_any),
+                chance: pctFormat(convertible.single_opens, convertible.times_with_any),
                 total: convertible.total,
                 single_opens: convertible.single_opens,
+                gold_value: convertible.item_gold_value 
+                    ? Math.round(convertible.item_gold_value * convertible.average_qty) : 'N/A',
             };
         });
-    const order = ['item', 'average_qty', 'chance', 'min_max', 'average_when'];
+    const order = ['item', 'average_qty', 'chance', 'min_max', 'average_when', 'gold_value'];
     const labels = {
         item: 'Item',
         average_qty: 'Per Open',
         min_max: 'Min-Max',
         chance: 'Chance',
         average_when: 'Per Slot',
+        gold_value: 'MP value',
     };
     //Sort the results
-    const numSort = (a, b) => {
-        return Number(a) - Number(b);
-    };
+    const numComparer = (a, b) => Number(a) - Number(b);
     converter.sort(
-        firstBy('average_qty', { cmp: numSort, direction: 'desc' })
-            .thenBy('chance', { cmp: numSort, direction: 'desc' })
+        firstBy('average_qty', { cmp: numComparer, direction: 'desc' })
+            .thenBy('chance', { cmp: numComparer, direction: 'desc' })
             .thenBy('item'),
     );
     converter.splice(isDM ? 100 : 10);
-    const total_seen = converter[0].total;
-    const single_seen = converter[0].single_opens;
     // Column Formatting specification.
     /** @type {Object <string, ColumnFormatOptions>} */
     const columnFormatting = {};
@@ -362,10 +368,31 @@ async function formatConvertibles(isDM, convertible, opts) {
         columnWidth: 7,
         commify: true,
     };
+    columnFormatting['gold_value'] = {
+        alignRight: true,
+        isFixedWidth: true,
+        columnWidth: 7,
+        commify: true,
+    };
+
+    const total_seen = converter[0].total;
+    const single_seen = converter[0].single_opens;
+    const target_url = `<https://www.mhct.win/converter.php?item=${convertible.id}>`;
+    const total_gold_value = results.reduce((a, convertible) => {
+        return a + (convertible.item_gold_value ?? 0) * convertible.average_qty;
+    }, 0);
+    const total_sb_value = results.reduce((a, convertible) => {
+        return a + (convertible.item_sb_value ?? 0) * convertible.average_qty;
+    }, 0);
+
     let reply = `${convertible.value} (convertible) has the following possible contents:\n\`\`\``;
     reply += prettyPrintArrayAsString(converter, columnFormatting, headers, '=');
     reply += '```\n' + `Seen ${intToHuman(total_seen)} times, ${intToHuman(single_seen)} as single opens. `;
+    if (total_gold_value > 0) {
+        reply += `Gold value of tradeable items per open: ${intToHuman(total_gold_value)} (~${total_sb_value.toPrecision(3)} SB). `;
+    }
     reply += `HTML version at: ${target_url}`;
+
     return reply;
 }
 
