@@ -23,17 +23,18 @@ Next big push is make things into slash commands.
   -minluck Ful'mina OR -minluck ful
 * config - Bot and server owner, mostly. Allows for some server-level configurations such as who can run that command
 
-
 ## TO-DO
 
 * Slash commands -- doing!
 
 ## To Use In Your Own Server
 
-Make a bot account. Google that if you don't know how. In the `data/settings.json` file you will need the following entries:
+Make a bot account. Google that if you don't know how. Ensure that the [Message Content intent](https://support-dev.discord.com/hc/en-us/articles/4404772028055) is enabled for the bot.
+
+In the `data/settings.json` file you will need the following entries:
 
 * token - this is your bot token
-* bitly_token - this does link conversion. Not setting this just causes weird output but the bot works fine.
+* bitly_token - (optional) this does link conversion. Not setting this just causes weird output but the bot works fine.
 * linkConversionChannel - (optional) the name of the channel to monitor for links (default: larrys-freebies)
 * timedAnnouncementsChannel - (optional) the name of the channel to announce timers in (default: timers)
 * botPrefix - (optional) the prefix for the bot's commands (default: -mh)
