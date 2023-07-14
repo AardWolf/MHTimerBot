@@ -23,22 +23,34 @@ Next big push is make things into slash commands.
   -minluck Ful'mina OR -minluck ful
 * config - Bot and server owner, mostly. Allows for some server-level configurations such as who can run that command
 
-## TO-DO
+## To use with your own discord server
 
-* Slash commands -- doing!
+Note: If you just want to use existing bot on your own discord server, ask Aardwolf if you can join our bot testing. Otherwise, these instructions are to host your own copy of the bot, so you can help us develop and customize it.
 
-## To Use In Your Own Server
+Note: The slash commands should work, everything else is buggy right now. Please submit your feedback or questions in official MH Discord in the Comm Tools Thread named "Larry Updates".
 
-Make a bot account. Google that if you don't know how. Ensure that the [Message Content intent](https://support-dev.discord.com/hc/en-us/articles/4404772028055) is enabled for the bot.
+1. Log into discord in a browser and create a discord bot account [like this](https://discordpy.readthedocs.io/en/stable/discord.html)
+2. In the [bot account settings](https://discord.com/developers/applications):
+    * Under Bot tab: Ensure that the [Message Content intent](https://support-dev.discord.com/hc/en-us/articles/4404772028055) is enabled.
+    * Under Oath2->Url Generator: Add the following permissions and open the new generated url to invite the bot to your server
+        * View Channels
+        * Send Messages
+        * Send Messages in Threads (if you use threads on your server)
+        * Embed Links
+        * Add Reactions
+        * Read Message History
+        * Use Application Commands
+3. Invide the bot to any private channels from that channel settings
+4. Clone this repo to your server and cd into that new directory
+5. Modify the `data/settings.json` (copy it from the sample file provided there):
+    * token (REQUIRED) - this is your bot token
+    * owner ID (REQUIRED) - this is your discord numerical id
+    * bitly_token - this does link conversion. Not setting this just causes weird output but the bot works fine.
+    * linkConversionChannel - the name of the channel to monitor for links (default: larrys-freebies)
+    * timedAnnouncementsChannel - the name of the channel to announce timers in (default: timers)
+    * botPrefix - the prefix for the bot's commands (default: -mh)
+6. Make sure you have nodejs (minimum v16.15) and npm installed
+7. Run `npm install` inside the repo folder
+8. Run `node src/MHTimer.js` to start the bot or `nohup node src/MHTimers.js >error.log 2>&1 &` to run it in background.
 
-In the `data/settings.json` file you will need the following entries:
 
-* token - this is your bot token
-* bitly_token - (optional) this does link conversion. Not setting this just causes weird output but the bot works fine.
-* linkConversionChannel - (optional) the name of the channel to monitor for links (default: larrys-freebies)
-* timedAnnouncementsChannel - (optional) the name of the channel to announce timers in (default: timers)
-* botPrefix - (optional) the prefix for the bot's commands (default: -mh)
-
-Current requirement is for node.js v16.15
-
-Fork this repo to your hosting server, edit the config files to put in your values (including your ID as owner), and run `node src/MHTimer.js`.
