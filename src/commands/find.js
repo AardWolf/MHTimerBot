@@ -145,6 +145,7 @@ async function interactionDisplayPage(interaction, pages, current_page) {
     if (interaction.id && interaction.isCommand() && pages.length) {
         current_page = current_page || 0;
         // Build buttons
+        /* Removed until discord.js can be updated
         let buttons = new MessageActionRow();
         if (pages.length > current_page + 1) {
             buttons = buttons.addComponents(new MessageButton()
@@ -157,7 +158,8 @@ async function interactionDisplayPage(interaction, pages, current_page) {
             .setCustomId(`fmshare_${interaction.id}_${current_page}`)
             .setLabel('Send to Channel')
             .setStyle('PRIMARY');
-        buttons = buttons.addComponents(share_button);
+        */
+        // buttons = buttons.addComponents(share_button); // removed until discord.js can be upgraded
         // Set filter
         const filter = f => (f.customId === `fmshare_${interaction.id}_${current_page}` || f.customId === `fmmore_${interaction.id}_${current_page}`) 
                             && f.user.id === interaction.user.id;
@@ -192,9 +194,9 @@ async function interactionDisplayPage(interaction, pages, current_page) {
         });
         // Send message
         if (current_page === 0) {
-            await interaction.editReply({ content: pages[current_page], ephemeral: true, components: [buttons] });
+            await interaction.editReply({ content: pages[current_page], ephemeral: true, components: [] });
         } else {
-            await interaction.followUp({ content: pages[current_page], ephemeral: true, components: [buttons] });
+            await interaction.followUp({ content: pages[current_page], ephemeral: true, components: [] });
         }
     }
 }
