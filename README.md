@@ -31,15 +31,15 @@ Note: The slash commands should work, everything else is buggy right now. Please
 
 1. Log into discord in a browser and create a discord bot account [like this](https://discordpy.readthedocs.io/en/stable/discord.html)
 2. In the [bot account settings](https://discord.com/developers/applications):
-    - Under Bot tab: Ensure that the [Message Content intent](https://support-dev.discord.com/hc/en-us/articles/4404772028055) is enabled.
-    - Under Oath2->Url Generator: Add the following permissions and open the new generated url to invite the bot to your server
-        - View Channels
-        - Send Messages
-        - Send Messages in Threads (if you use threads on your server)
-        - Embed Links
-        - Add Reactions
-        - Read Message History
-        - Use Application Commands
+    * Under Bot tab: Ensure that the [Message Content intent](https://support-dev.discord.com/hc/en-us/articles/4404772028055) is enabled.
+    * Under Oath2->Url Generator: Add the following permissions and open the new generated url to invite the bot to your server
+        * View Channels
+        * Send Messages
+        * Send Messages in Threads (if you use threads on your server)
+        * Embed Links
+        * Add Reactions
+        * Read Message History
+        * Use Application Commands
 3. Invide the bot to any private channels from that channel settings
 4. Clone this repo to your server and cd into that new directory
 5. Modify the `data/settings.json` (copy it from the sample file provided there):
