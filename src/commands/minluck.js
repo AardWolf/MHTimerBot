@@ -137,13 +137,14 @@ function getMinLuck(message, mouse, flags) {
 async function interact(interaction) {
     if (interaction.isCommand()) {
         const filter = f => f.customId === interaction.id && f.user.id === interaction.user.id;
+        /* Removed until Discord.js can be upgraded   
         const shareButton = new MessageActionRow()
             .addComponents(
                 new MessageButton()
                     .setCustomId(interaction.id)
                     .setLabel('Send to Channel')
                     .setStyle('PRIMARY'),
-            );
+            ); */
         const results = getMinLuck(interaction, interaction.options.getString('mouse'), interaction.options.getString('powertype'));
         const collector = interaction.channel.createMessageComponentCollector({ filter, time: 1 * 60 * 1000 });
         collector.on('collect', async c => {
@@ -156,7 +157,7 @@ async function interact(interaction) {
         collector.on('end', async () => {
             await interaction.editReply({ content: results, components: [] });
         });
-        await interaction.reply({ content: results, ephemeral: true, components: [shareButton] });
+        await interaction.reply({ content: results, ephemeral: true, components: [] }); // shareButton goes here when discord.js can be upgraded
     } else {
         Logger.error('Somehow minluck command interaction was called without a command');
     }
