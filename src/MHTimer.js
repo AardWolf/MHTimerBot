@@ -253,6 +253,7 @@ function Main() {
                 }
                 return res;
             }, { hgReward: /(http[s]?:\/\/htgb\.co\/)/ }));
+            
             client.on('messageCreate', async message => {
                 if (message.partial) {
                     try {
