@@ -11,7 +11,6 @@ const fs = require('fs');
 const { ChannelType, Client, Collection, TextBasedChannelTypes, Guild, GuildMember, GatewayIntentBits, Message, MessageReaction, EmbedBuilder, Partials, Status, TextChannel, User } = Discord;
 
 // Import our own local classes and functions.
-const { isDMChannel } = require('./modules/channel-utils.js');
 const Timer = require('./modules/timers.js');
 const CommandResult = require('./interfaces/command-result');
 const {
@@ -653,7 +652,7 @@ function parseUserMessage(message) {
                 `\t${dynCommand.usage.replace('\n', '\t\n')}\n\`\`\``;
             message.reply({ content: reply });
         }
-        else if (!dynCommand.canDM && isDMChannel(message.channel)) {
+        else if (!dynCommand.canDM && message.channel.isDMBased()) {
             const reply = `\`${command}\` is not allowed in DMs`;
             message.reply({ content: reply });
         }
@@ -1021,8 +1020,8 @@ function sendRemind(user, remind, timer) {
     const output = new EmbedBuilder({ title: timer.getAnnouncement() });
 
     if (timer.getArea() === 'relic_hunter') {
-        output.addField('Current Location', `She's in **${relic_hunter.location}**`, true);
-        output.addField('Source', relic_hunter.source, true);
+        output.addFields({ name: 'Current Location', value: `She's in **${relic_hunter.location}**`, inline: true });
+        output.addFields({ name: 'Source', value: relic_hunter.source, inline: true });
         output.setTitle(`RH: ${relic_hunter.location}`);
     }
 
@@ -1030,20 +1029,20 @@ function sendRemind(user, remind, timer) {
     if (remind.fail > 10)
         remind.count = 1;
     // For non-perpetual reminders, decrement the counter.
-    output.addField('Reminders Left', (remind.count < 0) ? 'unlimited' : `${--remind.count}`, true);
+    output.addFields({ name: 'Reminders Left', value: (remind.count < 0) ? 'unlimited' : `${--remind.count}`, inline: true });
 
     const advanceAmount = timer.getAdvanceNotice().as('milliseconds');
     // Should this be next user reminder, or next activation of this timer?
-    output.addField('Next Reminder', (advanceAmount
+    output.addFields({ name: 'Next Reminder', value: (advanceAmount
         ? timer.getNext().plus(timer.getRepeatInterval()).minus(advanceAmount)
         : timer.getNext()
-    ).diffNow().toFormat('dd\'d \'hh\'h \'mm\'m\'', { round: true }), true);
+    ).diffNow().toFormat('dd\'d \'hh\'h \'mm\'m\'', { round: true }), inline: true });
 
     // How to add or remove additional counts.
     let alter_str = `Use \`${settings.botPrefix} remind ${remind.area}${remind.sub_area ? ` ${remind.sub_area}` : ''}`;
     alter_str += (!remind.count) ? '` to turn this reminder back on.' : ' stop` to end these sooner.';
     alter_str += `\nUse \`${settings.botPrefix} help remind\` for additional info.`;
-    output.addField('To Update:', alter_str, false);
+    output.addFields({ name: 'To Update:', value: alter_str, inline: false });
 
     if (remind.fail) {
         output.setDescription(`(There were ${remind.fail} failures before this got through.)`);
@@ -1054,7 +1053,7 @@ function sendRemind(user, remind, timer) {
     // The timestamp could be the activation time, not the notification time. If there is
     // advance notice, then the activation time is yet to come (vs. moments ago).
     output.setTimestamp(new Date());
-    output.setFooter('Sent:');
+    output.setFooter({ text: 'Sent:' });
 
     user.send({ embeds: [output] }).then(
         () => remind.fail = 0,

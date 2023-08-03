@@ -2,7 +2,6 @@
 const { Message } = require('discord.js');
 
 const CommandResult = require('../interfaces/command-result');
-const { isDMChannel } = require('../modules/channel-utils');
 const Logger = require('../modules/logger');
 const { initialize, getConvertibles, sendInteractiveSearchResult,
     save, formatConvertibles } = require('../modules/mhct-lookup');
@@ -38,10 +37,10 @@ async function doWHATSIN(message, tokens) {
             // We have multiple options, show the interactive menu.
             urlInfo.qsParams = opts;
             sendInteractiveSearchResult(all_convertibles, message.channel, formatConvertibles,
-                isDMChannel(message.channel), urlInfo, searchString);
+                message.channel.isDMBased(), urlInfo, searchString);
             theResult.replied = true;
             theResult.success = true;
-            theResult.sentDM = isDMChannel(message.channel);
+            theResult.sentDM = message.channel.isDMBased();
         } else {
             reply = `I don't know anything about "${searchString}"`;
         }
@@ -54,7 +53,7 @@ async function doWHATSIN(message, tokens) {
             }
             theResult.replied = true;
             theResult.success = true;
-            theResult.sentDM = isDMChannel(message.channel);
+            theResult.sentDM = message.channel.isDMBased();
         } catch (err) {
             Logger.error('WHATSIN: failed to send reply', err);
             theResult.botError = true;

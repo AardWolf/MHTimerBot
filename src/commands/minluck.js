@@ -2,7 +2,6 @@
 const { Message, CommandInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, SlashCommandBuilder } = require('discord.js');
 
 const CommandResult = require('../interfaces/command-result');
-const { isDMChannel } = require('../modules/channel-utils');
 const Logger = require('../modules/logger');
 const { initialize, getMice, getMinluckString, save } = require('../modules/mhct-lookup');
 
@@ -77,7 +76,7 @@ async function doMINLUCK(message, tokens) {
             await message.channel.send((typeof reply === 'string') ? reply : { embeds: [reply] });
             theResult.replied = true;
             theResult.success = true;
-            theResult.sentDM = isDMChannel(message.channel);
+            theResult.sentDM = message.channel.isDMBased();
         } catch (err) {
             Logger.error('MINLUCK: failed to send reply', err);
             theResult.botError = true;

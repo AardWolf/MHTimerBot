@@ -362,7 +362,7 @@ function nextTimer(timers_list, validTimerData, botPrefix) {
             + `\nTo schedule this reminder: \`${sched_syntax}\``,
         )
         .setTimestamp(nextTimer.getNext().toJSDate())
-        .setFooter('at') // There has to be something in here or there is no footer
+        .setFooter({ text: 'at' }) // There has to be something in here or there is no footer
     );
 }
 

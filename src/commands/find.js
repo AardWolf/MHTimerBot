@@ -2,7 +2,6 @@
 const { Message, CommandInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, SlashCommandBuilder } = require('discord.js');
 
 const CommandResult = require('../interfaces/command-result');
-const { isDMChannel } = require('../modules/channel-utils');
 const Logger = require('../modules/logger');
 const { initialize, extractEventFilter, getMice, formatMice, sendInteractiveSearchResult,
     listFilters, getLoot, formatLoot, save, getFilter } = require('../modules/mhct-lookup');
@@ -42,10 +41,10 @@ async function doFIND(message, userArgs) {
             // We have multiple options, show the interactive menu.
             urlInfo.qsParams = opts;
             sendInteractiveSearchResult(all_mice, message.channel, formatMice,
-                isDMChannel(message.channel), urlInfo, searchString);
+                message.channel.isDMBased(), urlInfo, searchString);
             theResult.replied = true;
             theResult.success = true;
-            theResult.sentDM = isDMChannel(message.channel);
+            theResult.sentDM = message.channel.isDMBased();
         } else {
             const all_loot = getLoot(searchString, message.client.nicknames.get('loot'));
             if (all_loot && all_loot.length) {
@@ -54,10 +53,10 @@ async function doFIND(message, userArgs) {
                 urlInfo.type = 'item';
                 urlInfo.uri = 'https://www.mhct.win/loot.php';
                 sendInteractiveSearchResult(all_loot, message.channel, formatLoot,
-                    isDMChannel(message.channel), urlInfo, searchString);
+                    message.channel.isDMBased(), urlInfo, searchString);
                 theResult.replied = true;
                 theResult.success = true;
-                theResult.sentDM = isDMChannel(message.channel);
+                theResult.sentDM = message.channel.isDMBased();
             } else {
                 reply = `I don't know anything about "${searchString}"`;
             }
@@ -71,7 +70,7 @@ async function doFIND(message, userArgs) {
             }
             theResult.replied = true;
             theResult.success = true;
-            theResult.sentDM = isDMChannel(message.channel);
+            theResult.sentDM = message.channel.isDMBased();
         } catch (err) {
             Logger.error('FIND: failed to send reply', err);
             theResult.botError = true;
@@ -119,7 +118,6 @@ async function autotype(interaction) {
  */
 async function interact(interaction) {
     if (interaction.isChatInputCommand()) {
-        // const isDM = isDMChannel(interaction.channel);
         let mouse = {};
         await interaction.deferReply({ ephemeral: true });
         const search_string = interaction.options.getString('mouse');
