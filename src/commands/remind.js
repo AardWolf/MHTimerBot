@@ -1,9 +1,9 @@
 // eslint-disable-next-line no-unused-vars
-const { Formatters, Message, User, Util } = require('discord.js');
+const { Formatters, Message, User } = require('discord.js');
 
 const CommandResult = require('../interfaces/command-result');
 const { isDMChannel } = require('../modules/channel-utils');
-const { oxfordStringifyValues } = require('../modules/format-utils');
+const { oxfordStringifyValues, splitMessageRegex } = require('../modules/format-utils');
 const Logger = require('../modules/logger');
 const { listRemind, timerAliases, getKnownTimersDetails } = require('../modules/timer-helper');
 
@@ -141,7 +141,7 @@ async function doREMIND(message, tokens) {
  */
 async function sendDM(author, result, text) {
     try {
-        for (const msg of Util.splitMessage(text)) {
+        for (const msg of splitMessageRegex(text)) {
             await author.send(msg);
         }
         result.sentDM = true;

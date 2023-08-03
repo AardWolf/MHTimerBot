@@ -4,7 +4,7 @@ const { Message, Util } = require('discord.js');
 const { DateTime, Duration } = require('luxon');
 const CommandResult = require('../interfaces/command-result');
 const { isDMChannel } = require('../modules/channel-utils');
-const { timeLeft } = require('../modules/format-utils');
+const { timeLeft, splitMessageRegex } = require('../modules/format-utils');
 const Logger = require('../modules/logger');
 const { timerAliases } = require('../modules/timer-helper');
 
@@ -84,7 +84,7 @@ async function doSCHED(message, tokens) {
         try {
             // Note that a lot of this is handled by sendInteractiveSearchResult.
             if (typeof reply === 'string') {
-                for (const msg of Util.splitMessage(reply)) {
+                for (const msg of splitMessageRegex(reply)) {
                     await message.channel.send(msg);
                 }
             } else {

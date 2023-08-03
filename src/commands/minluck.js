@@ -1,6 +1,5 @@
 // eslint-disable-next-line no-unused-vars
-const { Message, CommandInteraction, MessageActionRow, MessageButton, Constants } = require('discord.js');
-const { SlashCommandBuilder } = require('@discordjs/builders');
+const { Message, CommandInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, SlashCommandBuilder } = require('discord.js');
 
 const CommandResult = require('../interfaces/command-result');
 const { isDMChannel } = require('../modules/channel-utils');
@@ -135,16 +134,15 @@ function getMinLuck(message, mouse, flags) {
  * @param {CommandInteraction} interaction -- the thing to respond to
  */
 async function interact(interaction) {
-    if (interaction.isCommand()) {
+    if (interaction.isChatInputCommand()) {
         const filter = f => f.customId === interaction.id && f.user.id === interaction.user.id;
-        /* Removed until Discord.js can be upgraded   
-        const shareButton = new MessageActionRow()
+        const shareButton = new ActionRowBuilder()
             .addComponents(
-                new MessageButton()
+                new ButtonBuilder()
                     .setCustomId(interaction.id)
                     .setLabel('Send to Channel')
-                    .setStyle('PRIMARY'),
-            ); */
+                    .setStyle(ButtonStyle.Primary),
+            ); 
         const results = getMinLuck(interaction, interaction.options.getString('mouse'), interaction.options.getString('powertype'));
         const collector = interaction.channel.createMessageComponentCollector({ filter, time: 1 * 60 * 1000 });
         collector.on('collect', async c => {
@@ -157,7 +155,7 @@ async function interact(interaction) {
         collector.on('end', async () => {
             await interaction.editReply({ content: results, components: [] });
         });
-        await interaction.reply({ content: results, ephemeral: true, components: [] }); // shareButton goes here when discord.js can be upgraded
+        await interaction.reply({ content: results, ephemeral: true, components: [ shareButton ] }); 
     } else {
         Logger.error('Somehow minluck command interaction was called without a command');
     }

@@ -1,8 +1,9 @@
 // eslint-disable-next-line no-unused-vars
-const { Message, Util } = require('discord.js');
+const { ChannelType, Message } = require('discord.js');
 
 const CommandResult = require('../interfaces/command-result');
 const { isDMChannel } = require('../modules/channel-utils');
+const { splitMessageRegex } = require('../modules/format-utils');
 const Logger = require('../modules/logger');
 const security = require('../modules/security');
 const usage = [
@@ -105,7 +106,7 @@ async function doSet(message, tokens) {
             const [channel] = Array.from(message.mentions.channels.values());
             if (!channel)
                 reply = 'I don\'t think you gave me a channel to add';
-            else if (!channel.isText())
+            else if (channel.type !== ChannelType.GuildText)
                 reply = `Didn't add ${channel.toString()} because "${channel.type}" is not a text channel`;
             else if (!('name' in channel))
                 reply = `Didn't add ${channel.toString()} because it has no name`;
@@ -151,7 +152,7 @@ async function doSet(message, tokens) {
     }
     if (reply) {
         try {
-            for (const msg of Util.splitMessage(reply)) {
+            for (const msg of splitMessageRegex(reply)) {
                 await message.channel.send(msg);
             }
             theResult.replied = true;

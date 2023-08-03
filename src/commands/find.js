@@ -1,6 +1,5 @@
 // eslint-disable-next-line no-unused-vars
-const { Message, CommandInteraction, MessageActionRow, MessageButton, Constants, Util } = require('discord.js');
-const { SlashCommandBuilder } = require('@discordjs/builders');
+const { Message, CommandInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, SlashCommandBuilder } = require('discord.js');
 
 const CommandResult = require('../interfaces/command-result');
 const { isDMChannel } = require('../modules/channel-utils');
@@ -67,7 +66,7 @@ async function doFIND(message, userArgs) {
     if (reply) {
         try {
             // Note that a lot of this is handled by sendInteractiveSearchResult.
-            for (const msg of Util.splitMessage(reply, { prepend: '```\n', append: '\n```' })) {
+            for (const msg of splitMessageRegex(reply, { prepend: '```\n', append: '\n```' })) {
                 await message.channel.send(msg);
             }
             theResult.replied = true;
@@ -119,11 +118,11 @@ async function autotype(interaction) {
  * @param {CommandInteraction} interaction -- the thing to respond to
  */
 async function interact(interaction) {
-    if (interaction.isCommand()) {
+    if (interaction.isChatInputCommand()) {
         // const isDM = isDMChannel(interaction.channel);
         let mouse = {};
         await interaction.deferReply({ ephemeral: true });
-        const search_string = interaction.options.get('mouse').value;
+        const search_string = interaction.options.getString('mouse');
         const all_mice = getMice(search_string);
         let results = 'Somehow you did not search for a mouse'; // also happens when no matching mouse
         if (all_mice && all_mice.length) {
@@ -142,24 +141,22 @@ async function interact(interaction) {
 }
 
 async function interactionDisplayPage(interaction, pages, current_page) {
-    if (interaction.id && interaction.isCommand() && pages.length) {
+    if (interaction.id && interaction.isChatInputCommand() && pages.length) {
         current_page = current_page || 0;
         // Build buttons
-        /* Removed until discord.js can be updated
-        let buttons = new MessageActionRow();
+        let buttons = new ActionRowBuilder();
         if (pages.length > current_page + 1) {
-            buttons = buttons.addComponents(new MessageButton()
+            buttons = buttons.addComponents(new ButtonBuilder()
                 .setCustomId(`fmmore_${interaction.id}_${current_page}`)
                 .setLabel('More Results')
-                .setStyle('PRIMARY'));
+                .setStyle(ButtonStyle.Primary));
             // Logger.log(`FIND: Page ${current_page} of ${pages.length}`);
         }
-        const share_button = new MessageButton()
+        const share_button = new ButtonBuilder()
             .setCustomId(`fmshare_${interaction.id}_${current_page}`)
             .setLabel('Send to Channel')
-            .setStyle('PRIMARY');
-        */
-        // buttons = buttons.addComponents(share_button); // removed until discord.js can be upgraded
+            .setStyle(ButtonStyle.Primary);
+        buttons = buttons.addComponents(share_button); 
         // Set filter
         const filter = f => (f.customId === `fmshare_${interaction.id}_${current_page}` || f.customId === `fmmore_${interaction.id}_${current_page}`) 
                             && f.user.id === interaction.user.id;
@@ -172,7 +169,7 @@ async function interactionDisplayPage(interaction, pages, current_page) {
                 if (allow_share) {
                     // TODO: Probably better to calculate X lines of attractions for sharing
                     await c.message.channel.send({ content: `<@${sharer.id}> used \`/find-mouse ${interaction.options.getString('mouse')}\`:\n${pages[current_page]}` });
-                    await c.update({ content: 'Shared', ephemeral: true, components: [] })
+                    await c.update({ content: 'Shared', ephemeral: true, components: [ buttons ] })
                         .catch((error) => Logger.error(error));
                 } else {
                     await c.reply( { content: 'Sorry, share is turned off right now', ephemeral: true } );
@@ -182,7 +179,7 @@ async function interactionDisplayPage(interaction, pages, current_page) {
                 // Here we use only the first chunk of results for sharing if it's not a DM
                 // Logger.log(`Find-mouse: Sending next page of results, ${current_page}`);
                 await interactionDisplayPage(interaction, pages, current_page+1);
-                await c.update({ content: pages[current_page], components: [] })
+                await c.update({ content: pages[current_page], components: [ buttons ] })
                     .catch((error) => Logger.error(error));
             }
         });
@@ -194,9 +191,9 @@ async function interactionDisplayPage(interaction, pages, current_page) {
         });
         // Send message
         if (current_page === 0) {
-            await interaction.editReply({ content: pages[current_page], ephemeral: true, components: [] });
+            await interaction.editReply({ content: pages[current_page], ephemeral: true, components: [ buttons ] });
         } else {
-            await interaction.followUp({ content: pages[current_page], ephemeral: true, components: [] });
+            await interaction.followUp({ content: pages[current_page], ephemeral: true, components: [ buttons ] });
         }
     }
 }
