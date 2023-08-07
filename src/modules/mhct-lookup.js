@@ -1,12 +1,12 @@
 // eslint-disable-next-line no-unused-vars
-const { Message, MessageEmbed, MessageReaction, Util, TextChannel } = require('discord.js');
+const { Message, EmbedBuilder, MessageReaction, Util, TextChannel } = require('discord.js');
 const { DateTime, Duration } = require('luxon');
 const fetch = require('node-fetch');
 const { firstBy } = require('thenby');
 const csv_parse = require('csv-parse');
 
 const DatabaseFilter = require('../models/dbFilter');
-const { calculateRate, prettyPrintArrayAsString, intToHuman, integerComma } = require('../modules/format-utils');
+const { calculateRate, prettyPrintArrayAsString, intToHuman, integerComma, splitMessageRegex } = require('../modules/format-utils');
 const Logger = require('../modules/logger');
 const { getSearchedEntity } = require('../modules/search-helpers');
 
@@ -72,8 +72,8 @@ async function sendInteractiveSearchResult(searchResults, channel, dataCallback,
     // Associate each search result with a "numeric" emoji.
     searchResults.slice(0, emojis.length);
     const matches = searchResults.map((sr, i) => ({ emojiId: emojis[i].id, match: sr }));
-    // Construct a MessageEmbed with the search result information, unless this is for a PM with a single response.
-    const embed = new MessageEmbed({
+    // Construct a Message Embed with the search result information, unless this is for a PM with a single response.
+    const embed = new EmbedBuilder({
         title: `Search Results for '${searchInput}'`,
         thumbnail: { url: 'https://cdn.discordapp.com/emojis/867110562617360445.png' }, // :clue:
         footer: { text: `For any reaction you select, I'll ${isDM ? 'send' : 'PM'} you that information.` },
@@ -107,8 +107,7 @@ async function sendInteractiveSearchResult(searchResults, channel, dataCallback,
 
     const sendResponse = async (ctx, text, errMsg) => {
         try {
-            for (const content of Util.splitMessage(text, { prepend: '```', append: '```' })) {
-                // splitMessage going away: https://github.com/discordjs/discord.js/issues/7674#issuecomment-1073273262
+            for (const content of splitMessageRegex(text, { prepend: '```', append: '```' })) {
                 await ctx.send({ content });
             }
         } catch (sendError) {

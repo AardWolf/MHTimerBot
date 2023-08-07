@@ -1,6 +1,6 @@
 const test = require('tape');
 const sinon = require('sinon');
-const { Permissions } = require('discord.js');
+const { PermissionsBitField } = require('discord.js');
 
 const { checkPerms } = require('../../src/modules/security');
 const mockMember = require('../helpers/mock-member');
@@ -25,7 +25,7 @@ test('checkPerms', suite => {
     suite.test('given member input (non-owner, non-admin) - returns false', t => {
         t.plan(1);
         const mockMemberStub = mockMember({
-            hasPermissionStub: sinon.stub().withArgs(Permissions.FLAGS.ADMINISTRATOR).returns(false),
+            hasPermissionStub: sinon.stub().withArgs(PermissionsBitField.Flags.Administrator).returns(false),
         });
         t.deepEqual(
             checkPerms(mockMemberStub, 'admin'),
@@ -49,7 +49,7 @@ test('checkPerms', suite => {
     suite.test('given member input (non-owner, admin) - returns true', t => {
         t.plan(1);
         const mockMemberStub = mockMember({
-            hasPermissionStub: sinon.stub().withArgs(Permissions.FLAGS.ADMINISTRATOR).returns(true),
+            hasPermissionStub: sinon.stub().withArgs(PermissionsBitField.Flags.Administrator).returns(true),
         });
         mockMemberStub.client.settings.owner = mockMemberStub.id;
         t.deepEqual(
@@ -62,8 +62,8 @@ test('checkPerms', suite => {
     suite.test('given member input (non-owner, mod) - returns false for admin', t => {
         t.plan(1);
         const mockMemberStub = mockMember();
-        mockMemberStub.permissions.has.withArgs(Permissions.FLAGS.ADMINISTRATOR).returns(false);
-        mockMemberStub.permissions.has.withArgs(Permissions.FLAGS.MANAGE_MESSAGES).returns(true),
+        mockMemberStub.permissions.has.withArgs(PermissionsBitField.Flags.Administrator).returns(false);
+        mockMemberStub.permissions.has.withArgs(PermissionsBitField.Flags.ManageMessages).returns(true),
         t.deepEqual(
             checkPerms(mockMemberStub, 'admin'),
             false,
@@ -74,8 +74,8 @@ test('checkPerms', suite => {
     suite.test('given member input (non-owner, mod) - returns true for mod', t => {
         t.plan(1);
         const mockMemberStub = mockMember();
-        mockMemberStub.permissions.has.withArgs(Permissions.FLAGS.ADMINISTRATOR).returns(false);
-        mockMemberStub.permissions.has.withArgs(Permissions.FLAGS.MANAGE_MESSAGES).returns(true),
+        mockMemberStub.permissions.has.withArgs(PermissionsBitField.Flags.Administrator).returns(false);
+        mockMemberStub.permissions.has.withArgs(PermissionsBitField.Flags.ManageMessages).returns(true),
         t.deepEqual(
             checkPerms(mockMemberStub, 'mod'),
             true,
@@ -86,8 +86,8 @@ test('checkPerms', suite => {
     suite.test('given member input (non-owner, admin) - returns true for mod', t => {
         t.plan(1);
         const mockMemberStub = mockMember();
-        mockMemberStub.permissions.has.withArgs(Permissions.FLAGS.ADMINISTRATOR).returns(true);
-        mockMemberStub.permissions.has.withArgs(Permissions.FLAGS.MANAGE_MESSAGES).returns(false),
+        mockMemberStub.permissions.has.withArgs(PermissionsBitField.Flags.Administrator).returns(true);
+        mockMemberStub.permissions.has.withArgs(PermissionsBitField.Flags.ManageMessages).returns(false),
         t.deepEqual(
             checkPerms(mockMemberStub, 'mod'),
             true,

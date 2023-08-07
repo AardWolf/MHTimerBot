@@ -1,11 +1,11 @@
 // eslint-disable-next-line no-unused-vars
-const { Message, Util } = require('discord.js');
+const { Message } = require('discord.js');
 
 const CommandResult = require('../interfaces/command-result');
-const { isDMChannel } = require('../modules/channel-utils');
 const Logger = require('../modules/logger');
 const { initialize, getConvertibles, sendInteractiveSearchResult,
     save, formatConvertibles } = require('../modules/mhct-lookup');
+const { splitMessageRegex } = require('../modules/format-utils');
 
 const usage = [
     '<convertible> will report stats about what is inside that convertible',
@@ -37,10 +37,10 @@ async function doWHATSIN(message, tokens) {
             // We have multiple options, show the interactive menu.
             urlInfo.qsParams = opts;
             sendInteractiveSearchResult(all_convertibles, message.channel, formatConvertibles,
-                isDMChannel(message.channel), urlInfo, searchString);
+                message.channel.isDMBased(), urlInfo, searchString);
             theResult.replied = true;
             theResult.success = true;
-            theResult.sentDM = isDMChannel(message.channel);
+            theResult.sentDM = message.channel.isDMBased();
         } else {
             reply = `I don't know anything about "${searchString}"`;
         }
@@ -48,12 +48,12 @@ async function doWHATSIN(message, tokens) {
     if (reply) {
         try {
             // Note that a lot of this is handled by sendInteractiveSearchResult
-            for (const msg of Util.splitMessage(reply, { prepend: '```\n', append: '\n```' })) {
+            for (const msg of splitMessageRegex(reply, { prepend: '```\n', append: '\n```' })) {
                 await message.channel.send(msg);
             }
             theResult.replied = true;
             theResult.success = true;
-            theResult.sentDM = isDMChannel(message.channel);
+            theResult.sentDM = message.channel.isDMBased();
         } catch (err) {
             Logger.error('WHATSIN: failed to send reply', err);
             theResult.botError = true;

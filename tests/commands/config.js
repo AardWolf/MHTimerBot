@@ -1,6 +1,6 @@
 const test = require('tape');
 const sinon = require('sinon');
-const { Permissions } = require('discord.js');
+const { PermissionsBitField } = require('discord.js');
 
 // Stub Logger methods to minimize crosstalk.
 const { stubLogger, restoreLogger } = require('../helpers/logging');
@@ -25,8 +25,8 @@ function stubAsAdmin() {
     const messageStub = mockMessage({ clientStub: memberStub.client });
     messageStub.guild = memberStub.guild;
     messageStub.member = memberStub;
-    memberStub.permissions.has.withArgs(Permissions.FLAGS.ADMINISTRATOR).returns(true);
-    memberStub.permissions.has.withArgs(Permissions.FLAGS.MANAGE_MESSAGES).returns(true);
+    memberStub.permissions.has.withArgs(PermissionsBitField.Flags.Administrator).returns(true);
+    memberStub.permissions.has.withArgs(PermissionsBitField.Flags.ManageMessages).returns(true);
     return messageStub;
 }
 
@@ -48,8 +48,8 @@ test('commands - config', suite => {
         const memberStub = mockMember();
         messageStub.guild = memberStub.guild;
         messageStub.client = memberStub.client;
-        memberStub.permissions.has.withArgs(Permissions.FLAGS.ADMINISTRATOR).returns(false);
-        memberStub.permissions.has.withArgs(Permissions.FLAGS.MANAGE_MESSAGES).returns(false);
+        memberStub.permissions.has.withArgs(PermissionsBitField.Flags.Administrator).returns(false);
+        memberStub.permissions.has.withArgs(PermissionsBitField.Flags.ManageMessages).returns(false);
         const result = await CONFIG.execute(messageStub, []);
         t.true(result.replied, 'should reply to random user');
         t.strictEqual(messageStub.channel.send.callCount, 1, 'should call channel.send');
@@ -65,8 +65,8 @@ test('commands - config', suite => {
         const memberStub = mockMember();
         messageStub.guild = memberStub.guild;
         messageStub.client = memberStub.client;
-        memberStub.permissions.has.withArgs(Permissions.FLAGS.ADMINISTRATOR).returns(false);
-        memberStub.permissions.has.withArgs(Permissions.FLAGS.MANAGE_MESSAGES).returns(true);
+        memberStub.permissions.has.withArgs(PermissionsBitField.Flags.Administrator).returns(false);
+        memberStub.permissions.has.withArgs(PermissionsBitField.Flags.ManageMessages).returns(true);
 
         const result = await CONFIG.execute(messageStub, []);
 

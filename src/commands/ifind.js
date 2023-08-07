@@ -1,8 +1,8 @@
 // eslint-disable-next-line no-unused-vars
-const { Message, Util } = require('discord.js');
+const { Message } = require('discord.js');
 
 const CommandResult = require('../interfaces/command-result');
-const { isDMChannel } = require('../modules/channel-utils');
+const { splitMessageRegex } = require('../modules/format-utils');
 const Logger = require('../modules/logger');
 const { extractEventFilter, getLoot, formatLoot,
     sendInteractiveSearchResult, listFilters, getMice, formatMice } = require('../modules/mhct-lookup');
@@ -42,10 +42,10 @@ async function doIFIND(message, userArgs) {
             // We have multiple options, show the interactive menu
             urlInfo.qsParams = opts;
             sendInteractiveSearchResult(all_loot, message.channel, formatLoot,
-                isDMChannel(message.channel), urlInfo, searchString);
+                message.channel.isDMBased(), urlInfo, searchString);
             theResult.replied = true;
             theResult.success = true;
-            theResult.sentDM = isDMChannel(message.channel);
+            theResult.sentDM = message.channel.isDMBased();
         } else {
             const all_mice = getMice(searchString, message.client.nicknames.get('mice'));
             if (all_mice && all_mice.length) {
@@ -54,10 +54,10 @@ async function doIFIND(message, userArgs) {
                 urlInfo.type = 'mouse';
                 urlInfo.uri = 'https://www.mhct.win/attractions.php';
                 sendInteractiveSearchResult(all_mice, message.channel, formatMice,
-                    isDMChannel(message.channel), urlInfo, searchString);
+                    message.channel.isDMBased(), urlInfo, searchString);
                 theResult.replied = true;
                 theResult.success = true;
-                theResult.sentDM = isDMChannel(message.channel);
+                theResult.sentDM = message.channel.isDMBased();
             } else {
                 reply = `I don't know anything about "${searchString}"`;
             }
@@ -66,12 +66,12 @@ async function doIFIND(message, userArgs) {
     if (reply) {
         try {
             // Note that a lot of this is handled by sendInteractiveSearchResult
-            for (const msg of Util.splitMessage(reply, { prepend: '```\n', append: '\n```' })) {
+            for (const msg of splitMessageRegex(reply, { prepend: '```\n', append: '\n```' })) {
                 await message.channel.send(msg);
             }
             theResult.replied = true;
             theResult.success = true;
-            theResult.sentDM = isDMChannel(message.channel);
+            theResult.sentDM = message.channel.isDMBased();
         } catch (err) {
             Logger.error('IFIND: failed to send reply', err);
             theResult.botError = true;

@@ -8,10 +8,9 @@ const fs = require('fs');
 
 // Extract type-hinting definitions for Discord classes.
 // eslint-disable-next-line no-unused-vars
-const { Client, Collection, Constants, Guild, GuildMember, Intents, Message, MessageReaction, MessageEmbed, TextChannel, User } = Discord;
+const { ChannelType, Client, Collection, TextBasedChannelTypes, Guild, GuildMember, GatewayIntentBits, Message, MessageReaction, EmbedBuilder, Partials, Status, TextChannel, User } = Discord;
 
 // Import our own local classes and functions.
-const { isDMChannel } = require('./modules/channel-utils.js');
 const Timer = require('./modules/timers.js');
 const CommandResult = require('./interfaces/command-result');
 const {
@@ -27,7 +26,6 @@ const {
     addMessageReaction,
 } = require('./modules/message-utils');
 const security = require('./modules/security.js');
-const EnumKeys = require('./utils/discord-enum-keys');
 
 // Access external URIs, like @devjacksmith 's tools.
 const fetch = require('node-fetch');
@@ -39,14 +37,15 @@ const { Routes } = require('discord-api-types/v9');
 // Globals
 const client = new Client({
     intents: [
-        Intents.FLAGS.GUILDS,
-        Intents.FLAGS.GUILD_MESSAGES,
-        Intents.FLAGS.GUILD_MESSAGE_REACTIONS,
-        Intents.FLAGS.GUILD_EMOJIS_AND_STICKERS,
-        Intents.FLAGS.DIRECT_MESSAGES,
-        Intents.FLAGS.DIRECT_MESSAGE_REACTIONS,
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.GuildMessageReactions,
+        GatewayIntentBits.GuildEmojisAndStickers,
+        GatewayIntentBits.DirectMessages,
+        GatewayIntentBits.DirectMessageReactions,
+        GatewayIntentBits.MessageContent,
     ],
-    partials: ['MESSAGE', 'CHANNEL', 'REACTION'],
+    partials: [ Partials.Message, Partials.Channel, Partials.Reaction],
 });
 const main_settings_filename = 'data/settings.json',
     timer_settings_filename = 'data/timer_settings.json',
@@ -227,7 +226,7 @@ function Main() {
                 const announcables = client.guilds.cache.reduce((channels, guild) => {
                     const requested = client.settings.guilds[guild.id].timedAnnouncementChannels;
                     const candidates = guild.channels.cache
-                        .filter(c => requested.has(c.name) && EnumKeys(Constants.TextBasedChannelTypes).has(c.type));
+                        .filter(c => requested.has(c.name) && c.isTextBased());
                     if (candidates.size)
                         Array.prototype.push.apply(channels, Array.from(candidates.values()));
                     else if (requested.size) {
@@ -270,10 +269,8 @@ function Main() {
                     return;
 
                 // A DM can only be a user message.
-                if (isDMChannel(message.channel)) {
+                if (message.channel.type === ChannelType.DM) {
                     parseUserMessage(message);
-                    return;
-                } else if (!message.channel.isText()) {
                     return;
                 }
 
@@ -590,17 +587,17 @@ function scheduleTimer(timer, channels) {
  * @param {CommandInteraction} interaction a Discord interaction
  */
 function handleInteraction(interaction) {
-    if (interaction.isCommand()) {
+    if (interaction.isChatInputCommand()) {
         const dynCommand = interaction.client.commands.get(interaction.commandName);
         if (dynCommand && dynCommand.interactionHandler) {
-            Promise.resolve(dynCommand.interactionHandler(interaction))
-                .catch((commandErr) => {
+            Promise.resolve(dynCommand.interactionHandler(interaction));
+            /*  .catch((commandErr) => {
                     Logger.error(`Error executing dynamic slash command ${interaction.commandName}: ${commandErr}`);
                     interaction.reply(`Sorry, ${dynCommand.name} seems broken`)
                         .catch((replyErr) => {
                             Logger.error('There was an error saying there was an error!', replyErr);
                         });
-                });
+                }); */
         }
     } // end command Interaction
     else if (interaction.isAutocomplete()) {
@@ -655,7 +652,7 @@ function parseUserMessage(message) {
                 `\t${dynCommand.usage.replace('\n', '\t\n')}\n\`\`\``;
             message.reply({ content: reply });
         }
-        else if (!dynCommand.canDM && isDMChannel(message.channel)) {
+        else if (!dynCommand.canDM && message.channel.isDMBased()) {
             const reply = `\`${command}\` is not allowed in DMs`;
             message.reply({ content: reply });
         }
@@ -943,7 +940,7 @@ function doAnnounce(timer) {
             tc.send(message).catch(err => {
                 Logger.error(`(${timer.name}): Error during announcement on channel "${tc.name}" in "${tc.guild.name}".\nClient status: ${client.status}\n`, err);
                 // Deactivate this channel only if we are connected to Discord. (Status === 'READY')
-                if (client.status === Constants.Status.READY) {
+                if (client.status === Status.Ready) {
                     const index = config.channels.indexOf(tc);
                     Array.prototype.push.apply(config.inactiveChannels, config.channels.splice(index, 1));
                     Logger.warn(`(${timer.name}): deactivated announcement on channel ${tc.name} in ${tc.guild.name} due to send error during send.`);
@@ -1004,7 +1001,7 @@ function doRemind(timer) {
 
 /**
  * Takes a user object and a reminder "object" and sends
- * the reminder as a MessageEmbed via PM.
+ * the reminder as a Message Embed via PM.
  * MAYBE: Add ReminderInfo class, let Timers ID one, and have timer definitions provide additional information
  *      to improve the appearance of the reminders.
  * @param {User} user The Discord user to be reminded
@@ -1020,11 +1017,11 @@ function sendRemind(user, remind, timer) {
     if (remind.count === 0)
         return;
     // TODO: better timer title info - no markdown formatting in the title.
-    const output = new MessageEmbed({ title: timer.getAnnouncement() });
+    const output = new EmbedBuilder({ title: timer.getAnnouncement() });
 
     if (timer.getArea() === 'relic_hunter') {
-        output.addField('Current Location', `She's in **${relic_hunter.location}**`, true);
-        output.addField('Source', relic_hunter.source, true);
+        output.addFields({ name: 'Current Location', value: `She's in **${relic_hunter.location}**`, inline: true });
+        output.addFields({ name: 'Source', value: relic_hunter.source, inline: true });
         output.setTitle(`RH: ${relic_hunter.location}`);
     }
 
@@ -1032,20 +1029,20 @@ function sendRemind(user, remind, timer) {
     if (remind.fail > 10)
         remind.count = 1;
     // For non-perpetual reminders, decrement the counter.
-    output.addField('Reminders Left', (remind.count < 0) ? 'unlimited' : `${--remind.count}`, true);
+    output.addFields({ name: 'Reminders Left', value: (remind.count < 0) ? 'unlimited' : `${--remind.count}`, inline: true });
 
     const advanceAmount = timer.getAdvanceNotice().as('milliseconds');
     // Should this be next user reminder, or next activation of this timer?
-    output.addField('Next Reminder', (advanceAmount
+    output.addFields({ name: 'Next Reminder', value: (advanceAmount
         ? timer.getNext().plus(timer.getRepeatInterval()).minus(advanceAmount)
         : timer.getNext()
-    ).diffNow().toFormat('dd\'d \'hh\'h \'mm\'m\'', { round: true }), true);
+    ).diffNow().toFormat('dd\'d \'hh\'h \'mm\'m\'', { round: true }), inline: true });
 
     // How to add or remove additional counts.
     let alter_str = `Use \`${settings.botPrefix} remind ${remind.area}${remind.sub_area ? ` ${remind.sub_area}` : ''}`;
     alter_str += (!remind.count) ? '` to turn this reminder back on.' : ' stop` to end these sooner.';
     alter_str += `\nUse \`${settings.botPrefix} help remind\` for additional info.`;
-    output.addField('To Update:', alter_str, false);
+    output.addFields({ name: 'To Update:', value: alter_str, inline: false });
 
     if (remind.fail) {
         output.setDescription(`(There were ${remind.fail} failures before this got through.)`);
@@ -1056,7 +1053,7 @@ function sendRemind(user, remind, timer) {
     // The timestamp could be the activation time, not the notification time. If there is
     // advance notice, then the activation time is yet to come (vs. moments ago).
     output.setTimestamp(new Date());
-    output.setFooter('Sent:');
+    output.setFooter({ text: 'Sent:' });
 
     user.send({ embeds: [output] }).then(
         () => remind.fail = 0,
@@ -1066,7 +1063,7 @@ function sendRemind(user, remind, timer) {
 
 /**
  * Get the help text.
- * TODO: Should this be a MessageEmbed?
+ * TODO: Should this be a EmbedBuilder?
  * TODO: Dynamically generate this information based on timers, etc.
  *
  * @param {Message} message The message that triggered the command

@@ -38,7 +38,7 @@ test('commands - NEXT', suite => {
         t.teardown(() => sinon.reset());
         t.plan(2);
 
-        const messageStub = mockMessage({ channelType: 'GUILD_TEXT' });
+        const messageStub = mockMessage({ channelType: 'GuildText' });
         const result = await NEXT.execute(messageStub, []);
         t.true(result.replied, 'should reply');
         t.true(messageStub.channel.send.calledOnce, 'Should use the channel send');

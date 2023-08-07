@@ -1,9 +1,8 @@
 // eslint-disable-next-line no-unused-vars
-const { Formatters, Message, User, Util } = require('discord.js');
+const { Formatters, Message, User } = require('discord.js');
 
 const CommandResult = require('../interfaces/command-result');
-const { isDMChannel } = require('../modules/channel-utils');
-const { oxfordStringifyValues } = require('../modules/format-utils');
+const { oxfordStringifyValues, splitMessageRegex } = require('../modules/format-utils');
 const Logger = require('../modules/logger');
 const { listRemind, timerAliases, getKnownTimersDetails } = require('../modules/timer-helper');
 
@@ -124,7 +123,7 @@ async function doREMIND(message, tokens) {
 
     // TODO: I don't think this "new user" block will get triggered any more since we added `newReminder` already.
     // Inform a new user of the reminder functionality (i.e. PM only).
-    if (!isDMChannel(message.channel, true) && !message.client.reminders.some(r => r.user === message.author.id))
+    if (!message.channel.isDMBased() && !message.client.reminders.some(r => r.user === message.author.id))
         responses.unshift('Hi there! Reminders are only sent via PM, and I\'m just making sure I can PM you.');
 
     // Send notice of the update via PM.
@@ -141,7 +140,7 @@ async function doREMIND(message, tokens) {
  */
 async function sendDM(author, result, text) {
     try {
-        for (const msg of Util.splitMessage(text)) {
+        for (const msg of splitMessageRegex(text)) {
             await author.send(msg);
         }
         result.sentDM = true;

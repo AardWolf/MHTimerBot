@@ -1,5 +1,5 @@
 const Logger = require('../modules/logger');
-const { MessageEmbed } = require('discord.js');
+const { EmbedBuilder } = require('discord.js');
 const { timeLeft } = require('../modules/format-utils');
 
 /**
@@ -336,11 +336,11 @@ function parseTokenForArea(token, newReminder) {
 }
 
 /**
- * Returns the next occurrence of the desired class of timers as a MessageEmbed.
+ * Returns the next occurrence of the desired class of timers as a Message Embed.
  * @param {Timer[]} timers_list List of known timers
  * @param {ReminderRequest} validTimerData Validated input that is known to match an area and subarea
  * @param {string} botPrefix The prefix for the bot on this guild
- * @returns {MessageEmbed} A rich snippet summary of the next occurrence of the matching timer.
+ * @returns {EmbedBuilder} A rich snippet summary of the next occurrence of the matching timer.
  */
 function nextTimer(timers_list, validTimerData, botPrefix) {
     // Inspect all known timers to determine the one that matches the requested area, and occurs soonest.
@@ -355,14 +355,14 @@ function nextTimer(timers_list, validTimerData, botPrefix) {
                 nextTimer = timer;
 
     const sched_syntax = `${botPrefix} remind ${area}${sub ? ` ${sub}` : ''}`;
-    return (new MessageEmbed()
+    return (new EmbedBuilder()
         .setDescription(nextTimer.getDemand()
             + `\n${timeLeft(nextTimer.getNext())}`
             // Putting here makes it look nicer and fit in portrait mode
             + `\nTo schedule this reminder: \`${sched_syntax}\``,
         )
         .setTimestamp(nextTimer.getNext().toJSDate())
-        .setFooter('at') // There has to be something in here or there is no footer
+        .setFooter({ text: 'at' }) // There has to be something in here or there is no footer
     );
 }
 

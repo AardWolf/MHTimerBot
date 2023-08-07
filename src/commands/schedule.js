@@ -3,8 +3,7 @@ const { Message, Util } = require('discord.js');
 
 const { DateTime, Duration } = require('luxon');
 const CommandResult = require('../interfaces/command-result');
-const { isDMChannel } = require('../modules/channel-utils');
-const { timeLeft } = require('../modules/format-utils');
+const { timeLeft, splitMessageRegex } = require('../modules/format-utils');
 const Logger = require('../modules/logger');
 const { timerAliases } = require('../modules/timer-helper');
 
@@ -41,7 +40,7 @@ async function doSCHED(message, tokens) {
             await message.channel.send('Invalid timespan given - how many hours did you want to look ahead?');
             theResult.replied = true;
             theResult.success = false;
-            theResult.sentDM = isDMChannel(message.channel);
+            theResult.sentDM = message.channel.isDMBased();
         } catch (err) {
             Logger.error('SCHED: failed to send reply', err);
             theResult.botError = true;
@@ -84,7 +83,7 @@ async function doSCHED(message, tokens) {
         try {
             // Note that a lot of this is handled by sendInteractiveSearchResult.
             if (typeof reply === 'string') {
-                for (const msg of Util.splitMessage(reply)) {
+                for (const msg of splitMessageRegex(reply)) {
                     await message.channel.send(msg);
                 }
             } else {
@@ -92,7 +91,7 @@ async function doSCHED(message, tokens) {
             }
             theResult.replied = true;
             theResult.success = true;
-            theResult.sentDM = isDMChannel(message.channel);
+            theResult.sentDM = message.channel.isDMBased();
         } catch (err) {
             Logger.error('SCHED: failed to send reply', err);
             theResult.botError = true;
