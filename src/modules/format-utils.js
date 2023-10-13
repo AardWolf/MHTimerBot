@@ -9,23 +9,23 @@
 function oxfordStringifyValues(container, final = 'and') {
     let printables = [];
     if (typeof container !== 'object')
-        throw new TypeError(`Utils: bad input for 1st argument: Expected object, got ${typeof container}`);
-    else if (Array.isArray(container))
-        printables = container;
+        throw new TypeError(
+            `Utils: bad input for 1st argument: Expected object, got ${typeof container}`,
+        );
+    else if (Array.isArray(container)) printables = container;
     else if (container instanceof Set || container instanceof Map)
         printables = Array.from(container.values());
-    else
-        printables = Array.from(Object.values(container));
+    else printables = Array.from(Object.values(container));
 
     const count = printables.length;
-    if (!count)
-        return '';
-    else if (count === 1)
-        return `${printables[0]}`;
-    else if (count === 2)
-        return `${printables[0]} ${final} ${printables[1]}`;
+    if (!count) return '';
+    else if (count === 1) return `${printables[0]}`;
+    else if (count === 2) return `${printables[0]} ${final} ${printables[1]}`;
 
-    return printables.slice(0, -1).join(', ') + `, ${final} ${printables.slice(-1)}`;
+    return (
+        printables.slice(0, -1).join(', ') +
+        `, ${final} ${printables.slice(-1)}`
+    );
 }
 
 /**
@@ -50,25 +50,52 @@ function oxfordStringifyValues(container, final = 'and') {
  * @param {string} [headerUnderline] a character to use to draw an "underline", separating the printed header row from the rows of the body.
  * @returns {string} an internally-aligned string that will print as a nice table in Discord.
  */
-function prettyPrintArrayAsString(body, columnFormat, headers, headerUnderline) {
+function prettyPrintArrayAsString(
+    body,
+    columnFormat,
+    headers,
+    headerUnderline,
+) {
     // The body should be an array of objects.
     if (!body || !Array.isArray(body) || !Object.keys(body[0]).length)
-        throw new TypeError(`Input body was of type ${typeof body}. Expected an array of objects.`);
+        throw new TypeError(
+            `Input body was of type ${typeof body}. Expected an array of objects.`,
+        );
     // The column formatter should be an object.
     if (!columnFormat || !Object.keys(columnFormat).length)
-        throw new TypeError('Input column formatter was of wrong type (or had no keys).');
+        throw new TypeError(
+            'Input column formatter was of wrong type (or had no keys).',
+        );
     // The headers should be an array of objects with at minimum 'key' and 'label' properties, of which 'key' must have a non-falsy value.
-    if (!headers || !Array.isArray(headers) || !headers.every(col => (col.key && col.label !== undefined)))
-        throw new TypeError('Input headers of incorrect type. Expected array of objects with properties \'key\' and \'label\'.');
+    if (
+        !headers ||
+        !Array.isArray(headers) ||
+        !headers.every((col) => col.key && col.label !== undefined)
+    )
+        throw new TypeError(
+            "Input headers of incorrect type. Expected array of objects with properties 'key' and 'label'.",
+        );
     // All object keys in the headers array must be found in both the body and columnFormat objects.
-    const bodyKeys = body.reduce((acc, row) => { Object.keys(row).forEach(key => acc.add(key)); return acc; }, new Set());
-    if (!headers.every(col => (bodyKeys.has(col.key) && columnFormat[col.key] !== undefined)))
-        throw new TypeError('Input header array specifies non-existent columns.');
+    const bodyKeys = body.reduce((acc, row) => {
+        Object.keys(row).forEach((key) => acc.add(key));
+        return acc;
+    }, new Set());
+    if (
+        !headers.every(
+            (col) =>
+                bodyKeys.has(col.key) && columnFormat[col.key] !== undefined,
+        )
+    )
+        throw new TypeError(
+            'Input header array specifies non-existent columns.',
+        );
 
     // Ensure that the column format prefix/suffix strings are initialized.
     for (const col in columnFormat) {
-        ['prefix', 'suffix'].forEach(key => {
-            columnFormat[col][key] = columnFormat[col][key] || (columnFormat[col][key] === 0 ? '0' : '');
+        ['prefix', 'suffix'].forEach((key) => {
+            columnFormat[col][key] =
+                columnFormat[col][key] ||
+                (columnFormat[col][key] === 0 ? '0' : '');
         });
     }
 
@@ -76,7 +103,10 @@ function prettyPrintArrayAsString(body, columnFormat, headers, headerUnderline) 
     // Initialize with the width of the column's header text.
     for (const col of headers)
         if (!columnFormat[col.key].isFixedWidth)
-            columnFormat[col.key].columnWidth = Math.max(col.label.length, columnFormat[col.key].columnWidth);
+            columnFormat[col.key].columnWidth = Math.max(
+                col.label.length,
+                columnFormat[col.key].columnWidth,
+            );
 
     // Then parse every row in the body. The column width will be set such that any desired prefix or suffix can be included.
     // If a column is specified as fixed width, it is assumed that the width was properly set.
@@ -85,29 +115,37 @@ function prettyPrintArrayAsString(body, columnFormat, headers, headerUnderline) 
             if (!columnFormat[col].isFixedWidth)
                 columnFormat[col].columnWidth = Math.max(
                     columnFormat[col].columnWidth,
-                    row[col].length + columnFormat[col].prefix.length + columnFormat[col].suffix.length,
+                    row[col].length +
+                        columnFormat[col].prefix.length +
+                        columnFormat[col].suffix.length,
                 );
 
     // Stringify the header information. Headers are center-padded if they are not the widest element in the column.
     const output = [
-        headers.reduce((row, col) => {
-            let text = col.label;
-            const diff = columnFormat[col.key].columnWidth - text.length;
-            if (diff < 0)
-                // This was a fixed-width column that needs to be expanded.
-                columnFormat[col.key].columnWidth = text.length;
-            else if (diff > 0)
-                // Use padStart and padEnd to center-align this not-the-widest element.
-                text = text.padStart(Math.floor(diff / 2) + text.length).padEnd(columnFormat[col.key].columnWidth);
+        headers
+            .reduce((row, col) => {
+                let text = col.label;
+                const diff = columnFormat[col.key].columnWidth - text.length;
+                if (diff < 0)
+                    // This was a fixed-width column that needs to be expanded.
+                    columnFormat[col.key].columnWidth = text.length;
+                else if (diff > 0)
+                    // Use padStart and padEnd to center-align this not-the-widest element.
+                    text = text
+                        .padStart(Math.floor(diff / 2) + text.length)
+                        .padEnd(columnFormat[col.key].columnWidth);
 
-            row.push(text);
-            return row;
-        }, []).join(' | '),
+                row.push(text);
+                return row;
+            }, [])
+            .join(' | '),
     ];
 
     // If there is a underline string, add it.
     if (headerUnderline || headerUnderline === 0) {
-        let text = String(headerUnderline).repeat(output[0].length / headerUnderline.length);
+        let text = String(headerUnderline).repeat(
+            output[0].length / headerUnderline.length,
+        );
         text = text.substr(0, output[0].length);
         output.push(text);
     }
@@ -128,15 +166,22 @@ function prettyPrintArrayAsString(body, columnFormat, headers, headerUnderline) 
                 text = parseFloat(text);
                 if (!isNaN(text)) {
                     text = text * 100;
-                    if (options.numDecimals === 0)
-                        text = Math.round(text);
+                    if (options.numDecimals === 0) text = Math.round(text);
                     else if (!isNaN(parseInt(options.numDecimals, 10))) {
-                        const factor = Math.pow(10, Math.abs(parseInt(options.numDecimals, 10)));
+                        const factor = Math.pow(
+                            10,
+                            Math.abs(parseInt(options.numDecimals, 10)),
+                        );
                         if (factor !== Infinity)
                             text = Math.round(text * factor) / factor;
                     }
                     // The float may have any number of decimals, so we should ensure that there is room for the prefix and suffix.
-                    text = String(text).substr(0, options.columnWidth - options.suffix.length - options.prefix.length);
+                    text = String(text).substr(
+                        0,
+                        options.columnWidth -
+                            options.suffix.length -
+                            options.prefix.length,
+                    );
                 }
                 text = String(text);
             }
@@ -147,10 +192,8 @@ function prettyPrintArrayAsString(body, columnFormat, headers, headerUnderline) 
 
             // Add the desired prefix and suffix for this column, and then pad as desired.
             text = `${options.prefix}${text}${options.suffix}`;
-            if (options.alignRight)
-                text = text.padStart(options.columnWidth);
-            else
-                text = text.padEnd(options.columnWidth);
+            if (options.alignRight) text = text.padStart(options.columnWidth);
+            else text = text.padEnd(options.columnWidth);
             rowText.push(text);
         }
         output.push(rowText.join(' | '));
@@ -201,10 +244,14 @@ function timeLeft(in_date) {
 
     // Push any nonzero units into an array, removing "s" if appropriate (since unit is plural).
     const labels = [];
-    units.forEach(unit => {
+    units.forEach((unit) => {
         const val = remaining.get(unit);
         if (val)
-            labels.push(`${val.toLocaleString('en-US', { maximumFractionDigits: 0 })} ${(val !== 1) ? unit : unit.slice(0, -1)}`);
+            labels.push(
+                `${val.toLocaleString('en-US', { maximumFractionDigits: 0 })} ${
+                    val !== 1 ? unit : unit.slice(0, -1)
+                }`,
+            );
     });
     return `in ${oxfordStringifyValues(labels, 'and')}`;
 }
@@ -218,9 +265,10 @@ function forceToString(str) {
     if (typeof str === 'object') {
         try {
             str = str.valueOf();
-        }
-        catch ( error ) {
-            error.message = 'Utils: tried turning argument into a string, unsuccessful' + error.message;
+        } catch (error) {
+            error.message =
+                'Utils: tried turning argument into a string, unsuccessful' +
+                error.message;
             throw error;
         }
     }
@@ -235,8 +283,10 @@ function forceToString(str) {
 function unescapeEntities(str) {
     str = forceToString(str);
     if (typeof str !== 'string')
-        throw new TypeError(`Utils: bad input for string to unescape: Expected string, got ${typeof str}`);
-    return str.replace(/&#(\d+);/gi, function(match, numStr) {
+        throw new TypeError(
+            `Utils: bad input for string to unescape: Expected string, got ${typeof str}`,
+        );
+    return str.replace(/&#(\d+);/gi, function (match, numStr) {
         const num = parseInt(numStr, 10);
         return String.fromCharCode(num);
     });
@@ -250,7 +300,9 @@ function unescapeEntities(str) {
 function isValidURL(str) {
     str = forceToString(str);
     if (typeof str !== 'string')
-        throw new TypeError(`Utils: bad input for string to unescape: Expected string, got ${typeof str}`);
+        throw new TypeError(
+            `Utils: bad input for string to unescape: Expected string, got ${typeof str}`,
+        );
     let url;
     try {
         url = new URL(str);
@@ -269,21 +321,26 @@ function isValidURL(str) {
  * @returns {number}
  */
 function calculateRate(denominator, numerator, precision) {
-    if ((typeof denominator === 'undefined') ||
-        (typeof numerator === 'undefined') ||
-        isNaN(denominator) || isNaN(numerator)) {
+    if (
+        typeof denominator === 'undefined' ||
+        typeof numerator === 'undefined' ||
+        isNaN(denominator) ||
+        isNaN(numerator)
+    ) {
         return NaN;
     }
-    if (!denominator)
-        return NaN;
-    if (!numerator)
-        numerator = 0;
-    if (!precision)
-        precision = 4;
+    if (!denominator) return NaN;
+    if (!numerator) numerator = 0;
+    if (!precision) precision = 4;
     const value = denominator ? Number(numerator / denominator) : 0;
-    const value2 = value.toPrecision(Math.max(Math.ceil(Math.log10(value)) || 1, 4));
-    return Number.parseFloat(value2).toFixed(value2 >= 1 ?
-        Math.max(4 - Math.ceil(Math.log10(value2) || 1,0),0) : precision);
+    const value2 = value.toPrecision(
+        Math.max(Math.ceil(Math.log10(value)) || 1, 4),
+    );
+    return Number.parseFloat(value2).toFixed(
+        value2 >= 1
+            ? Math.max(4 - Math.ceil(Math.log10(value2) || 1, 0), 0)
+            : precision,
+    );
 }
 
 /**
@@ -292,10 +349,8 @@ function calculateRate(denominator, numerator, precision) {
  * @returns {string} A comma-formatted string.
  */
 function integerComma(number) {
-    if (typeof number === 'undefined')
-        return false;
-    if (isNaN(number) || Number(number) < 1)
-        return number.toString();
+    if (typeof number === 'undefined') return false;
+    if (isNaN(number) || Number(number) < 1) return number.toString();
     //TODO: Can split this on '.' and only work on the left side, then re-join it.
     return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
@@ -312,14 +367,10 @@ function intToHuman(number) {
     }
     number = parseInt(number, 10);
     let reply = '';
-    if (number >= 1000000000)
-        reply = Math.round(number / 10000000) / 100 + 'B';
-    else if (number > 1000000)
-        reply =  Math.round(number / 10000) / 100 + 'M';
-    else if (number > 1000)
-        reply = Math.round(number / 10) / 100 + 'K';
-    else
-        reply = number.toString();
+    if (number >= 1000000000) reply = Math.round(number / 10000000) / 100 + 'B';
+    else if (number > 1000000) reply = Math.round(number / 10000) / 100 + 'M';
+    else if (number > 1000) reply = Math.round(number / 10) / 100 + 'K';
+    else reply = number.toString();
     return reply;
 }
 
@@ -343,12 +394,10 @@ function intToHuman(number) {
  * using options.regex, combined such that each part is as long as possible
  * while not exceeding options.maxLength.
  */
-function splitMessageRegex(text, {
-    maxLength = 2000,
-    regex = /\n/g,
-    prepend = '',
-    append = '',
-} = {}) {
+function splitMessageRegex(
+    text,
+    { maxLength = 2000, regex = /\n/g, prepend = '', append = '' } = {},
+) {
     if (text.length <= maxLength) return [text];
     const parts = [];
     let curPart = ''; // was prepend but chunk 0 should not be prepended for us
@@ -366,17 +415,15 @@ function splitMessageRegex(text, {
         }
 
         // The length of the current part if the next chunk were added to it:
-        const lengthWithChunk = (
-            curPart.length + prevDelim.length + nextChunkLen + append.length
-        );
+        const lengthWithChunk =
+            curPart.length + prevDelim.length + nextChunkLen + append.length;
 
         // If adding the next chunk to the current part would cause it to exceed
         // the maximum length, push the current part and reset it for next time:
         if (lengthWithChunk > maxLength) {
             parts.push(curPart + append);
             curPart = prepend + nextChunk;
-        }
-        else {
+        } else {
             curPart += prevDelim + nextChunk;
         }
         prevDelim = nextDelim;
@@ -391,6 +438,46 @@ function splitMessageRegex(text, {
     return parts;
 }
 
+/**
+ * Forms a 95% confidence interval for a given AR/hunts pair
+ * @param {number} nHunts
+ * @param {number} attractionRate
+ * @returns {string} Formatted number
+ */
+function formatInterval(attractionRate, nHunts) {
+    if (isNaN(parseInt(attractionRate, 10))) {
+        return NaN;
+    }
+    attractionRate = parseInt(attractionRate, 10) / 10000;
+    if (isNaN(parseInt(nHunts, 10))) {
+        return NaN;
+    }
+    nHunts = parseInt(nHunts, 10);
+    let reply = '';
+    const meanOffset =
+        1.96 * Math.sqrt(attractionRate * ((1 - attractionRate) / nHunts));
+    const lowBound = (attractionRate * 100 - meanOffset).toFixed(2);
+    const highBound = (attractionRate * 100 + meanOffset).toFixed(2);
+    reply = lowBound + '% - ' + highBound + '%';
+    return reply;
+}
+
+/**
+ * Calculates the mean number of hunts required for one attraction
+ * @param {number} attractionRate
+ * @returns {string} Formatted number
+ */
+function howManyHunts(attractionRate) {
+    if (isNaN(parseInt(attractionRate, 10))) {
+        return NaN;
+    }
+    attractionRate = parseInt(attractionRate, 10) / 10000;
+    const huntsForOne = intToHuman(
+        Math.log10(1 - 0.95) / Math.log10(1 - attractionRate),
+    );
+    return huntsForOne;
+}
+
 exports.oxfordStringifyValues = oxfordStringifyValues;
 exports.prettyPrintArrayAsString = prettyPrintArrayAsString;
 exports.splitString = splitString;
@@ -401,3 +488,5 @@ exports.calculateRate = calculateRate;
 exports.integerComma = integerComma;
 exports.intToHuman = intToHuman;
 exports.splitMessageRegex = splitMessageRegex;
+exports.formatInterval = formatInterval;
+exports.howManyHunts = howManyHunts;
