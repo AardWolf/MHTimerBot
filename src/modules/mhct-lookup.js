@@ -1,12 +1,26 @@
 // eslint-disable-next-line no-unused-vars
-const { Message, EmbedBuilder, MessageReaction, Util, TextChannel } = require('discord.js');
+const {
+    Message,
+    EmbedBuilder,
+    MessageReaction,
+    Util,
+    TextChannel,
+} = require('discord.js');
 const { DateTime, Duration } = require('luxon');
 const fetch = require('node-fetch');
 const { firstBy } = require('thenby');
 const csv_parse = require('csv-parse');
 
 const DatabaseFilter = require('../models/dbFilter');
-const { calculateRate, prettyPrintArrayAsString, intToHuman, integerComma, splitMessageRegex } = require('../modules/format-utils');
+const {
+    calculateRate,
+    prettyPrintArrayAsString,
+    intToHuman,
+    integerComma,
+    splitMessageRegex,
+    formatInterval,
+    howManyHunts,
+} = require('../modules/format-utils');
 const Logger = require('../modules/logger');
 const { getSearchedEntity } = require('../modules/search-helpers');
 
@@ -41,21 +55,31 @@ const emojis = [
     { id: '%F0%9F%94%9F', text: ':keycap_ten:' },
 ];
 
-const powerFlags = ['Arcane', 'Draconic', 'Forgotten', 'Hydro', 'Parental', 'Physical', 'Shadow',
-    'Tactical', 'Law', 'Rift'];
+const powerFlags = [
+    'Arcane',
+    'Draconic',
+    'Forgotten',
+    'Hydro',
+    'Parental',
+    'Physical',
+    'Shadow',
+    'Tactical',
+    'Law',
+    'Rift',
+];
 
 // Default but overwrite with guild-level config
 const powerEmoji = {
-    'arcane': 'Arcane',
-    'draconic': 'Draconic',
-    'forgotten': 'Forgotten',
-    'hydro': 'Hydro',
-    'parental': 'Parental',
-    'physical': 'Physical',
-    'shadow': 'Shadow',
-    'tactical': 'Tactical',
-    'law': 'Law',
-    'rift': 'Rift',
+    arcane: 'Arcane',
+    draconic: 'Draconic',
+    forgotten: 'Forgotten',
+    hydro: 'Hydro',
+    parental: 'Parental',
+    physical: 'Physical',
+    shadow: 'Shadow',
+    tactical: 'Tactical',
+    law: 'Law',
+    rift: 'Rift',
 };
 
 /**
@@ -68,20 +92,39 @@ const powerEmoji = {
  * @param {{qsParams: Object <string, string>, uri: string, type: string}} urlInfo Information about the query that returned the given matches, including querystring parameters, uri, and the type of search.
  * @param {string} searchInput a lower-cased representation of the user's input.
  */
-async function sendInteractiveSearchResult(searchResults, channel, dataCallback, isDM, urlInfo, searchInput) {
+async function sendInteractiveSearchResult(
+    searchResults,
+    channel,
+    dataCallback,
+    isDM,
+    urlInfo,
+    searchInput,
+) {
     // Associate each search result with a "numeric" emoji.
     searchResults.slice(0, emojis.length);
-    const matches = searchResults.map((sr, i) => ({ emojiId: emojis[i].id, match: sr }));
+    const matches = searchResults.map((sr, i) => ({
+        emojiId: emojis[i].id,
+        match: sr,
+    }));
     // Construct a Message Embed with the search result information, unless this is for a PM with a single response.
     const embed = new EmbedBuilder({
         title: `Search Results for '${searchInput}'`,
-        thumbnail: { url: 'https://cdn.discordapp.com/emojis/867110562617360445.png' }, // :clue:
-        footer: { text: `For any reaction you select, I'll ${isDM ? 'send' : 'PM'} you that information.` },
+        thumbnail: {
+            url: 'https://cdn.discordapp.com/emojis/867110562617360445.png',
+        }, // :clue:
+        footer: {
+            text: `For any reaction you select, I'll ${
+                isDM ? 'send' : 'PM'
+            } you that information.`,
+        },
     });
 
     // Pre-compute the url prefix & suffix for each search result. Assumption: single-valued querystring params.
     const urlPrefix = `${urlInfo.uri}?${urlInfo.type}=`;
-    const urlSuffix = Object.keys(urlInfo.qsParams).reduce((acc, key) => `${acc}&${key}=${urlInfo.qsParams[key]}`, '');
+    const urlSuffix = Object.keys(urlInfo.qsParams).reduce(
+        (acc, key) => `${acc}&${key}=${urlInfo.qsParams[key]}`,
+        '',
+    );
     // Generate the description to include the reaction, name, and link to HTML data on @devjacksmith's website.
     const description = matches.reduce((acc, entity, i) => {
         const url = `${urlPrefix}${entity.match.id}${urlSuffix}`;
@@ -90,24 +133,33 @@ async function sendInteractiveSearchResult(searchResults, channel, dataCallback,
     }, `I found ${matches.length === 1 ? 'a single result' : `${matches.length} good results`}:`);
     embed.setDescription(description);
 
-    const searchResponse = (isDM && matches.length === 1)
-        ? `I found a single result for '${searchInput}':`
-        : { embeds: [embed] };
+    const searchResponse =
+        isDM && matches.length === 1
+            ? `I found a single result for '${searchInput}':`
+            : { embeds: [embed] };
 
     const executeCallback = async (asDM, entity) => {
         let result = '';
         try {
             result = await dataCallback(asDM, entity, urlInfo.qsParams);
         } catch (err) {
-            Logger.error(`SendInteractive: error executing data callback for "${entity.value}"`, err);
+            Logger.error(
+                `SendInteractive: error executing data callback for "${entity.value}"`,
+                err,
+            );
             return `Sorry, I had an issue looking up "${entity.value}"`;
         }
-        return result ? result : `Sorry, I didn't find anything when looking up "${entity.value}"`;
+        return result
+            ? result
+            : `Sorry, I didn't find anything when looking up "${entity.value}"`;
     };
 
     const sendResponse = async (ctx, text, errMsg) => {
         try {
-            for (const content of splitMessageRegex(text, { prepend: '```', append: '```' })) {
+            for (const content of splitMessageRegex(text, {
+                prepend: '```',
+                append: '```',
+            })) {
                 await ctx.send({ content });
             }
         } catch (sendError) {
@@ -122,26 +174,47 @@ async function sendInteractiveSearchResult(searchResults, channel, dataCallback,
     const addReactivity = async (msg) => {
         const ids = matches.map((m) => m.emojiId);
         // Add a reaction listener to the message first, to eliminate latency issues in processing reactions.
-        const filter = (reaction, user) => !user.bot && ids.includes(reaction.emoji.identifier);
+        const filter = (reaction, user) =>
+            !user.bot && ids.includes(reaction.emoji.identifier);
         const rc = msg.createReactionCollector({ filter, time: 5 * 60 * 1000 });
         rc.on('collect', async (mr, user) => {
             // Fetch the response and DM it to the user.
-            const entity = matches.find(m => m.emojiId === mr.emoji.identifier)?.match;
+            const entity = matches.find(
+                (m) => m.emojiId === mr.emoji.identifier,
+            )?.match;
             if (!entity) {
-                Logger.warn(`SendInteractive: Collected unexpected reaction "${mr.emoji}" from "${user.tag}"`);
+                Logger.warn(
+                    `SendInteractive: Collected unexpected reaction "${mr.emoji}" from "${user.tag}"`,
+                );
                 return;
             }
             // Get the DB response for the given entity.
             const result = await executeCallback(true, entity);
-            await sendResponse(user, result, `Error while DMing user "${user.tag}"`);
+            await sendResponse(
+                user,
+                result,
+                `Error while DMing user "${user.tag}"`,
+            );
         });
-        rc.on('end', () => rc.message.delete().catch((err) => Logger.error('SendInteractive: Failed to delete interactive message', err)));
+        rc.on('end', () =>
+            rc.message
+                .delete()
+                .catch((err) =>
+                    Logger.error(
+                        'SendInteractive: Failed to delete interactive message',
+                        err,
+                    ),
+                ),
+        );
         // Add the reactions
         for (const m of matches) {
             try {
                 await msg.react(m.emojiId);
             } catch (reactErr) {
-                Logger.error(`SendInteractive: error adding reaction emoji ${m.emojiId}`, reactErr);
+                Logger.error(
+                    `SendInteractive: error adding reaction emoji ${m.emojiId}`,
+                    reactErr,
+                );
             }
         }
     };
@@ -153,7 +226,9 @@ async function sendInteractiveSearchResult(searchResults, channel, dataCallback,
 
     // Always send one result to the channel.
     const query = executeCallback(isDM, matches[0].match);
-    sent.then(async () => sendResponse(channel, await query, 'error responding in channel'));
+    sent.then(async () =>
+        sendResponse(channel, await query, 'error responding in channel'),
+    );
 }
 
 /**
@@ -166,32 +241,57 @@ async function sendInteractiveSearchResult(searchResults, channel, dataCallback,
 async function formatLoot(isDM, loot, opts) {
     const results = await findThing('loot', loot.id, opts);
     const no_stage = ' N/A ';
-    const target_url = `<https://www.mhct.win/loot.php?item=${loot.id}&timefilter=${opts.timefilter ? opts.timefilter : 'all_time'}>`;
-    const drops = results.filter(loot => loot.total_catches > 99)
-        .map(loot => {
+    const target_url = `<https://www.mhct.win/loot.php?item=${
+        loot.id
+    }&timefilter=${opts.timefilter ? opts.timefilter : 'all_time'}>`;
+    const drops = results
+        .filter((loot) => loot.total_catches > 99)
+        .map((loot) => {
             return {
                 location: loot.location.substring(0, 20),
-                stage: loot.stage === null ? no_stage : loot.stage.substring(0, 20),
-                cheese: loot.cheese.substring(0,15),
+                stage:
+                    loot.stage === null
+                        ? no_stage
+                        : loot.stage.substring(0, 20),
+                cheese: loot.cheese.substring(0, 15),
                 total_catches: intToHuman(loot.total_catches),
                 dr: calculateRate(loot.total_catches, loot.total_drops),
                 pct: loot.drop_pct,
+                conf: formatInterval(loot.drop_pct * 100, loot.total_catches),
+                catches_for_one: howManyHunts(loot.drop_pct * 100),
             };
         });
     if (!drops.length)
         return `There were no results with 100 or more catches for ${loot.value}, see more at ${target_url}`;
-    const order = ['location', 'stage', 'cheese', 'pct', 'dr', 'total_catches'];
-    const labels = { location: 'Location', stage: 'Stage', total_catches: 'Catches',
-        dr: '/Catch', cheese: 'Cheese', pct: 'Chance' };
+    const order = [
+        'location',
+        'stage',
+        'cheese',
+        'pct',
+        'dr',
+        'total_catches',
+        'conf',
+        'catches_for_one',
+    ];
+    const labels = {
+        location: 'Location',
+        stage: 'Stage',
+        total_catches: 'Catches',
+        dr: '/Catch',
+        cheese: 'Cheese',
+        pct: 'Chance',
+        conf: 'Chance (95%)',
+        catches_for_one: '~Catches/1',
+    };
     // Sort the results by overall drop rate.
     drops.sort((a, b) => parseFloat(b.dr) - parseFloat(a.dr));
     drops.splice(isDM ? 100 : 10);
-    if (drops.every(row => row.stage === no_stage))
+    if (drops.every((row) => row.stage === no_stage))
         order.splice(order.indexOf('stage'), 1);
     // Column Formatting specification.
     /** @type {Object <string, ColumnFormatOptions>} */
     const columnFormatting = {};
-    const headers = order.map(key => {
+    const headers = order.map((key) => {
         columnFormatting[key] = {
             columnWidth: labels[key].length,
             alignRight: !isNaN(parseInt(drops[0][key], 10)),
@@ -227,40 +327,64 @@ async function formatLoot(isDM, loot, opts) {
 async function formatMice(isDM, mouse, opts) {
     const results = await findThing('mouse', mouse.id, opts);
     if (results === null) {
-        const reply = 'Looks like I\'m having a bit of trouble finding your mouse right now.' ;
+        const reply =
+            "Looks like I'm having a bit of trouble finding your mouse right now.";
         return reply;
     }
     const no_stage = ' N/A ';
-    const target_url = `<https://www.mhct.win/attractions.php?mouse=${mouse.id}&timefilter=${opts.timefilter ? opts.timefilter : 'all_time'}>`;
-    const attracts = results.filter(mouse => mouse.total_hunts > 99)
-        .map(mice => {
+    const target_url = `<https://www.mhct.win/attractions.php?mouse=${
+        mouse.id
+    }&timefilter=${opts.timefilter ? opts.timefilter : 'all_time'}>`;
+    const attracts = results
+        .filter((mouse) => mouse.total_hunts > 99)
+        .map((mice) => {
             return {
                 location: mice.location.substring(0, 20),
-                stage: mice.stage === null ? no_stage : mice.stage.substring(0, 20),
-                cheese: mice.cheese.substring(0,15),
+                stage:
+                    mice.stage === null
+                        ? no_stage
+                        : mice.stage.substring(0, 20),
+                cheese: mice.cheese.substring(0, 15),
                 total_hunts: intToHuman(mice.total_hunts),
                 ar: mice.rate / 100,
+                conf: formatInterval(mice.rate, mice.total_hunts),
+                hunts_for_one: howManyHunts(mice.rate),
             };
         });
     if (!attracts.length)
         return `There were no results with 100 or more hunts for ${mouse.value}, see more at ${target_url}`;
-    const order = ['location', 'stage', 'cheese', 'ar', 'total_hunts'];
-    const labels = { location: 'Location', stage: 'Stage', total_hunts: 'Hunts',
-        ar: '/Hunt', cheese: 'Cheese' };
+    const order = [
+        'location',
+        'stage',
+        'cheese',
+        'ar',
+        'total_hunts',
+        'conf',
+        'hunts_for_one',
+    ];
+    const labels = {
+        location: 'Location',
+        stage: 'Stage',
+        total_hunts: 'Hunts',
+        ar: '/Hunt',
+        cheese: 'Cheese',
+        conf: '/Hunt (95%)',
+        hunts_for_one: '~Hunts/1',
+    };
     // Sort the results.
     attracts.sort((a, b) => parseFloat(b.ar) - parseFloat(a.ar));
     attracts.splice(isDM ? 100 : 10);
-    if (attracts.every(row => row.stage === no_stage))
+    if (attracts.every((row) => row.stage === no_stage))
         order.splice(order.indexOf('stage'), 1);
     // Column Formatting specification.
     /** @type {Object <string, ColumnFormatOptions>} */
     const columnFormatting = {};
-    const headers = order.map(key => {
+    const headers = order.map((key) => {
         columnFormatting[key] = {
             columnWidth: labels[key].length,
             alignRight: !isNaN(parseInt(attracts[0][key], 10)),
         };
-        return { 'key': key, 'label': labels[key] };
+        return { key: key, label: labels[key] };
     });
     // Give the numeric column proper formatting.
     // TODO: toLocaleString - can it replace integerComma too?
@@ -290,15 +414,12 @@ async function formatMice(isDM, mouse, opts) {
  */
 async function formatConvertibles(isDM, convertible, opts) {
     const minMaxFormat = (a, b) => {
-        if (!a || !b || !Number(a) || !Number(b))
-            return 'N/A';
-        else if(a === b)
-            return integerComma(a);
-        else
-            return `${a}-${b}`;
+        if (!a || !b || !Number(a) || !Number(b)) return 'N/A';
+        else if (a === b) return integerComma(a);
+        else return `${a}-${b}`;
     };
     const pctFormat = (opens, total_items) => {
-        return Number(calculateRate(opens, total_items*100)).toFixed(2);
+        return Number(calculateRate(opens, total_items * 100)).toFixed(2);
     };
 
     const results = await findThing('convertible', convertible.id, opts);
@@ -306,21 +427,34 @@ async function formatConvertibles(isDM, convertible, opts) {
         item.average_qty = calculateRate(item.total, item.total_items);
     }
 
-    const converter = results
-        .map(item => {
-            return {
-                item: item.item.substring(0, 30),
-                average_qty: item.average_qty,
-                min_max: minMaxFormat(item.min_item_quantity, item.max_item_quantity),
-                average_when: calculateRate(item.times_with_any, item.total_quantity_when_any),
-                chance: pctFormat(item.single_opens, item.times_with_any),
-                total: item.total,
-                single_opens: item.single_opens,
-                gold_value: item.item_gold_value 
-                    ? intToHuman(item.item_gold_value * item.average_qty) : 'N/A',
-            };
-        });
-    const order = ['item', 'average_qty', 'chance', 'min_max', 'average_when', 'gold_value'];
+    const converter = results.map((item) => {
+        return {
+            item: item.item.substring(0, 30),
+            average_qty: item.average_qty,
+            min_max: minMaxFormat(
+                item.min_item_quantity,
+                item.max_item_quantity,
+            ),
+            average_when: calculateRate(
+                item.times_with_any,
+                item.total_quantity_when_any,
+            ),
+            chance: pctFormat(item.single_opens, item.times_with_any),
+            total: item.total,
+            single_opens: item.single_opens,
+            gold_value: item.item_gold_value
+                ? intToHuman(item.item_gold_value * item.average_qty)
+                : 'N/A',
+        };
+    });
+    const order = [
+        'item',
+        'average_qty',
+        'chance',
+        'min_max',
+        'average_when',
+        'gold_value',
+    ];
     const labels = {
         item: 'Item',
         average_qty: 'Per Open',
@@ -340,12 +474,12 @@ async function formatConvertibles(isDM, convertible, opts) {
     // Column Formatting specification.
     /** @type {Object <string, ColumnFormatOptions>} */
     const columnFormatting = {};
-    const headers = order.map(key => {
+    const headers = order.map((key) => {
         columnFormatting[key] = {
             columnWidth: labels[key].length,
             alignRight: !isNaN(parseInt(converter[0][key], 10)),
         };
-        return { 'key': key, 'label': labels[key] };
+        return { key: key, label: labels[key] };
     });
     // Give the numeric column proper formatting.
     columnFormatting['average_qty'] = {
@@ -384,10 +518,21 @@ async function formatConvertibles(isDM, convertible, opts) {
     }, 0);
 
     let reply = `${convertible.value} (convertible) has the following possible contents:\n\`\`\``;
-    reply += prettyPrintArrayAsString(converter, columnFormatting, headers, '=');
-    reply += '```\n' + `Seen ${intToHuman(total_seen)} times, ${intToHuman(single_seen)} as single opens. `;
+    reply += prettyPrintArrayAsString(
+        converter,
+        columnFormatting,
+        headers,
+        '=',
+    );
+    reply +=
+        '```\n' +
+        `Seen ${intToHuman(total_seen)} times, ${intToHuman(
+            single_seen,
+        )} as single opens. `;
     if (total_gold_value > 0) {
-        reply += `Gold value of tradeable items per open: ${intToHuman(total_gold_value)} (~${total_sb_value.toPrecision(3)} SB). `;
+        reply += `Gold value of tradeable items per open: ${intToHuman(
+            total_gold_value,
+        )} (~${total_sb_value.toPrecision(3)} SB). `;
     }
     reply += `HTML version at: ${target_url}`;
 
@@ -401,8 +546,7 @@ async function formatConvertibles(isDM, convertible, opts) {
  */
 function getFilter(tester) {
     // Process filter-y nicknames.
-    if (!tester || typeof tester !== 'string')
-        return;
+    if (!tester || typeof tester !== 'string') return;
     const asFilterSearchTerm = (token) => {
         if (/^3_?d/i.test(token)) return '3_days';
         if (/^3_?m/i.test(token)) return '3_months';
@@ -412,7 +556,9 @@ function getFilter(tester) {
     };
     // If there is an ongoing event, we will use that instead of the 1-month filter.
     if (tester === 'current') {
-        const currentEvent = filters.find((f) => f.code_name !== '1_month' && f.start_time && !f.end_time);
+        const currentEvent = filters.find(
+            (f) => f.code_name !== '1_month' && f.start_time && !f.end_time,
+        );
         if (currentEvent) return currentEvent;
     }
     const searchTerm = asFilterSearchTerm(tester);
@@ -458,10 +604,9 @@ function extractEventFilter(tokens) {
  * @returns the first ten loots that matched
  */
 function getLoot(tester, nicknames) {
-    if (!tester)
-        return;
+    if (!tester) return;
     tester = `${tester}`;
-    if (nicknames && (tester in nicknames) && nicknames[tester])
+    if (nicknames && tester in nicknames && nicknames[tester])
         tester = nicknames[tester];
     return getSearchedEntity(tester, loot);
 }
@@ -474,10 +619,9 @@ function getLoot(tester, nicknames) {
  * @returns The first ten mice that matched
  */
 function getMice(tester, nicknames) {
-    if (!tester)
-        return;
+    if (!tester) return;
     let ltester = `${tester}`.toLowerCase();
-    if (nicknames && (ltester in nicknames) && nicknames[ltester])
+    if (nicknames && ltester in nicknames && nicknames[ltester])
         ltester = nicknames[ltester].toLowerCase();
     return getSearchedEntity(ltester, mice);
 }
@@ -489,8 +633,7 @@ function getMice(tester, nicknames) {
  * @returns The first ten convertibles that matched
  */
 function getConvertibles(tester) {
-    if (!tester)
-        return;
+    if (!tester) return;
 
     return getSearchedEntity(`${tester}`, convertibles);
 }
@@ -503,8 +646,7 @@ function getConvertibles(tester) {
  * @returns {Promise<any[]|null>} An array of things it found
  */
 async function findThing(type, id, options) {
-    if (!type || !id)
-        return [];
+    if (!type || !id) return [];
 
     // If caching is ever implemented it'd be checked here
     const qsOptions = new URLSearchParams(options);
@@ -513,15 +655,16 @@ async function findThing(type, id, options) {
     const url = 'https://www.mhct.win/searchByItem.php?' + qsOptions.toString();
     return await fetch(url)
         .then((response) => {
-            if(response.ok){
+            if (response.ok) {
                 return response.json();
-            }
-            else {
+            } else {
                 return null;
             }
         })
-        .catch(err => {
-            Logger.log(`findThings: Error getting item ${qsOptions.toString()} - ${err}`);
+        .catch((err) => {
+            Logger.log(
+                `findThings: Error getting item ${qsOptions.toString()} - ${err}`,
+            );
         });
 }
 
@@ -534,22 +677,25 @@ async function getMHCTList(type, list) {
     const now = DateTime.utc();
     if (type && refresh_list[type]) {
         const next_refresh = refresh_list[type].plus(refresh_rate);
-        if (now < next_refresh)
-            return;
+        if (now < next_refresh) return;
         refresh_list[type] = now;
     } else {
-        Logger.log(`getMHCTList: Received a request for ${type} but I don't do that yet`);
+        Logger.log(
+            `getMHCTList: Received a request for ${type} but I don't do that yet`,
+        );
     }
     Logger.log(`MHCT list: Getting a new ${type} list`);
     const url = `https://www.mhct.win/searchByItem.php?item_type=${type}&item_id=all`;
     await fetch(url)
-        .then(response => (response.status === 200) ? response.json() : '')
+        .then((response) => (response.status === 200 ? response.json() : ''))
         .then((body) => {
             if (body) {
                 Logger.log(`MHCT: Got a new ${type} list`);
                 list.splice(0, list.length);
                 Array.prototype.push.apply(list, body);
-                list.forEach(item => item.lowerValue = item.value.toLowerCase());
+                list.forEach(
+                    (item) => (item.lowerValue = item.value.toLowerCase()),
+                );
             }
         });
     Logger.log(`MHCT List: ${type} was ${list.length} long`);
@@ -563,8 +709,7 @@ async function getFilterList() {
     const now = DateTime.utc();
     if (refresh_list.filter) {
         const next_refresh = refresh_list.filter.plus(refresh_rate);
-        if (now < next_refresh)
-            return;
+        if (now < next_refresh) return;
     }
     refresh_list.filter = now;
 
@@ -573,7 +718,9 @@ async function getFilterList() {
     try {
         const response = await fetch(url);
         if (response.status !== 200) {
-            Logger.warn(`Filters: request returned non-200 response code "${response.status}`);
+            Logger.warn(
+                `Filters: request returned non-200 response code "${response.status}`,
+            );
             return;
         }
         const body = await response.json();
@@ -582,10 +729,18 @@ async function getFilterList() {
             return;
         }
         filters.length = 0;
-        Array.prototype.push.apply(filters, body
-            .filter((f) => f && typeof f.code_name === 'string')
-            .map(({ code_name, ...rest }) => new DatabaseFilter(code_name, rest)));
-        Logger.log(`Filters: Replaced filter list with ${filters.length} items`);
+        Array.prototype.push.apply(
+            filters,
+            body
+                .filter((f) => f && typeof f.code_name === 'string')
+                .map(
+                    ({ code_name, ...rest }) =>
+                        new DatabaseFilter(code_name, rest),
+                ),
+        );
+        Logger.log(
+            `Filters: Replaced filter list with ${filters.length} items`,
+        );
     } catch (err) {
         Logger.error('Filters: request returned error:', err);
     }
@@ -599,13 +754,13 @@ async function getMinLuck() {
     const now = DateTime.utc();
     if (refresh_list.minluck) {
         const next_refresh = refresh_list.minluck.plus(refresh_rate);
-        if (now < next_refresh)
-            return;
+        if (now < next_refresh) return;
     }
     refresh_list.minluck = now;
 
     Logger.log('Minluck: Grabbing a fresh copy');
-    const url = 'https://docs.google.com/a/google.com/spreadsheets/d/13hKjNDFTFR3rTkmQzyi3d4ZDOlQJUvTfWPDQemmFW_Y/gviz/tq?tq=select%20*&tqx=out:csv&sheet=Minlucks';
+    const url =
+        'https://docs.google.com/a/google.com/spreadsheets/d/13hKjNDFTFR3rTkmQzyi3d4ZDOlQJUvTfWPDQemmFW_Y/gviz/tq?tq=select%20*&tqx=out:csv&sheet=Minlucks';
     const newMinlucks = {};
     // Set up the parser
     const parser = csv_parse({ delimiter: ',' })
@@ -617,33 +772,50 @@ async function getMinLuck() {
                     continue;
                 }
                 newMinlucks[record[0]] = {
-                    'Arcane': record[4] || '∞',
-                    'Draconic': record[5] || '∞',
-                    'Forgotten': record[6] || '∞',
-                    'Hydro': record[7] || '∞',
-                    'Parental': record[8] || '∞',
-                    'Physical': record[9] || '∞',
-                    'Shadow': record[10] || '∞',
-                    'Tactical': record[11] || '∞',
-                    'Law': record[12] || '∞',
-                    'Rift': record[13] || '∞',
+                    Arcane: record[4] || '∞',
+                    Draconic: record[5] || '∞',
+                    Forgotten: record[6] || '∞',
+                    Hydro: record[7] || '∞',
+                    Parental: record[8] || '∞',
+                    Physical: record[9] || '∞',
+                    Shadow: record[10] || '∞',
+                    Tactical: record[11] || '∞',
+                    Law: record[12] || '∞',
+                    Rift: record[13] || '∞',
                 };
             }
         })
-        .on('error', err => Logger.error(err.message));
+        .on('error', (err) => Logger.error(err.message));
 
-    fetch(url).then(async (response) => {
-        if (response.status !== 200) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-        const body = await response.text();
-        // Pass the response to the CSV parser (after removing the header row).
-        parser.write(body.split(/[\r\n]+/).splice(1).join('\n').toLowerCase());
-        parser.end(() => {
-            Object.assign(minlucks, newMinlucks);
-            Logger.log(`Minlucks: ${Object.keys(minlucks).length} minlucks loaded.`);
-        });
-    }).catch(err => Logger.error('Minlucks: request for minlucks failed with error:', err));
+    fetch(url)
+        .then(async (response) => {
+            if (response.status !== 200) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            const body = await response.text();
+            // Pass the response to the CSV parser (after removing the header row).
+            parser.write(
+                body
+                    .split(/[\r\n]+/)
+                    .splice(1)
+                    .join('\n')
+                    .toLowerCase(),
+            );
+            parser.end(() => {
+                Object.assign(minlucks, newMinlucks);
+                Logger.log(
+                    `Minlucks: ${
+                        Object.keys(minlucks).length
+                    } minlucks loaded.`,
+                );
+            });
+        })
+        .catch((err) =>
+            Logger.error(
+                'Minlucks: request for minlucks failed with error:',
+                err,
+            ),
+        );
 }
 
 /**
@@ -654,19 +826,22 @@ async function getMinLuck() {
  * @param {object} emojiMap Key-value pairs for power type to emoji to use
  * @returns {string} The string to report to the requester
  */
-function getMinluckString(mouse, flags, shorten_flag = false, emojiMap = powerEmoji) {
+function getMinluckString(
+    mouse,
+    flags,
+    shorten_flag = false,
+    emojiMap = powerEmoji,
+) {
     let reply = '';
-    if (!flags || !Array.isArray(flags))
-        flags = powerFlags;
+    if (!flags || !Array.isArray(flags)) flags = powerFlags;
     if (!mouse || !(mouse.toLowerCase() in minlucks)) {
         reply = `Sorry, I don't know ${mouse}'s minluck values`;
-    }
-    else {
+    } else {
         // Minluck for <mouse>: <power> <num>
         const lmouse = mouse.toLowerCase();
         reply = `Minluck for __${mouse}__: `;
         const lucks = {};
-        flags.forEach(flag => {
+        flags.forEach((flag) => {
             if (minlucks[lmouse] && flag in minlucks[lmouse]) {
                 if (minlucks[lmouse][flag] in lucks) {
                     lucks[minlucks[lmouse][flag]].push(flag.toLowerCase());
@@ -675,17 +850,22 @@ function getMinluckString(mouse, flags, shorten_flag = false, emojiMap = powerEm
                 }
             }
         });
-        const powerString = Object.keys(lucks).sort(sortMinluck).map(minluck => {
-            const pString = lucks[minluck].map(power => {
-                if (power in emojiMap) {
-                    return emojiMap[power];
-                } else {
-                    return powerEmoji[power];
-                }
-            }).join(' ');
-            // const pString = lucks[minluck].join(' ');
-            return `**${minluck}**: ${pString}`;
-        }).join(`${shorten_flag ? ' / ': '\n'}`);
+        const powerString = Object.keys(lucks)
+            .sort(sortMinluck)
+            .map((minluck) => {
+                const pString = lucks[minluck]
+                    .map((power) => {
+                        if (power in emojiMap) {
+                            return emojiMap[power];
+                        } else {
+                            return powerEmoji[power];
+                        }
+                    })
+                    .join(' ');
+                // const pString = lucks[minluck].join(' ');
+                return `**${minluck}**: ${pString}`;
+            })
+            .join(`${shorten_flag ? ' / ' : '\n'}`);
         if (powerString) {
             reply += `\n${powerString}`;
         } else {
@@ -723,10 +903,9 @@ function sortMinluck(a, b) {
  * @param {DatabaseFilter} current -- something with code_name as a property
  * @returns {string} the fully grown string.
  */
-function code_name_reduce (accumulator, current) {
+function code_name_reduce(accumulator, current) {
     // Empty entry? Skip it.
-    if (!current?.code_name)
-        return accumulator;
+    if (!current?.code_name) return accumulator;
     // Existing items? Join with comma.
     if (accumulator) {
         return `${accumulator}, \`${current.code_name}\``;
@@ -744,8 +923,7 @@ function listFilters() {
 }
 
 async function initialize() {
-    if (someone_initialized)
-        return true;
+    if (someone_initialized) return true;
     someone_initialized = true;
     await Promise.all([
         getMHCTList('mouse', mice),
@@ -757,11 +935,16 @@ async function initialize() {
     intervals.push(
         setInterval(() => getMHCTList('mouse', mice), refresh_rate),
         setInterval(() => getMHCTList('loot', loot), refresh_rate),
-        setInterval(() => getMHCTList('convertible', convertibles), refresh_rate),
+        setInterval(
+            () => getMHCTList('convertible', convertibles),
+            refresh_rate,
+        ),
         setInterval(() => getFilterList(), refresh_rate),
         setInterval(() => getMinLuck(), refresh_rate),
     );
-    Logger.log(`MHCT Initialized: Loot: ${loot.length}, mice: ${mice.length}, Convertibles: ${convertibles.length}, filters: ${filters.length}`);
+    Logger.log(
+        `MHCT Initialized: Loot: ${loot.length}, mice: ${mice.length}, Convertibles: ${convertibles.length}, filters: ${filters.length}`,
+    );
     return true;
 }
 
@@ -771,8 +954,7 @@ async function initialize() {
  */
 async function save() {
     let timeout;
-    while ((timeout = intervals.pop()))
-        clearInterval(timeout);
+    while ((timeout = intervals.pop())) clearInterval(timeout);
     return true;
 }
 
