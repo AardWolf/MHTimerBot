@@ -473,7 +473,7 @@ function howManyHunts(attractionRate) {
     }
     attractionRate = parseInt(attractionRate, 10) / 10000;
     const huntsForOne = intToHuman(
-        Math.log10(1 - 0.95) / Math.log10(1 - attractionRate),
+        Math.ceil(Math.log10(1 - 0.95) / Math.log10(1 - attractionRate)),
     );
     return huntsForOne;
 }

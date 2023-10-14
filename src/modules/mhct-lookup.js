@@ -257,11 +257,22 @@ async function formatLoot(isDM, loot, opts) {
                 total_catches: intToHuman(loot.total_catches),
                 dr: calculateRate(loot.total_catches, loot.total_drops),
                 pct: loot.drop_pct,
+                conf: formatInterval(loot.drop_pct * 100, loot.total_catches),
+                catches_for_one: howManyHunts(loot.drop_pct * 100),
             };
         });
     if (!drops.length)
         return `There were no results with 100 or more catches for ${loot.value}, see more at ${target_url}`;
-    const order = ['location', 'stage', 'cheese', 'pct', 'dr', 'total_catches'];
+    const order = [
+        'location',
+        'stage',
+        'cheese',
+        'pct',
+        'dr',
+        'total_catches',
+        'conf',
+        'catches_for_one',
+    ];
     const labels = {
         location: 'Location',
         stage: 'Stage',
@@ -269,6 +280,8 @@ async function formatLoot(isDM, loot, opts) {
         dr: '/Catch',
         cheese: 'Cheese',
         pct: 'Chance',
+        conf: 'Chance (95%)',
+        catches_for_one: '~Catches/1',
     };
     // Sort the results by overall drop rate.
     drops.sort((a, b) => parseFloat(b.dr) - parseFloat(a.dr));
