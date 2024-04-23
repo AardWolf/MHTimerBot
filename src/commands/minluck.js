@@ -14,11 +14,10 @@ const usage = [
     '-h[ydro]       : Hydro',
     '-l[aw]         : Law',
     '-p[hysical]    : Physical',
-    '-P[arental]    : Parental (note the capital P)',
     '-s[hadow]      : Shadow',
     '-t[actical]    : Tactical',
     '-r[ift]        : Rift',
-    'Only the first letter after the dash is considered, Parental must be a capital P, Physical must be lowercase p.',
+    'Only the first letter after the dash is considered.',
 ].join('\n\t');
 
 const typeMap = {
@@ -28,7 +27,6 @@ const typeMap = {
     'h': 'Hydro',
     'l': 'Law',
     'p': 'Physical',
-    'P': 'Parental',
     's': 'Shadow',
     't': 'Tactical',
     'r': 'Rift',
@@ -98,7 +96,7 @@ function getMinLuck(message, mouse, flags) {
     if (!mouse || mouse === '') {
         return 'Looks like you forgot what you were searching for';
     }
-    if (!flags || flags === '*' || flags === ['*']) {
+    if (!flags || flags === '*' || flags == ['*']) {
         flags = Object.keys(typeMap);
     }
     if (!Array.isArray(flags)) {
