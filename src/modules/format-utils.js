@@ -73,7 +73,7 @@ function prettyPrintArrayAsString(
         !headers.every((col) => col.key && col.label !== undefined)
     )
         throw new TypeError(
-            "Input headers of incorrect type. Expected array of objects with properties 'key' and 'label'.",
+            'Input headers of incorrect type. Expected array of objects with properties \'key\' and \'label\'.',
         );
     // All object keys in the headers array must be found in both the body and columnFormat objects.
     const bodyKeys = body.reduce((acc, row) => {

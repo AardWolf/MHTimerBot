@@ -1,10 +1,6 @@
 // eslint-disable-next-line no-unused-vars
 const {
-    Message,
     EmbedBuilder,
-    MessageReaction,
-    Util,
-    TextChannel,
 } = require('discord.js');
 const { DateTime, Duration } = require('luxon');
 const fetch = require('node-fetch');
@@ -60,7 +56,6 @@ const powerFlags = [
     'Draconic',
     'Forgotten',
     'Hydro',
-    'Parental',
     'Physical',
     'Shadow',
     'Tactical',
@@ -74,7 +69,6 @@ const powerEmoji = {
     draconic: 'Draconic',
     forgotten: 'Forgotten',
     hydro: 'Hydro',
-    parental: 'Parental',
     physical: 'Physical',
     shadow: 'Shadow',
     tactical: 'Tactical',
@@ -328,7 +322,7 @@ async function formatMice(isDM, mouse, opts) {
     const results = await findThing('mouse', mouse.id, opts);
     if (results === null) {
         const reply =
-            "Looks like I'm having a bit of trouble finding your mouse right now.";
+            'Looks like I\'m having a bit of trouble finding your mouse right now.';
         return reply;
     }
     const no_stage = ' N/A ';
@@ -767,7 +761,7 @@ async function getMinLuck() {
         .on('readable', () => {
             let record;
             while ((record = parser.read())) {
-                if (record.length < 14) {
+                if (record.length < 13) {
                     Logger.log(`Minluck: Short entry found: ${record}`);
                     continue;
                 }
@@ -776,12 +770,11 @@ async function getMinLuck() {
                     Draconic: record[5] || '∞',
                     Forgotten: record[6] || '∞',
                     Hydro: record[7] || '∞',
-                    Parental: record[8] || '∞',
-                    Physical: record[9] || '∞',
-                    Shadow: record[10] || '∞',
-                    Tactical: record[11] || '∞',
-                    Law: record[12] || '∞',
-                    Rift: record[13] || '∞',
+                    Physical: record[8] || '∞',
+                    Shadow: record[9] || '∞',
+                    Tactical: record[10] || '∞',
+                    Law: record[11] || '∞',
+                    Rift: record[12] || '∞',
                 };
             }
         })
